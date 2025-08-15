@@ -24,20 +24,17 @@ const riscoStyles = {
 // ========================================================================================
 // IMPORTANTE: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S.
-// SE SEUS DADOS FOREM DE OUTRA ZONA UTM OU OUTRO DATUM, VOCÊ PRECISA MUDAR A DEFINIÇÃO ABAIXO.
+// Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S (EPSG:31983).
+// SE SEUS DADOS FOREM DE OUTRA ZONA UTM OU OUTRO DATUM (OUTRO EPSG), VOCÊ PRECISA MUDAR A DEFINIÇÃO ABAIXO.
 // Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
 if (typeof proj4 !== 'undefined') {
     // Definimos a projeção para SIRGAS 2000 / UTM Zone 23S (EPSG:31983)
-    // Para outras zonas, mude o 'zone=XX' e possivelmente o 'south'/'north' e o EPSG.
-    // Ex: para Zona 24S: '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'
+    // Ex: para Zona 24S (EPSG:31984): '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
-    // Você pode adicionar mais definições se tiver dados de múltiplas zonas e selecioná-los dinamicamente
-    // Ex: proj4.defs('EPSG:31984', '...');
-    // Ex: proj4.defs('EPSG:XXXX', '...');
-
+    
+    console.log("Definição EPSG:31983 carregada para reprojeção UTM.");
 } else {
-    console.error("Proj4js não carregado. A reprojeção UTM não funcionará.");
+    console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
 }
 // ========================================================================================
 
@@ -251,7 +248,7 @@ function setupFileUpload() {
 
                 // Heurística para detectar UTM: verifica se a primeira coordenada tem valores grandes de Northing e Easting
                 // e se proj4js está disponível para a reprojeção
-                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { // Verifica se a definição UTM existe
+                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined') {
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
                         let sampleCoord = [];
@@ -267,21 +264,25 @@ function setupFileUpload() {
                         sampleCoord = extractFirstCoord(sampleFeature.geometry.coordinates);
                         
                         if (sampleCoord && sampleCoord.length >= 2) {
-                            const easting = sampleCoord[0]; // X
-                            const northing = sampleCoord[1]; // Y
+                            const easting = sampleCoord[0];
+                            const northing = sampleCoord[1];
 
-                            // Heurística para UTM no Brasil (especialmente Zonas 22S, 23S, 24S)
-                            // Easting entre 100.000 e 900.000 (False Easting para não ter negativos)
-                            // Northing grande (acima de ~1 milhão para sul)
+                            // Heurística para UTM no Brasil (para SIRGAS 2000, zonas 22S, 23S, 24S)
+                            // Easting entre 100.000 e 900.000
+                            // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
                                 console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84...`);
-                                // Define o CRS para o Leaflet.Proj com base na definição do proj4.defs()
-                                // ASSUME EPSG:31983. SE SEUS DADOS SÃO DE OUTRA ZONA, VOCÊ DEVE MUDAR O proj4.defs() NO INÍCIO DESTE ARQUIVO.
-                                const utmCrs = new L.Proj.CRS('EPSG:31983'); 
-                                
-                                // O L.Proj.geoJson aceita um GeoJSON e um objeto de opções, onde crs é o CRS de ENTRADA do GeoJSON
-                                featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
-                                console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
+                                // Tenta usar o EPSG 31983 como padrão, mas é CRÍTICO QUE ISSO SEJA A ZONA CORRETA!
+                                // Se você tiver múltiplas zonas UTM, a lógica aqui precisaria ser mais complexa
+                                // (ex: um campo de seleção no upload para cada arquivo).
+                                if (proj4.defs['EPSG:31983']) { // Verifica se a definição UTM para 31983 existe
+                                    const utmCrs = new L.Proj.CRS('EPSG:31983'); 
+                                    featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
+                                    console.log(`Feições de ${file.name} reprojetadas com sucesso usando EPSG:31983.`);
+                                } else {
+                                    console.warn(`Definição para EPSG:31983 não encontrada em proj4.defs(). Carregando UTM sem reprojeção.`, file.name);
+                                    featuresToLoad = geojsonData.features;
+                                }
                             }
                         }
                     }
@@ -298,9 +299,10 @@ function setupFileUpload() {
                 // Adiciona as feições processadas (originais ou reprojetadas) às camadas globais
                 if (file.name.toLowerCase().includes('lotes')) {
                     allLotesGeoJSON.features.push(...featuresToLoad);
-                    featuresToLoad.forEach(f => { // Usa featuresToLoad para popular núcleos
-                        if (f.properties && f.properties.nucleo) {
-                            nucleosSet.add(f.properties.nucleo);
+                    featuresToLoad.forEach(f => { 
+                        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para o nome do núcleo
+                        if (f.properties && f.properties.desc_nucleo) { 
+                            nucleosSet.add(f.properties.desc_nucleo);
                         }
                     });
                 } else if (file.name.toLowerCase().includes('app')) {
@@ -440,14 +442,16 @@ function onEachFeatureLotes(feature, layer) {
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
             // CORREÇÃO AQUI: Verifique o nome da propriedade de custo no seu GeoJSON
-            // Ex: se a propriedade de custo no seu GeoJSON for 'VALOR_CUSTO', mude 'custo_intervencao' para 'VALOR_CUSTO'
+            // Ex: se a propriedade de custo no seu GeoJSON for 'VALOR_CUSTO', você deve mudar a linha abaixo
+            // de 'custo_intervencao' para 'VALOR_CUSTO'. Mantenha o '|| 0' para segurança.
             if (key.toLowerCase().includes('custo') || key.toLowerCase().includes('valor_intervencao')) { // Inclui uma verificação mais ampla
                 if (typeof value === 'number') {
                    value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
             }
             // CORREÇÃO AQUI: Verifique o nome da propriedade de APP no seu GeoJSON
-            // Ex: se a propriedade de APP no seu GeoJSON for 'DENTRO_APP', mude 'app' para 'DENTRO_APP'
+            // Ex: se a propriedade de APP no seu GeoJSON for 'DENTRO_APP', você deve mudar a linha abaixo
+            // de 'app' para 'DENTRO_APP'.
             if (key.toLowerCase() === 'app' || key.toLowerCase().includes('area_preservacao')) { // Inclui uma verificação mais ampla
                 if (typeof value === 'boolean') {
                     value = value ? 'Sim' : 'Não';
@@ -484,7 +488,7 @@ function updateDashboard(features) {
         }
         
         // CORREÇÃO AQUI: Verifique o nome da propriedade 'app' no seu GeoJSON
-        // Use o nome exato da propriedade. Ex: se for 'em_app', mude abaixo.
+        // Use o nome exato da propriedade. Ex: se for 'em_app', mude 'app' para 'em_app' aqui.
         // O valor deve ser true/false ou "sim"/"não" (case-insensitive)
         const appStatus = feature.properties.app || feature.properties.area_preservacao || ''; // Exemplo: verifica 'app' ou 'area_preservacao'
         if (appStatus === true || String(appStatus).toLowerCase() === 'sim') {
@@ -492,7 +496,7 @@ function updateDashboard(features) {
         }
 
         // CORREÇÃO AQUI: Verifique o nome da propriedade 'custo_intervencao' no seu GeoJSON
-        // Use o nome exato. Ex: se for 'custo_total', mude abaixo.
+        // Use o nome exato. Ex: se for 'custo_total', mude 'custo_intervencao' para 'custo_total' aqui.
         // O valor deve ser numérico
         const custoValor = feature.properties.custo_intervencao || feature.properties.valor_custo || 0; // Exemplo: verifica 'custo_intervencao' ou 'valor_custo'
         if (typeof custoValor === 'number') {
@@ -535,7 +539,7 @@ function populateNucleusFilter(nucleos) {
             const option = document.createElement('option');
             option.value = nucleo;
             option.textContent = nucleo;
-            filterSelect.appendChild(option);
+            reportNucleosSelect.appendChild(option);
         });
     } else {
         reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
@@ -549,7 +553,8 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     let filteredFeatures = allLotesGeoJSON.features;
 
     if (selectedNucleus !== 'all') {
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.nucleo === selectedNucleus);
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para filtrar
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
     }
 
     // Re-renderiza a camada de lotes no mapa com os dados filtrados
@@ -577,13 +582,14 @@ function updateLotesTable(features) {
         const props = feature.properties;
 
         row.insertCell().textContent = props.codigo || 'N/A';
-        row.insertCell().textContent = props.nucleo || 'N/A';
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para exibir
+        row.insertCell().textContent = props.desc_nucleo || 'N/A'; 
         row.insertCell().textContent = props.tipo_uso || 'N/A';
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
         row.insertCell().textContent = props.risco || 'N/A';
         // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
         // Use o nome exato da propriedade 'app' do seu GeoJSON
-        const appStatus = props.app || props.area_preservacao || ''; // Exemplo: verifica 'app' ou 'area_preservacao'
+        const appStatus = props.app || props.area_preservacao || ''; 
         row.insertCell().textContent = (appStatus === true || String(appStatus).toLowerCase() === 'sim') ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
@@ -754,7 +760,8 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
     let filteredFeatures = allLotesGeoJSON.features;
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.nucleo === nucleosAnalise);
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para filtrar
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
     } else {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
@@ -777,8 +784,10 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         filteredFeatures.forEach(f => {
-            const risco = f.properties.risco || 'N/A';
-            if (riskCounts.hasOwnProperty(risco)) riskCounts[risco]++;
+            const risco = f.properties.risco || 'N/A'; // Verifique se esta é a propriedade exata no seu GeoJSON
+            if (riskCounts.hasOwnProperty(risco)) { 
+                riskCounts[risco]++;
+            }
         });
         const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
         const percRiscoElevado = (lotesComRiscoElevado / filteredFeatures.length * 100 || 0).toFixed(2);
@@ -868,7 +877,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
     } else if (incInformacoesGerais) {
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
-        reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
+        reportText += `Nenhuma informação general foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
     }
 
 
@@ -879,7 +888,15 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
     
     // Custo de Intervenção (sempre incluído no final do relatório)
-    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.custo_intervencao || 0), 0);
+    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => {
+        // CORREÇÃO: Verifique o nome da propriedade de custo no seu GeoJSON
+        const custoValor = f.properties.custo_intervencao || f.properties.valor_custo || 0; // Exemplo: verifica 'custo_intervencao' ou 'valor_custo'
+        if (typeof custoValor === 'number') {
+            return acc + custoValor;
+        }
+        return acc;
+    }, 0);
+
     reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
     reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
     reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
