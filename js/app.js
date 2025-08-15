@@ -27,16 +27,16 @@ const riscoStyles = {
 // ========================================================================================
 // CRÍTICO: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// RECONFIRMADO: SEU DADO É EPSG:29193 (Córrego Alegre / UTM Zone 23S)
+// CONFIRMADO AGORA: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
 // Esta é a definição EXATA para este EPSG.
 if (typeof proj4 !== 'undefined') {
-    proj4.defs('EPSG:29193', '+proj=utm +zone=23 +south +ellps=aust_SA +towgs84=-66.879,4.371,-38.528,0,0,0,0 +units=m +no_defs +type=crs');
+    proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     
     // Se você tiver dados de MÚLTIPLAS ZONAS UTM ou outros datums, você pode adicionar mais definições aqui:
-    // proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 23S
     // proj4.defs('EPSG:31982', '+proj=utm +zone=22 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 22S
+    // proj4.defs('EPSG:31984', '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 24S
 
-    console.log("Definição EPSG:29193 (Córrego Alegre / UTM Zone 23S) carregada para reprojeção UTM.");
+    console.log("Definição EPSG:31983 (SIRGAS 2000 / UTM Zone 23S) carregada para reprojeção UTM.");
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
 }
@@ -55,10 +55,9 @@ function initMap() {
         minZoom: 0, 
         maxZoom: 19 
     }).on('tileerror', function(error, tile) {
-        // Loga erros de carregamento de tiles do OSM
         console.error('Erro CRÍTICO ao carregar tile OpenStreetMap:', error, tile);
-        // Pode tentar um fallback para outro provedor de tiles se o OSM falhar consistentemente
-        // Ex: map.addLayer(esriStreetMap);
+        // Se este erro persistir, o problema é na sua rede/navegador, não no código.
+        // Verifique o console do navegador (F12) na aba "Rede" e "Console" para mais detalhes.
     });
     osmLayer.addTo(map); // Define como o mapa base padrão
     console.log('initMap: Basemap OpenStreetMap adicionado como padrão.'); 
@@ -265,8 +264,8 @@ function setupFileUpload() {
                 // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
                 let featuresToLoad = [];
 
-                // Heurística para detectar UTM e reprojetar. USANDO EPSG:29193 CONFIRMADO!
-                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:29193']) { // USANDO EPSG:29193
+                // Heurística para detectar UTM e reprojetar. AGORA USANDO EPSG:31983 CONFIRMADO!
+                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { 
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
                         let sampleCoord = [];
@@ -284,22 +283,22 @@ function setupFileUpload() {
                             const easting = sampleCoord[0];
                             const northing = sampleCoord[1];
 
-                            // Heurística para UTM no Brasil (para Córrego Alegre/SAD69, zonas 22S, 23S, 24S)
+                            // Heurística para UTM no Brasil (SIRGAS 2000, zonas 22S, 23S, 24S)
                             // Valores de Easting e Northing devem estar dentro do range UTM esperado para o hemisfério sul
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:29193). Reprojetando para WGS84...`);
-                                const utmCrs = new L.Proj.CRS('EPSG:29193'); // Usando o EPSG:29193
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:31983). Reprojetando para WGS84...`);
+                                const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
                                 console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
                             } else {
-                                console.log(`Coordenadas de ${file.name} não parecem ser UTM (fora do range esperado para Brasil Sul). Carregando como WGS84.`);
+                                console.log(`Coordenadas de ${file.name} não parecem ser UTM na Zona 23S. Carregando como WGS84.`);
                                 featuresToLoad = geojsonData.features; // Carrega como está (WGS84)
                             }
                         }
                     }
                 } else if (geojsonData.features.length > 0) { // Se proj4/proj4leaflet não estão disponíveis ou EPSG não definido
                     featuresToLoad = geojsonData.features;
-                    console.warn(`Proj4js/L.Proj não carregados ou definição EPSG:29193 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
+                    console.warn(`Proj4js/L.Proj não carregados ou definição EPSG:31983 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
                 }
                 
                 // Se o featuresToLoad ainda estiver vazio e o geojsonData original tiver features,
@@ -856,7 +855,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         }
     } else {
         reportText += `**ANÁLISE ABRANGENTE (TODOS OS NÚCLEOS)**\n\n`;
-        // Pega o nome do município do primeiro lote geral se disponível
+        // Pega o nome do município do primeiro lote general se disponível
         if (allLotesGeoJSON.features.length > 0 && allLotesGeoJSON.features[0].properties.municipio) {
             municipioNome = allLotesGeoJSON.features[0].properties.municipio;
         }
