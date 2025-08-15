@@ -527,8 +527,8 @@ function updateDashboard(features) {
         } 
         
         // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
-        // Esta contagem será a SOMA das categorias "Médio", "Alto", "Muito Alto"
-        if (['Médio', 'Alto', 'Muito Alto'].includes(riscoValue)) { 
+        // Apenas para o card "Lotes em Risco", conta qualquer risco que não seja 'Baixo' ou 'N/A'
+        if (riscoValue !== 'Baixo' && riscoValue !== 'N/A') { 
             lotesRiscoCount++;
         }
         
@@ -556,7 +556,7 @@ function updateDashboard(features) {
     document.getElementById('riskHighCount').innerText = riskCategoryCounts['Alto'] || 0;
     document.getElementById('riskVeryHighCount').innerText = riskCategoryCounts['Muito Alto'] || 0;
 
-    // Atualiza o resumo de intervenções (agora consistente com lotesRiscoCount)
+    // Atualiza o resumo de intervenções
     document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
     document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
 }
@@ -855,14 +855,15 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `**NÚCLEO DE ANÁLISE: ${nucleosAnalise.toUpperCase()}**\n\n`;
         // Tenta pegar o nome do município do primeiro lote do núcleo selecionado
-        if (filteredFeatures.length > 0 && filteredFeatures[0].properties.municipio) { 
-            municipioNome = filteredFeatures[0].properties.municipio;
+        // AGORA USA A PROPRIEDADE 'nm_mun' PARA O NOME DO MUNICÍPIO
+        if (filteredFeatures.length > 0 && filteredFeatures[0].properties.nm_mun) { 
+            municipioNome = filteredFeatures[0].properties.nm_mun;
         }
     } else {
         reportText += `**ANÁLISE ABRANGENTE (TODOS OS NÚCLEOS)**\n\n`;
-        // Pega o nome do município do primeiro lote geral se disponível
-        if (allLotesGeoJSON.features.length > 0 && allLotesGeoJSON.features[0].properties.municipio) {
-            municipioNome = allLotesGeoJSON.features[0].properties.municipio;
+        // Pega o nome do município do primeiro lote general se disponível
+        if (allLotesGeoJSON.features.length > 0 && allLotesGeoJSON.features[0].properties.nm_mun) {
+            municipioNome = allLotesGeoJSON.features[0].properties.nm_mun;
         }
     }
 
