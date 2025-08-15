@@ -1,3 +1,4 @@
+```javascript
 // Variáveis Globais para armazenar os dados e camadas
 let map; 
 let allLotesGeoJSON = { type: 'FeatureCollection', features: [] };
@@ -27,7 +28,7 @@ const riscoStyles = {
 // ========================================================================================
 // CRÍTICO: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// CONFIRMADO AGORA: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
+// CONFIRMADO: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
 // Esta é a definição EXATA para este EPSG.
 if (typeof proj4 !== 'undefined') {
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
@@ -513,7 +514,7 @@ function updateDashboard(features) {
         // Lógica para 'risco': verifica 'risco' ou 'Status Risco'
         let riscoValue = feature.properties.risco || feature.properties['Status Risco'] || 'N/A'; 
         if (riscoValue && typeof riscoValue === 'string') {
-            riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase();
+            riscoValue = risco.trim().charAt(0).toUpperCase() + risco.trim().slice(1).toLowerCase(); // Capitalize
         }
         
         // Mapeia "Geologico" para "Alto" para fins de contagem nos cards e seção "Análise de Riscos"
@@ -527,8 +528,8 @@ function updateDashboard(features) {
         } 
         
         // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
-        // Apenas para o card "Lotes em Risco", conta qualquer risco que não seja 'Baixo' ou 'N/A'
-        if (riscoValue !== 'Baixo' && riscoValue !== 'N/A') { 
+        // Esta contagem será a SOMA das categorias "Médio", "Alto", "Muito Alto"
+        if (['Médio', 'Alto', 'Muito Alto'].includes(riscoValue)) { 
             lotesRiscoCount++;
         }
         
@@ -559,6 +560,33 @@ function updateDashboard(features) {
     // Atualiza o resumo de intervenções
     document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
     document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
+
+    // NOVO: Exibe o nome do município no dashboard e busca dados do IBGE
+    let currentMunicipioNome = 'Não informado';
+    if (features.length > 0 && features[0].properties.nm_mun) {
+        currentMunicipioNome = features[0].properties.nm_mun;
+    }
+    document.getElementById('municipioNomeDisplay').innerText = currentMunicipioNome;
+    
+    if (currentMunicipioNome !== 'Não informado') {
+        fetchIbgeData(currentMunicipioNome).then(ibgeInfo => {
+            const ibgeDisplay = document.getElementById('ibgeInfoDisplay');
+            if (ibgeInfo) {
+                ibgeDisplay.innerHTML = `
+                    <p><strong>Dados do IBGE:</strong></p>
+                    <p>UF: <span>${ibgeInfo.uf || 'N/A'}</span></p>
+                    <p>Região Geográfica: <span>${ibgeInfo.regiaoGeografica || 'N/A'}</span></p>
+                    <p>Mesorregião: <span>${ibgeInfo.mesorregiao || 'N/A'}</span></p>
+                    <p>Microrregião: <span>${ibgeInfo.microrregiao || 'N/A'}</span></p>
+                    <p>População (2021): <span>${ibgeInfo.populacao.toLocaleString('pt-BR') || 'Não disponível'} pessoas</span></p>
+                `;
+            } else {
+                ibgeDisplay.innerHTML = `<p>Dados do IBGE para este município não puderam ser obtidos. Verifique o nome do município no GeoJSON ou a conexão com a internet.</p>`;
+            }
+        });
+    } else {
+        document.getElementById('ibgeInfoDisplay').innerHTML = `<p>Município não identificado nos dados do lote para busca no IBGE.</p>`;
+    }
 }
 
 // 6. Preenche o Filtro de Núcleos
@@ -855,7 +883,6 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `**NÚCLEO DE ANÁLISE: ${nucleosAnalise.toUpperCase()}**\n\n`;
         // Tenta pegar o nome do município do primeiro lote do núcleo selecionado
-        // AGORA USA A PROPRIEDADE 'nm_mun' PARA O NOME DO MUNICÍPIO
         if (filteredFeatures.length > 0 && filteredFeatures[0].properties.nm_mun) { 
             municipioNome = filteredFeatures[0].properties.nm_mun;
         }
@@ -878,7 +905,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
             reportText += `  - Região Geográfica: ${ibgeInfo.regiaoGeografica || 'N/A'}\n`;
             reportText += `  - Mesorregião: ${ibgeInfo.mesorregiao || 'N/A'}\n`;
             reportText += `  - Microrregião: ${ibgeInfo.microrregiao || 'N/A'}\n`;
-            reportText += `  - População (2021): ${ibgeInfo.populacao.toLocaleString('pt-BR') || 'Não disponível'}\n\n`;
+            reportText += `  - População (2021): ${ibgeInfo.populacao.toLocaleString('pt-BR') || 'Não disponível'} pessoas\n\n`;
         } else {
             reportText += `  - Dados do IBGE para o município não puderam ser obtidos. Verifique o nome do município no GeoJSON ou a conexão com a internet.\n\n`;
         }
@@ -1045,33 +1072,3 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         }
         return acc + custoValor;
     }, 0);
-
-    reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
-    reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
-    reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
-
-
-    reportText += `--- Fim do Relatório ---\n`;
-    reportText += `Este relatório foi gerado automaticamente pelo GeoLaudo.AI. Para análises mais aprofundadas e validação legal, consulte um especialista qualificado e os órgãos competentes.`;
-
-    generatedReportContent.textContent = reportText;
-    generatedReportContent.scrollTop = 0; // Volta para o topo do relatório
-});
-
-// Exportar Relatório (botão no header)
-document.getElementById('exportReportBtn').addEventListener('click', () => {
-    console.log('Evento: Botão "Exportar Relatório" clicado.'); 
-    const reportContent = document.getElementById('generatedReportContent').textContent;
-    if (reportContent.includes('Nenhum relatório gerado ainda') || reportContent.includes('Nenhum dado de lotes disponível')) {
-        alert('Por favor, gere um relatório primeiro na aba "Relatórios".');
-        return;
-    }
-
-    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'relatorio_geolaudo.txt');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-});
