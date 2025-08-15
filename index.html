@@ -340,9 +340,9 @@
                     <div class="checkbox-group">
                         <label><input type="checkbox" id="incDadosGerais" checked> Dados Gerais dos Lotes</label>
                         <label><input type="checkbox" id="incAnaliseRiscos" checked> Análise de Riscos</label>
-                        <label><input type="checkbox" id="incAreasPublicas"> Áreas Públicas (APP)</label>
+                        <label><input type="checkbox" id="incAreasPublicas" checked> Áreas Públicas (APP)</label> <!-- Mudado para checked por padrão -->
                         <label><input type="checkbox" id="incInformacoesGerais" checked> Informações Gerais do Projeto</label>
-                        <label><input type="checkbox" id="incInfraestrutura"> Infraestrutura (Poligonais)</label>
+                        <label><input type="checkbox" id="incInfraestrutura" checked> Infraestrutura (Poligonais)</label> <!-- Mudado para checked por padrão -->
                     </div>
                     <button id="generateReportBtn">Gerar Relatório com IA</button>
                 </div>
@@ -362,11 +362,11 @@
             <h3>Como usar:</h3>
             <ol>
                 <li><strong>Upload de Dados:</strong> Navegue até a aba "Upload de Dados". Arraste e solte seus arquivos GeoJSON (para lotes, APPs, infraestrutura, poligonais etc.) ou clique em "Selecionar Arquivos".
-                    <p class="note"><strong>Importante:</strong> Para que a "Análise de Riscos" e "Lotes em APP" funcionem corretamente no dashboard e relatórios, é fundamental que o GeoJSON dos seus lotes já contenha propriedades como <code>risco</code> (ex: "Baixo", "Médio", "Alto", "Muito Alto"), <code>app</code> (ex: <code>true</code> ou <code>false</code>, ou "sim"/"não"), <code>nucleo</code> e <code>custo_intervencao</code>.</p>
+                    <p class="note"><strong>Importante:</strong> Para que a "Análise de Riscos" e "Lotes em APP" funcionem corretamente no dashboard e relatórios, é fundamental que o GeoJSON dos seus lotes já contenha propriedades como <code>risco</code> (ex: "Baixo", "Médio", "Alto", "Muito Alto") ou <code>Status Risco</code> (ex: "Geológico"), <code>dentro_app</code> (ex: <code>true</code> ou <code>false</code>, ou "Sim"/"Não"), <code>desc_nucleo</code> (nome do núcleo), <code>valor</code> (para custo) e <code>municipio</code> (para IBGE).</p>
                 </li>
                 <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto, como infraestrutura básica, restrições legais e ambientais, e aspectos fundiários. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
                 <li><strong>Processar e Carregar:</strong> Após selecionar os arquivos GeoJSON, clique em "Processar e Carregar Dados". O aplicativo irá ler, processar e exibir suas camadas no mapa.</li>
-                <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estadístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
+                <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estatístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
                 <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
                 <li><strong>Dados Detalhados:</strong> A tabela na parte inferior do Dashboard lista os lotes com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
