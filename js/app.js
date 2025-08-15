@@ -18,22 +18,18 @@ const riscoStyles = {
     'Médio': { fillColor: '#f39c12', color: 'white' },        // Laranja
     'Alto': { fillColor: '#e74c3c', color: 'white' },         // Vermelho
     'Muito Alto': { fillColor: '#c0392b', color: 'white' },   // Vermelho escuro
-    'N/A': { fillColor: '#3498db', color: 'white' },           // Azul padrão para risco não definido
-    'Geológico': { fillColor: '#e74c3c', color: 'white' }     // NOVO: Estilo para "Geológico" (exemplo: Alto risco)
+    'N/A': { fillColor: '#3498db', color: 'white' }            // Azul padrão para risco não definido
 };
 
 // ========================================================================================
-// IMPORTANTE: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
+// CRÍTICO: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S (EPSG:31983).
-// É CRÍTICO QUE VOCÊ CONFIRME O EPSG EXATO DOS SEUS DADOS.
-// Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
+// CONFIRMADO AGORA: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
+// Esta é a definição EXATA para este EPSG.
 if (typeof proj4 !== 'undefined') {
-    // Definimos a projeção para SIRGAS 2000 / UTM Zone 23S (EPSG:31983)
-    // Se precisar de outra zona, mude o 'zone=XX' e possivelmente o 'south'/'north' e o EPSG.
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     
-    console.log("Definição EPSG:31983 carregada para reprojeção UTM.");
+    console.log("Definição EPSG:31983 (SIRGAS 2000 / UTM Zone 23S) carregada para reprojeção UTM.");
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
 }
@@ -46,11 +42,14 @@ function initMap() {
     map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas iniciais (centro do Brasil)
     console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap OpenStreetMap (Voltando ao OSM puro, que geralmente funciona)
+    // Basemap OpenStreetMap (Geralmente o mais compatível)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         minZoom: 0, 
         maxZoom: 19 
+    }).on('tileerror', function(error, tile) {
+        console.warn('Erro ao carregar tile OSM:', error, tile);
+        // Se este erro persistir, o problema é na sua rede/navegador, não no código.
     });
     osmLayer.addTo(map); // Define como o mapa base padrão
     console.log('initMap: Basemap OpenStreetMap adicionado como padrão.'); 
@@ -60,11 +59,15 @@ function initMap() {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
         minZoom: 0,
         maxZoom: 19
+    }).on('tileerror', function(error, tile) {
+        console.warn('Erro ao carregar tile Esri Street Map:', error, tile);
     });
 
     // Basemap Esri World Imagery (Satélite)
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    }).on('tileerror', function(error, tile) {
+        console.warn('Erro ao carregar tile Esri World Imagery:', error, tile);
     });
 
     // Controle de camadas base para o usuário escolher o basemap
@@ -81,7 +84,6 @@ function initMap() {
     document.getElementById('togglePoligonais').addEventListener('change', (e) => toggleLayerVisibility(poligonaisLayer, e.target.checked));
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
-    // map.invalidateSize() é chamado em DOMContentLoaded e na mudança de abas
     console.log('initMap: Mapa inicializado com sucesso.'); 
 }
 
@@ -118,7 +120,7 @@ document.querySelectorAll('nav a').forEach(link => {
         // Garante que o mapa renderize corretamente após a seção do dashboard se tornar visível
         if (targetSectionId === 'dashboard' && map) {
             console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
-            map.invalidateSize();
+            map.invalidateSize(); // Garante que o mapa aparece corretamente quando a aba é selecionada
         }
     });
 });
@@ -248,7 +250,7 @@ function setupFileUpload() {
                 // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
                 let featuresToLoad = [];
 
-                // Heurística para detectar UTM e reprojetar
+                // Heurística para detectar UTM e reprojetar. AGORA USANDO EPSG:31983 CONFIRMADO!
                 if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { 
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
@@ -271,20 +273,26 @@ function setupFileUpload() {
                             // Easting entre 100.000 e 900.000
                             // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84 usando EPSG:31983...`);
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:31983 provável). Reprojetando para WGS84...`);
                                 const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
-                                console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
+                                console.log(`Feições de ${file.name} reprojetadas com sucesso usando EPSG:31983.`);
+                            } else {
+                                console.log(`Coordenadas de ${file.name} não parecem ser UTM na Zona 23S. Carregando como WGS84.`);
+                                featuresToLoad = geojsonData.features; // Carrega como está (WGS84)
                             }
                         }
                     }
+                } else if (geojsonData.features.length > 0) { // Se proj4/proj4leaflet não estão disponíveis
+                    featuresToLoad = geojsonData.features;
+                    console.warn(`Proj4js ou L.Proj não estão carregados, ou definição EPSG:31983 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
                 }
                 
-                // Se não detectou UTM ou proj4/proj4leaflet não estão carregados, ou reprojeção não ocorreu,
-                // carrega as feições como estão (assumindo WGS84)
+                // Se o featuresToLoad ainda estiver vazio e o geojsonData original tiver features,
+                // significa que não houve detecção/reprojeção, então carregamos o original.
                 if (featuresToLoad.length === 0 && geojsonData.features.length > 0) {
                     featuresToLoad = geojsonData.features;
-                    console.log(`Coordenadas de ${file.name} carregadas como WGS84 ou reprojeção não aplicável.`);
+                    console.log(`Carregando ${file.name} como WGS84 (assumido).`);
                 }
 
 
@@ -345,17 +353,20 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             onEachFeature: onEachFeatureLotes,
             style: styleLotes
         }).addTo(map);
-        // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
-        map.fitBounds(lotesLayer.getBounds());
-        console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
+        try {
+            map.fitBounds(lotesLayer.getBounds());
+            console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
+        } catch (e) {
+            console.error("Erro ao ajustar o mapa para a extensão dos lotes. Coordenadas podem estar inválidas ou fora da área visível.", e);
+            map.setView([-15.7801, -47.9292], 5); // Volta para o centro do Brasil se falhar
+        }
     } else {
-        // Se não houver lotes, centraliza o mapa no Brasil e limpa a camada de lotes
         map.setView([-15.7801, -47.9292], 5);
-        document.getElementById('toggleLotes').checked = false; // Desmarca o checkbox
+        document.getElementById('toggleLotes').checked = false; 
         console.log('renderLayersOnMap: Nenhum lote para exibir, mapa centralizado.'); 
     }
 
-    // Carrega APP (não adiciona ao mapa por padrão, apenas o cria)
+    // Carrega APP 
     if (allAPPGeoJSON && allAPPGeoJSON.features.length > 0) {
         appLayer = L.geoJSON(allAPPGeoJSON, {
             style: {
@@ -368,16 +379,15 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Área de Preservação Permanente (APP)</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase().includes('area') ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
             }
         });
-        // Garante que o checkbox do APP esteja desmarcado e a camada invisível
-        document.getElementById('toggleAPP').checked = false;
-        if (map.hasLayer(appLayer)) map.removeLayer(appLayer); // Apenas para garantir
-        console.log('renderLayersOnMap: Camada APP carregada (mas invisível por padrão).'); 
+        appLayer.addTo(map); // Adiciona a camada APP ao mapa por padrão
+        document.getElementById('toggleAPP').checked = true; // Marca o checkbox
+        console.log('renderLayersOnMap: Camada APP carregada e visível por padrão.'); 
     }
 
     // Carrega Poligonais diversas (infraestrutura, etc.)
@@ -393,16 +403,15 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Informações da Poligonal</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase().includes('area') ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
             }
         });
-        // Garante que o checkbox de poligonais esteja desmarcado e a camada invisível
-        document.getElementById('togglePoligonais').checked = false;
-        if (map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer); // Apenas para garantir
-        console.log('renderLayersOnMap: Camada Poligonais carregada (mas invisível por padrão).'); 
+        poligonaisLayer.addTo(map); // Adiciona a camada Poligonais ao mapa por padrão
+        document.getElementById('togglePoligonais').checked = true; // Marca o checkbox
+        console.log('renderLayersOnMap: Camada Poligonais carregada e visível por padrão.'); 
     }
 }
 
@@ -414,9 +423,9 @@ function styleLotes(feature) {
         risco = risco.trim().charAt(0).toUpperCase() + risco.trim().slice(1).toLowerCase();
     }
     
-    // Mapeia "Geológico" para "Alto" para fins de cor e contagem
+    // Mapeia "Geologico" para "Alto" para fins de cor e contagem
     if (risco === 'Geologico') {
-        risco = 'Alto'; // Ou 'Muito Alto' se preferir mais impacto visual
+        risco = 'Alto'; 
     }
     
     const style = riscoStyles[risco] || riscoStyles['N/A']; 
@@ -438,4 +447,526 @@ function onEachFeatureLotes(feature, layer) {
         // Itera sobre todas as propriedades e adiciona ao popup
         for (let key in feature.properties) {
             let value = feature.properties[key];
-            if (value === null || value === undefi
+            if (value === null || value === undefined || value === "") value = 'N/A'; // Trata valores nulos/indefinidos/vazios
+
+            // Lógica para formatar campos específicos
+            if (key.toLowerCase().includes('area') && typeof value === 'number') {
+                value = value.toLocaleString('pt-BR') + ' m²';
+            } else if (key.toLowerCase() === 'risco' || key.toLowerCase() === 'status risco') {
+                // Formata a exibição do risco no popup
+                if (value.toLowerCase() === 'geologico') {
+                    value = 'Geológico (Risco Alto)'; 
+                }
+            } else if (key.toLowerCase() === 'dentro_app') { // Usa 'dentro_app'
+                value = (value === 'Sim' || value === true) ? 'Sim' : 'Não';
+            } else if (key.toLowerCase() === 'valor') { // Usa 'valor' para custo, se houver 'intervencao'
+                if (feature.properties.intervencao && typeof value === 'number') {
+                    value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    key = 'Custo de Intervenção (associado a ' + feature.properties.intervencao + ')'; 
+                }
+            } else if (key.toLowerCase() === 'tipo_uso' && typeof value === 'string') {
+                 value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+            }
+            
+            // Adiciona a propriedade e seu valor ao popup
+            popupContent += `<strong>${key}:</strong> ${value}<br>`;
+        }
+        layer.bindPopup(popupContent);
+    }
+}
+
+// 5. Atualiza o Dashboard
+function updateDashboard(features) {
+    console.log('updateDashboard: Atualizando cards do dashboard com', features.length, 'lotes.'); 
+    document.getElementById('totalLotes').innerText = features.length;
+
+    let lotesRiscoCount = 0; // Contagem geral de lotes em risco (que não são "Baixo")
+    let lotesAppCount = 0; // Contagem de lotes em APP
+    let custoTotal = 0; // Soma do custo
+    
+    // Contagem por categoria de risco para "Análise de Riscos"
+    let riskCategoryCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 }; 
+
+    features.forEach(feature => {
+        // Lógica para 'risco': verifica 'risco' ou 'Status Risco'
+        let riscoValue = feature.properties.risco || feature.properties['Status Risco'] || 'N/A'; 
+        if (riscoValue && typeof riscoValue === 'string') {
+            riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase();
+        }
+        
+        // Mapeia "Geologico" para "Alto" para fins de contagem nos cards e seção "Análise de Riscos"
+        if (riscoValue === 'Geologico') {
+            riscoValue = 'Alto'; 
+        }
+        
+        // Conta por categoria de risco
+        if (riskCategoryCounts.hasOwnProperty(riscoValue)) { 
+            riskCategoryCounts[riscoValue]++;
+        } 
+        
+        // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
+        // Garante que não conte o mesmo lote duas vezes se ele já foi contado na categoria
+        if (['Médio', 'Alto', 'Muito Alto'].includes(riscoValue)) { 
+            lotesRiscoCount++;
+        }
+        // Se houverem outros riscos que não são "Baixo" e não se encaixam nas 4 categorias principais,
+        // mas devem ser contados no total de risco. Por exemplo, se "geologico" não fosse mapeado.
+        // Já está coberto acima se for mapeado para 'Alto'.
+
+        // CONTAGEM DE Lotes em APP: Usa a propriedade 'dentro_app'
+        const appStatus = feature.properties.dentro_app; 
+        if (appStatus === 'Sim' || appStatus === true) { 
+            lotesAppCount++;
+        }
+
+        // CONTAGEM DE Custo de Intervenção: Usa a propriedade 'valor'
+        // Assume que 'intervencao' e 'valor' andam juntos, e 'valor' é o custo numérico.
+        if (feature.properties.intervencao && typeof feature.properties.valor === 'number') {
+            custoTotal += feature.properties.valor;
+        }
+    });
+
+    // Atualiza os cards principais do dashboard
+    document.getElementById('lotesRisco').innerText = lotesRiscoCount;
+    document.getElementById('lotesApp').innerText = lotesAppCount;
+    document.getElementById('custoEstimado').innerText = custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Atualiza as contagens na seção "Análise de Riscos"
+    document.getElementById('riskLowCount').innerText = riskCategoryCounts['Baixo'] || 0;
+    document.getElementById('riskMediumCount').innerText = riskCategoryCounts['Médio'] || 0;
+    document.getElementById('riskHighCount').innerText = riskCategoryCounts['Alto'] || 0;
+    document.getElementById('riskVeryHighCount').innerText = riskCategoryCounts['Muito Alto'] || 0;
+
+    // Atualiza o resumo de intervenções
+    document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
+    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; // Ajuste se a lógica de intervenção for diferente da identificação de risco
+}
+
+// 6. Preenche o Filtro de Núcleos
+function populateNucleusFilter(nucleos) {
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); 
+    const filterSelect = document.getElementById('nucleusFilter');
+    filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
+    if (nucleos.length > 0) {
+        nucleos.sort().forEach(nucleo => {
+            const option = document.createElement('option');
+            option.value = nucleo;
+            option.textContent = nucleo;
+            filterSelect.appendChild(option);
+        });
+    }
+
+    // Preenche o filtro de núcleos do relatório também
+    const reportNucleosSelect = document.getElementById('nucleosAnalise');
+    reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
+    if (nucleos.length > 0) {
+        nucleos.sort().forEach(nucleo => {
+            const option = document.createElement('option');
+            option.value = nucleo;
+            option.textContent = nucleo;
+            reportNucleosSelect.appendChild(option);
+        });
+    } else {
+        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
+    }
+}
+
+// 7. Aplica Filtros no Dashboard (e mapa)
+document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+    console.log('Evento: Botão "Aplicar Filtros" clicado.'); 
+    const selectedNucleus = document.getElementById('nucleusFilter').value;
+    let filteredFeatures = allLotesGeoJSON.features;
+
+    if (selectedNucleus !== 'all') {
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
+    }
+
+    // Re-renderiza a camada de lotes no mapa com os dados filtrados
+    renderLayersOnMap(filteredFeatures);
+    
+    // Atualiza o dashboard com os dados filtrados
+    updateDashboard(filteredFeatures);
+    // Atualiza a tabela com dados filtrados
+    updateLotesTable(filteredFeatures); 
+});
+
+// 8. Tabela de Lotes Detalhados
+function updateLotesTable(features) {
+    console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
+    const tableBody = document.querySelector('#lotesDataTable tbody');
+    tableBody.innerHTML = ''; // Limpa a tabela
+
+    if (features.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro ou ajuste os filtros.</td></tr>';
+        return;
+    }
+
+    features.forEach(feature => {
+        const row = tableBody.insertRow();
+        const props = feature.properties;
+
+        row.insertCell().textContent = props.codigo || 'N/A';
+        row.insertCell().textContent = props.desc_nucleo || 'N/A'; // Exibe o núcleo
+        row.insertCell().textContent = (typeof props.tipo_uso === 'string') ? props.tipo_uso.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : 'N/A';
+        row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
+        
+        // Lógica para exibir o risco na tabela
+        let riscoTabela = props.risco || props['Status Risco'] || 'N/A';
+        if (riscoTabela.toLowerCase() === 'geologico') {
+            riscoTabela = 'Geológico'; // Exibe "Geológico" na tabela
+        }
+        row.insertCell().textContent = riscoTabela;
+
+        // USA A PROPRIEDADE 'dentro_app' PARA EXIBIR O STATUS DE APP
+        const appStatus = props.dentro_app; 
+        row.insertCell().textContent = (appStatus === 'Sim' || appStatus === true) ? 'Sim' : 'Não';
+        
+        const actionsCell = row.insertCell();
+        const viewBtn = document.createElement('button');
+        viewBtn.textContent = 'Ver no Mapa';
+        viewBtn.className = 'small-btn'; 
+        viewBtn.onclick = () => {
+            document.querySelector('nav a[data-section="dashboard"]').click();
+            if (lotesLayer) {
+                lotesLayer.eachLayer(layer => {
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.codigo === props.codigo) {
+                        map.setView(layer.getBounds().getCenter(), 18); 
+                        layer.openPopup(); 
+                    }
+                });
+            }
+        };
+        actionsCell.appendChild(viewBtn);
+    });
+}
+
+// Busca na tabela
+document.getElementById('lotSearch').addEventListener('keyup', (e) => {
+    const searchTerm = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll('#lotesDataTable tbody tr');
+    rows.forEach(row => {
+        const textContent = row.textContent.toLowerCase();
+        if (textContent.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+
+// Exportar Tabela para CSV
+document.getElementById('exportTableBtn').addEventListener('click', () => {
+    console.log('Evento: Botão "Exportar Tabela" clicado.'); 
+    const table = document.getElementById('lotesDataTable');
+    let csv = [];
+    // Cabeçalho
+    const headerRow = [];
+    table.querySelectorAll('thead th').forEach(th => {
+        if (th.textContent !== 'Ações') { 
+            headerRow.push(`"${th.textContent.trim()}"`); 
+        }
+    });
+    csv.push(headerRow.join(';')); 
+
+    // Linhas de dados
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const row = [];
+        tr.querySelectorAll('td').forEach((td, index) => {
+            if (index < tr.querySelectorAll('td').length - 1) {
+                let text = td.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
+                row.push(`"${text}"`);
+            }
+        });
+        csv.push(row.join(';'));
+    });
+
+    const csvString = csv.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'dados_lotes_geolaudo.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
+
+// FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
+function setupGeneralInfoForm() {
+    console.log('setupGeneralInfoForm: Configurando formulário de informações gerais.'); 
+    const saveButton = document.getElementById('saveGeneralInfoBtn');
+    const statusMessage = document.getElementById('generalInfoStatus');
+
+    saveButton.addEventListener('click', () => {
+        console.log('Evento: Botão "Salvar Informações Gerais" clicado.'); 
+        const getRadioValue = (name) => {
+            const radios = document.getElementsByName(name);
+            for (let i = 0; i < radios.length; i++) {
+                if (radios[i].checked) {
+                    return radios[i].value;
+                }
+            }
+            return ''; 
+        };
+
+        generalProjectInfo = {
+            ucConservacao: getRadioValue('ucConservacao'),
+            protecaoMananciais: getRadioValue('protecaoMananciais'),
+            tipoAbastecimento: document.getElementById('tipoAbastecimento').value.trim(),
+            responsavelAbastecimento: document.getElementById('responsavelAbastecimento').value.trim(),
+            tipoColetaEsgoto: document.getElementById('tipoColetaEsgoto').value.trim(),
+            responsavelColetaEsgoto: document.getElementById('responsavelColetaEsgoto').value.trim(),
+            sistemaDrenagem: getRadioValue('sistemaDrenagem'),
+            drenagemInadequada: getRadioValue('drenagemInadequada'),
+            logradourosIdentificados: getRadioValue('logradourosIdentificados'),
+            
+            linhaTransmissao: getRadioValue('linhaTransmissao'),
+            minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
+            linhaFerrea: getRadioValue('linhaFerrea'),
+            aeroporto: getRadioValue('aeroporto'),
+            limitacoesOutras: getRadioValue('limitacoesOutras'),
+            processoMP: getRadioValue('processoMP'),
+            processosJudiciais: getRadioValue('processosJudiciais'),
+            comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
+            
+            titularidadeArea: getRadioValue('titularidadeArea'),
+            terraLegal: getRadioValue('terraLegal'),
+            instrumentoJuridico: document.getElementById('instrumentoJuridico').value.trim(),
+            legislacaoReurb: document.getElementById('legislacaoReurb').value.trim(),
+            legislacaoAmbiental: getRadioValue('legislacaoAmbiental'),
+            planoDiretor: getRadioValue('planoDiretor'),
+            zoneamento: getRadioValue('zoneamento'),
+            municipioOriginal: document.getElementById('municipioOriginal').value.trim(),
+            matriculasOrigem: document.getElementById('matriculasOrigem').value.trim(),
+            matriculasIdentificadas: document.getElementById('matriculasIdentificadas').value.trim(),
+
+            adequacaoDesconformidades: getRadioValue('adequacaoDesconformidades'),
+            obrasInfraestrutura: getRadioValue('obrasInfraestrutura'),
+            medidasCompensatorias: getRadioValue('medidasCompensatorias')
+        };
+
+        statusMessage.textContent = 'Informações gerais salvas com sucesso!';
+        statusMessage.className = 'status-message success';
+        console.log('Informações Gerais Salvas:', generalProjectInfo); 
+    });
+}
+
+
+// 9. Gerador de Relatórios com IA (Simulada)
+document.getElementById('generateReportBtn').addEventListener('click', () => {
+    console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); 
+    const reportType = document.getElementById('reportType').value;
+    const nucleosAnalise = document.getElementById('nucleosAnalise').value;
+    const incDadosGerais = document.getElementById('incDadosGerais').checked;
+    const incAnaliseRiscos = document.getElementById('incAnaliseRiscos').checked;
+    const incAreasPublicas = document.getElementById('incAreasPublicas').checked;
+    const incInformacoesGerais = document.getElementById('incInformacoesGerais').checked; 
+    const incInfraestrutura = document.getElementById('incInfraestrutura').checked;
+    const generatedReportContent = document.getElementById('generatedReportContent');
+
+    if (!allLotesGeoJSON || allLotesGeoJSON.features.length === 0) {
+        generatedReportContent.textContent = "Nenhum dado de lotes disponível para gerar o relatório. Faça o upload das camadas primeiro.";
+        return;
+    }
+    if (incInformacoesGerais && Object.keys(generalProjectInfo).length === 0) {
+        generatedReportContent.textContent = "Seção 'Informações Gerais do Projeto' selecionada, mas nenhum dado foi salvo. Por favor, preencha e salve as informações na aba 'Informações Gerais'.";
+        return;
+    }
+
+    let reportText = `RELATÓRIO GEOLAUDO.AI - ${reportType.toUpperCase()}\n`;
+    reportText += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}\n\n`;
+
+    let filteredFeatures = allLotesGeoJSON.features;
+    if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
+        reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
+    } else {
+        reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
+    }
+
+    // Conteúdo do relatório baseado nas opções selecionadas (IA SIMULADA)
+    if (incDadosGerais) {
+        reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
+        reportText += `Total de Lotes Analisados: ${filteredFeatures.length}\n`;
+        
+        const totalArea = filteredFeatures.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0);
+        reportText += `Área Total dos Lotes: ${totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²\n\n`;
+
+        const uniqueTiposUso = new Set(filteredFeatures.map(f => f.properties.tipo_uso).filter(Boolean));
+        if (uniqueTiposUso.size > 0) {
+            reportText += `Principais Tipos de Uso Identificados: ${Array.from(uniqueTiposUso).join(', ')}\n\n`;
+        }
+    }
+
+    if (incAnaliseRiscos) {
+        const riskCategoryCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
+        const otherRisks = {}; // Para riscos que não se encaixam nas categorias padrão
+
+        filteredFeatures.forEach(f => {
+            let riscoValue = f.properties.risco || f.properties['Status Risco'] || 'N/A'; 
+            if (riscoValue && typeof riscoValue === 'string') {
+                riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase(); // Capitalize
+            }
+
+            // Mapeia "Geologico" para "Alto" para o relatório
+            if (riscoValue === 'Geologico') {
+                riscoValue = 'Alto'; 
+            }
+
+            if (riskCategoryCounts.hasOwnProperty(riscoValue)) { 
+                riskCategoryCounts[riscoValue]++;
+            } else if (riscoValue !== 'N/A') { 
+                if (otherRisks[riscoValue]) {
+                    otherRisks[riscoValue]++;
+                } else {
+                    otherRisks[riscoValue] = 1;
+                }
+            }
+        });
+
+        const lotesComRiscoElevado = riskCategoryCounts['Médio'] + riskCategoryCounts['Alto'] + riskCategoryCounts['Muito Alto'] + Object.values(otherRisks).reduce((a, b) => a + b, 0);
+        const percRiscoElevado = (lotesComRiscoElevado / filteredFeatures.length * 100 || 0).toFixed(2);
+
+        reportText += `--- 2. Análise de Riscos Geológicos e Ambientais ---\n`;
+        reportText += `Distribuição de Risco dos Lotes:\n`;
+        reportText += `- Baixo Risco: ${riskCategoryCounts['Baixo'] || 0} lotes\n`;
+        reportText += `- Médio Risco: ${riskCategoryCounts['Médio'] || 0} lotes\n`;
+        reportText += `- Alto Risco: ${riskCategoryCounts['Alto'] || 0} lotes\n`;
+        reportText += `- Muito Alto Risco: ${riskCategoryCounts['Muito Alto'] || 0} lotes\n`;
+        
+        // Adiciona outros tipos de risco encontrados (como "Geológico")
+        for (const riskType in otherRisks) {
+            reportText += `- ${riskType}: ${otherRisks[riskType]} lotes\n`;
+        }
+        reportText += `\n`;
+        reportText += `Total de Lotes com Risco Elevado (considerando Médio, Alto, Muito Alto e Outros Tipos): ${lotesComRiscoElevado} (${percRiscoElevado}% do total)\n`;
+        
+        if (lotesComRiscoElevado > 0) {
+            reportText += `Recomendação: Áreas com risco demandam estudos geotécnicos aprofundados e, possivelmente, intervenções estruturais para mitigação de riscos ou realocação, conforme a legislação vigente de REURB e plano de contingência municipal.\n\n`;
+        } else {
+            reportText += `Recomendação: A área analisada apresenta um perfil de baixo risco predominante, o que facilita o processo de regularização fundiária.\n\n`;
+        }
+    }
+
+    if (incAreasPublicas) {
+        // USA A PROPRIEDADE 'dentro_app' para APP
+        const lotesEmAPP = filteredFeatures.filter(f => {
+            const appStatus = f.properties.dentro_app; 
+            return (appStatus === 'Sim' || appStatus === true); 
+        }).length;
+
+        // Porcentagem de lotes em APP
+        const totalLotes = filteredFeatures.length;
+        const percLotesEmAPP = totalLotes > 0 ? (lotesEmAPP / totalLotes * 100).toFixed(2) : 0;
+
+
+        reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
+        reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP} (${percLotesEmAPP}% do total)\n`; // Adicionado percentual
+        if (lotesEmAPP > 0) {
+            reportText += `Observação: A presença de lotes em Áreas de Preservação Permanente exige a aplicação de medidas específicas de regularização ambiental, como a recuperação da área degradada ou a compensação ambiental, conforme o Código Florestal e demais normativas ambientais aplicáveis à REURB.\n\n`;
+        } else {
+            reportText += `Observação: Não foram identificados lotes em Áreas de Preservação Permanente no conjunto de dados analisado, o que simplifica o licenciamento ambiental da regularização.\n\n`;
+        }
+    }
+
+    // SEÇÃO: Informações Gerais do Projeto (Puxa do Formulário Manual)
+    if (incInformacoesGerais && Object.keys(generalProjectInfo).length > 0) {
+        const info = generalProjectInfo; 
+
+        reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
+        
+        // Infraestrutura Básica
+        reportText += `**Infraestrutura Básica:**\n`;
+        reportText += `  - Unidades de Conservação Próximas: ${info.ucConservacao || 'Não informado'}.\n`;
+        reportText += `  - Proteção de Mananciais na Área: ${info.protecaoMananciais || 'Não informado'}.\n`;
+        reportText += `  - Abastecimento de Água: ${info.tipoAbastecimento || 'Não informado'}${info.responsavelAbastecimento ? ' (Responsável: ' + info.responsavelAbastecimento + ')' : ''}.\n`;
+        reportText += `  - Coleta de Esgoto: ${info.tipoColetaEsgoto || 'Não informado'}${info.responsavelColetaEsgoto ? ' (Responsável: ' + info.responsavelColetaEsgoto + ')' : ''}.\n`;
+        reportText += `  - Sistema de Drenagem: ${info.sistemaDrenagem || 'Não informado'}.\n`;
+        reportText += `  - Lotes com Drenagem Inadequada: ${info.drenagemInadequada || 'Não informado'}.\n`;
+        reportText += `  - Logradouros: ${info.logradourosIdentificados || 'Não informado'}.\n\n`;
+
+        // Restrições e Conflitos
+        reportText += `**Restrições e Conflitos:**\n`;
+        if (info.linhaTransmissao === 'Sim' || info.minerodutoGasoduto === 'Sim' || info.linhaFerrea === 'Sim' || info.aeroporto === 'Sim' || info.limitacoesOutras === 'Sim') {
+            reportText += `  - Foram identificadas as seguintes restrições/infraestruturas de grande porte:\n`;
+            if (info.linhaTransmissao === 'Sim') reportText += `    - Linha de Transmissão de Energia.\n`;
+            if (info.minerodutoGasoduto === 'Sim') reportText += `    - Mineroduto / Gasoduto.\n`;
+            if (info.linhaFerrea === 'Sim') reportText += `    - Linha Férrea.\n`;
+            if (info.aeroporto === 'Sim') reportText += `    - Proximidade de Aeroporto.\n`;
+            if (info.limitacoesOutras === 'Sim') reportText += `    - Outras limitações de natureza diversa.\n`;
+        } else {
+            reportText += `  - Não foram identificadas restrições significativas de infraestruturas de grande porte ou outras limitações específicas.\n`;
+        }
+        reportText += `  - Processo no Ministério Público: ${info.processoMP || 'Não informado'}.\n`;
+        reportText += `  - Processos Judiciais Existentes: ${info.processosJudiciais || 'Não informado'}.\n`;
+        reportText += `  - Comarcas do CRI: ${info.comarcasCRI || 'Não informado/Não aplicável'}.\n\n`;
+
+        // Aspectos Legais e Fundiários
+        reportText += `**Aspectos Legais e Fundiários:**\n`;
+        reportText += `  - Titularidade da Área: ${info.titularidadeArea || 'Não informado'}.\n`;
+        reportText += `  - Programa Terra Legal: ${info.terraLegal || 'Não informado'}.\n`;
+        reportText += `  - - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
+        reportText += `  - Legislação Municipal REURB: ${info.legislacaoReurb || 'Não informada'}.\n`;
+        reportText += `  - Legislação Municipal Ambiental: ${info.legislacaoAmbiental || 'Não informada'}.\n`;
+        reportText += `  - Plano Diretor Municipal: ${info.planoDiretor || 'Não informado'}.\n`;
+        reportText += `  - Lei de Uso e Ocupação do Solo/Zoneamento: ${info.zoneamento || 'Não informado'}.\n`;
+        reportText += `  - Município de Origem do Núcleo: ${info.municipioOriginal || 'Não informado/Atual'}.\n`;
+        reportText += `  - Matrículas de Origem/Afetadas: ${info.matriculasOrigem || 'Não informadas.'}\n`;
+        reportText += `  - Matrículas Identificadas: ${info.matriculasIdentificadas || 'Não informadas.'}\n\n`;
+
+        // Ações e Medidas Propostas
+        reportText += `**Ações e Medidas Propostas:**\n`;
+        reportText += `  - Adequação para Correção de Desconformidades: ${info.adequacaoDesconformidades || 'Não informado'}.\n`;
+        reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
+        reportText += `  - Medidas Compensatórias: ${info.medidasCompensatorias || 'Não informado'}.\n\n`;
+
+        reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
+    } else if (incInformacoesGerais) {
+        reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
+        reportText += `Nenhuma informação general foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
+    }
+
+
+    if (incInfraestrutura && allPoligonaisGeoJSON && allPoligonaisGeoJSON.features.length > 0) {
+        reportText += `--- 5. Análise de Infraestrutura e Equipamentos Urbanos (Camadas Geoespaciais) ---\n`;
+        reportText += `Foram detectadas ${allPoligonaisGeoJSON.features.length} poligonais de infraestrutura ou outras áreas de interesse (como vias, áreas verdes, equipamentos comunitários) nas camadas carregadas.\n`;
+        reportText += `A presença e adequação da infraestrutura existente é um fator chave para a viabilidade e qualidade da regularização. Recomenda-se verificação detalhada da situação da infraestrutura básica (água, esgoto, energia, drenagem, acesso) em relação aos lotes.\n\n`;
+    }
+    
+    // Custo de Intervenção (sempre incluído no final do relatório)
+    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => {
+        let custoValor = 0;
+        if (typeof f.properties.valor === 'number') { // Usamos 'valor'
+            custoValor = f.properties.valor;
+        }
+        return acc + custoValor;
+    }, 0);
+
+    reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
+    reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+    reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
+
+
+    reportText += `--- Fim do Relatório ---\n`;
+    reportText += `Este relatório foi gerado automaticamente pelo GeoLaudo.AI. Para análises mais aprofundadas e validação legal, consulte um especialista qualificado e os órgãos competentes.`;
+
+    generatedReportContent.textContent = reportText;
+    generatedReportContent.scrollTop = 0; // Volta para o topo do relatório
+});
+
+// Exportar Relatório (botão no header)
+document.getElementById('exportReportBtn').addEventListener('click', () => {
+    console.log('Evento: Botão "Exportar Relatório" clicado.'); 
+    const reportContent = document.getElementById('generatedReportContent').textContent;
+    if (reportContent.includes('Nenhum relatório gerado ainda') || reportContent.includes('Nenhum dado de lotes disponível')) {
+        alert('Por favor, gere um relatório primeiro na aba "Relatórios".');
+        return;
+    }
+
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'relatorio_geolaudo.txt');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+});
