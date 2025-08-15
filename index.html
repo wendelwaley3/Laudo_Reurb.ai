@@ -133,7 +133,7 @@
                 <label for="geojsonFileInput" class="drag-drop-area">
                     <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
                     <p>ou clique para selecionar</p>
-                    <!-- BOTÃO DE SELEÇÃO DE ARQUIVOS (AGORA COM ID) -->
+                    <!-- BOTÃO DE SELEÇÃO DE ARQUIVOS (COM ID) -->
                     <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button>
                     <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
                 </label>
@@ -385,6 +385,10 @@
     <!-- Inclui o JS do Leaflet -->
     <!-- ATENÇÃO: Atributo 'integrity' REMOVIDO para evitar bloqueios -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Inclui proj4js para definição de sistemas de coordenadas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
+    <!-- Inclui proj4leaflet para integração Leaflet com proj4js -->
+    <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
     <!-- Inclui o Turf.js para operações geoespaciais client-side (se for usar extensivamente) -->
     <!-- Embora não seja amplamente usado neste template, está aqui para referência futura. -->
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
