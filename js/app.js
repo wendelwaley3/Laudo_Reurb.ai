@@ -4,8 +4,8 @@ let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena t
 let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   // Armazena todas as APPs carregadas
 let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena outras poligonais (infraestrutura, etc.)
 
-// NOVA VARIÁVEL: Armazenar informações gerais do projeto (manual)
-let generalProjectInfo = {};
+// VARIÁVEL PARA INFORMAÇÕES GERAIS (MANUAL)
+let generalProjectInfo = {}; 
 
 // Camadas Leaflet no mapa
 let lotesLayer = null;
@@ -49,8 +49,9 @@ function initMap() {
     document.getElementById('togglePoligonais').addEventListener('change', (e) => toggleLayerVisibility(poligonaisLayer, e.target.checked));
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
-    // Invalida o tamanho do mapa após a inicialização para garantir que renderize corretamente
-    map.invalidateSize();
+    // IMPORTANTE: map.invalidateSize() deve ser chamado depois que o mapa está visível no DOM
+    // Chamamos aqui e também na mudança de abas
+    map.invalidateSize(); 
 }
 
 // Função para ligar/desligar a visibilidade da camada no mapa
@@ -82,7 +83,7 @@ document.querySelectorAll('nav a').forEach(link => {
         document.getElementById(targetSectionId).classList.add('active');
         this.classList.add('active');
 
-        // Invalida o tamanho do mapa se a seção do dashboard for ativada (garante que o mapa renderize corretamente)
+        // Garante que o mapa renderize corretamente após a seção do dashboard se tornar visível
         if (targetSectionId === 'dashboard' && map) {
             map.invalidateSize();
         }
@@ -93,7 +94,7 @@ document.querySelectorAll('nav a').forEach(link => {
 document.addEventListener('DOMContentLoaded', () => {
     initMap(); // Inicializa o mapa ao carregar a página
     setupFileUpload(); // Configura o upload de arquivos
-    setupGeneralInfoForm(); // NOVA: Configura o formulário de informações gerais
+    setupGeneralInfoForm(); // Configura o formulário de informações gerais
     // Garante que o dashboard esteja visível por padrão ao carregar a página
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
@@ -105,10 +106,16 @@ function setupFileUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
+    const selectFilesButton = dragDropArea.querySelector('button'); // NOVO: Seleciona o botão dentro da área de arrastar e soltar
 
     let selectedFiles = []; // Array para armazenar os arquivos GeoJSON selecionados
 
-    // Lida com a seleção de arquivos via input
+    // NOVO: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    selectFilesButton.addEventListener('click', () => {
+        fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+    });
+
+    // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
     fileInput.addEventListener('change', (e) => {
         selectedFiles = Array.from(e.target.files);
         displaySelectedFiles(selectedFiles);
@@ -242,6 +249,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             onEachFeature: onEachFeatureLotes,
             style: styleLotes
         }).addTo(map);
+        // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
         map.fitBounds(lotesLayer.getBounds());
     } else {
         // Se não houver lotes, centraliza o mapa no Brasil e limpa a camada de lotes
@@ -519,7 +527,7 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     document.body.removeChild(link);
 });
 
-// NOVA FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
+// FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
 function setupGeneralInfoForm() {
     const saveButton = document.getElementById('saveGeneralInfoBtn');
     const statusMessage = document.getElementById('generalInfoStatus');
@@ -665,7 +673,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         }
     }
 
-    // NOVA SEÇÃO: Informações Gerais do Projeto (Puxa do Formulário Manual)
+    // SEÇÃO: Informações Gerais do Projeto (Puxa do Formulário Manual)
     if (incInformacoesGerais && Object.keys(generalProjectInfo).length > 0) {
         const info = generalProjectInfo; // Usa as propriedades do objeto generalProjectInfo
 
