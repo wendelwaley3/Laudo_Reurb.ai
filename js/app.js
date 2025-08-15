@@ -1,8 +1,8 @@
 // Variáveis Globais para armazenar os dados e camadas
-let map; // Apenas declaração, a inicialização ocorre em initMap()
-let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena todos os lotes carregados
-let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   // Armazena todas as APPs carregadas
-let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena outras poligonais (infraestrutura, etc.)
+let map; 
+let allLotesGeoJSON = { type: 'FeatureCollection', features: [] };
+let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   
+let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; 
 
 // VARIÁVEL PARA INFORMAÇÕES GERAIS (MANUAL)
 let generalProjectInfo = {}; 
@@ -23,17 +23,20 @@ const riscoStyles = {
 
 // 1. Inicializa o Mapa
 function initMap() {
-    console.log('initMap: Iniciando mapa...'); // Log para depuração
+    console.log('initMap: Iniciando mapa...'); 
     // AQUI: Inicializamos o objeto 'map' com L.map()
-    map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas do centro do Brasil
-    console.log('initMap: Objeto mapa criado.'); // Log para depuração
+    // Definimos a visualização inicial e o zoom
+    map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
+    console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap OpenStreetMap (Padrão)
+    // Basemap OpenStreetMap (AGORA DEVE CARREGAR CORRETAMENTE)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        minZoom: 0, // Garante que carrega em todos os zooms
+        maxZoom: 19 // Garante que carrega em todos os zooms
     });
-    osmLayer.addTo(map); // Adiciona o OSM como camada padrão
-    console.log('initMap: Basemap OpenStreetMap adicionado.'); // Log para depuração
+    osmLayer.addTo(map); 
+    console.log('initMap: Basemap OpenStreetMap adicionado.'); 
 
     // Basemap Esri World Imagery (Satélite) - similar ao Google Maps Satélite
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -43,10 +46,10 @@ function initMap() {
     // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
         "OpenStreetMap": osmLayer,
-        "Esri World Imagery (Satélite)": esriWorldImagery // Nome mais claro para o usuário
+        "Esri World Imagery (Satélite)": esriWorldImagery 
     };
-    L.control.layers(baseMaps).addTo(map); // AQUI: Adiciona o controle de camadas ao mapa JÁ INICIALIZADO
-    console.log('initMap: Controle de camadas base adicionado.'); // Log para depuração
+    L.control.layers(baseMaps).addTo(map); 
+    console.log('initMap: Controle de camadas base adicionado.'); 
 
     // Adiciona listeners para os checkboxes da legenda personalizada
     document.getElementById('toggleLotes').addEventListener('change', (e) => toggleLayerVisibility(lotesLayer, e.target.checked));
@@ -54,9 +57,8 @@ function initMap() {
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
     // IMPORTANTE: map.invalidateSize() deve ser chamado depois que o mapa está visível no DOM
-    // O DOMContentLoaded garante que o elemento mapid exista, e invalidateSize garante que o Leaflet calcule o tamanho
     map.invalidateSize(); 
-    console.log('initMap: invalidateSize() chamado.'); // Log para depuração
+    console.log('initMap: invalidateSize() chamado.'); 
 }
 
 // Função para ligar/desligar a visibilidade da camada no mapa
@@ -75,7 +77,7 @@ document.querySelectorAll('nav a').forEach(link => {
     link.addEventListener('click', function(e) {
         e.preventDefault();
         const targetSectionId = this.getAttribute('data-section');
-        console.log(`Navegação: Clicado em ${targetSectionId}`); // Log para depuração
+        console.log(`Navegação: Clicado em ${targetSectionId}`); 
 
         // Remove 'active' de todas as seções e links
         document.querySelectorAll('main section').forEach(section => {
@@ -91,7 +93,7 @@ document.querySelectorAll('nav a').forEach(link => {
 
         // Garante que o mapa renderize corretamente após a seção do dashboard se tornar visível
         if (targetSectionId === 'dashboard' && map) {
-            console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); // Log para depuração
+            console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
             map.invalidateSize();
         }
     });
@@ -99,50 +101,52 @@ document.querySelectorAll('nav a').forEach(link => {
 
 // 3. Funções de Upload e Processamento de GeoJSON
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded: Página e DOM carregados.'); // Log inicial
+    console.log('DOMContentLoaded: Página e DOM carregados.'); 
     initMap(); // Inicializa o mapa ao carregar a página
     setupFileUpload(); // Configura o upload de arquivos
     setupGeneralInfoForm(); // Configura o formulário de informações gerais
     // Garante que o dashboard esteja visível por padrão ao carregar a página
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); // Log final
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
 
 function setupFileUpload() {
-    console.log('setupFileUpload: Configurando upload de arquivos...'); // Log para depuração
+    console.log('setupFileUpload: Configurando upload de arquivos...'); 
     const fileInput = document.getElementById('geojsonFileInput');
     const dragDropArea = document.querySelector('.drag-drop-area');
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    // NOVO: Seleciona o botão visível pelo ID que adicionamos no index.html
+    // SELECIONA O BOTÃO VISÍVEL PELO ID: AGORA DEVE FUNCIONAR
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
 
-    let selectedFiles = []; // Array para armazenar os arquivos GeoJSON selecionados
+    let selectedFiles = []; 
 
     // Verifica se os elementos foram encontrados (para depuração)
     if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput não encontrado!');
     if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton não encontrado!');
 
-    // NOVO: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado.'); // Log para depuração
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
             fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
         });
+    } else {
+        console.error('setupFileUpload: Botão visível ou input de arquivo não encontrados. O upload não funcionará.');
     }
 
     // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
     fileInput.addEventListener('change', (e) => {
-        console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); // Log para depuração
+        console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
         selectedFiles = Array.from(e.target.files);
         displaySelectedFiles(selectedFiles);
     });
 
     // Lida com o arrastar e soltar
     dragDropArea.addEventListener('dragover', (e) => {
-        e.preventDefault(); // Necessário para permitir o drop
+        e.preventDefault(); 
         dragDropArea.classList.add('dragging');
     });
     dragDropArea.addEventListener('dragleave', () => {
@@ -157,8 +161,8 @@ function setupFileUpload() {
 
     // Exibe os nomes dos arquivos selecionados na lista
     function displaySelectedFiles(files) {
-        console.log('displaySelectedFiles: Exibindo arquivos selecionados.'); // Log para depuração
-        fileListElement.innerHTML = ''; // Limpa a lista
+        console.log('displaySelectedFiles: Exibindo arquivos selecionados.'); 
+        fileListElement.innerHTML = ''; 
         if (files.length === 0) {
             fileListElement.innerHTML = '<li>Nenhum arquivo selecionado.</li>';
         } else {
@@ -172,7 +176,7 @@ function setupFileUpload() {
 
     // Botão Processar e Carregar Dados
     processAndLoadBtn.addEventListener('click', async () => {
-        console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); // Log para depuração
+        console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         if (selectedFiles.length === 0) {
             uploadStatus.textContent = 'Nenhum arquivo para processar. Por favor, selecione arquivos GeoJSON.';
             uploadStatus.className = 'status-message error';
@@ -200,7 +204,7 @@ function setupFileUpload() {
 
         for (const file of selectedFiles) {
             try {
-                console.log(`Processando arquivo: ${file.name}`); // Log para depuração
+                console.log(`Processando arquivo: ${file.name}`); 
                 const reader = new FileReader();
                 const fileContent = await new Promise((resolve, reject) => {
                     reader.onload = (e) => resolve(e.target.result);
@@ -217,24 +221,78 @@ function setupFileUpload() {
                      console.warn(`Arquivo ${file.name} não é um FeatureCollection, pode não ser processado corretamente.`);
                 }
 
-                // Lógica simplificada para determinar o tipo de camada pelo nome do arquivo.
-                // Você pode estender isso com um campo de seleção para o usuário, se necessário.
+                // Lógica para determinar o tipo de camada e processar coordenadas UTM
+                let currentLayerFeatures = [];
+                let isUtm = false; // Flag para saber se precisamos reprojectar
+
+                // Tenta detectar se as coordenadas são UTM
+                // Uma heurística simples: Northing grande (7 milhões), Easting entre 100k e 900k
+                if (geojsonData.features.length > 0 && geojsonData.features[0].geometry && geojsonData.features[0].geometry.coordinates) {
+                    const firstCoords = geojsonData.features[0].geometry.coordinates;
+                    let sampleCoord;
+                    if (Array.isArray(firstCoords[0]) && Array.isArray(firstCoords[0][0])) { // Polygon/MultiPolygon
+                        sampleCoord = firstCoords[0][0][0];
+                    } else if (Array.isArray(firstCoords[0])) { // LineString/Point
+                         sampleCoord = firstCoords[0];
+                         if (!Array.isArray(sampleCoord[0])) sampleCoord = firstCoords; // If it's just a Point
+                    } else { // Single point coordinates (e.g. [E,N])
+                         sampleCoord = firstCoords;
+                    }
+                    
+                    if (sampleCoord && sampleCoord.length >= 2) {
+                        const easting = sampleCoord[0];
+                        const northing = sampleCoord[1];
+                        // Heurística para UTM: Easting entre ~100k e ~900k, Northing grande (acima de ~1 milhão para sul, ou ~10 mil para norte)
+                        // Ajustando para as suas coordenadas (341xxx, 794xxxx) que são tipicamente UTM Sul
+                        if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
+                            isUtm = true;
+                            console.log("Coordenadas detectadas como UTM. Preparando reprojeção.");
+                        }
+                    }
+                }
+
+                if (isUtm) {
+                    // DEFINE O CRS PARA SEUS DADOS UTM (EPSG:31983 para SIRGAS 2000 / UTM Zone 23S)
+                    // **** VOCÊ DEVE VERIFICAR E MUDAR ESTE EPSG SE SEUS DADOS FOREM DE OUTRA ZONA UTM ****
+                    // Ex: Para Zona 24S, use 'EPSG:31984'
+                    // Ex: Para Zona 22S, use 'EPSG:31982'
+                    const utmCrs = new L.Proj.CRS('EPSG:31983',
+                        '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs',
+                        {
+                            origin: [-4862502.81, 10000000], // Exemplo de origem para ajuste se necessário
+                            resolutions: [
+                                8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625
+                            ]
+                        }
+                    );
+                    
+                    // Reprojeta as feições UTM para Lat/Lon (WGS84) que o mapa padrão do Leaflet usa
+                    // L.Proj.geoJson precisa do crs da camada
+                    currentLayerFeatures = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
+                    console.log("Feições reprojetadas de UTM para WGS84 (Lat/Lon).");
+
+                } else {
+                    currentLayerFeatures = geojsonData.features; // Se não for UTM, usa como está (Lat/Lon)
+                    console.log("Feições carregadas como WGS84 (Lat/Lon).");
+                }
+
+
                 if (file.name.toLowerCase().includes('lotes')) {
-                    allLotesGeoJSON.features.push(...geojsonData.features);
-                    geojsonData.features.forEach(f => {
+                    allLotesGeoJSON.features.push(...currentLayerFeatures);
+                    currentLayerFeatures.forEach(f => {
                         if (f.properties && f.properties.nucleo) {
                             nucleosSet.add(f.properties.nucleo);
                         }
                     });
                 } else if (file.name.toLowerCase().includes('app')) {
-                    allAPPGeoJSON.features.push(...geojsonData.features);
+                    allAPPGeoJSON.features.push(...currentLayerFeatures);
                 } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura)
-                    allPoligonaisGeoJSON.features.push(...geojsonData.features);
+                    allPoligonaisGeoJSON.features.push(...currentLayerFeatures);
                 }
-                console.log(`Arquivo ${file.name} processado com sucesso.`); // Log para depuração
+                console.log(`Arquivo ${file.name} processado com sucesso.`); 
 
             } catch (error) {
-                console.error(`Erro ao carregar ou processar ${file.name}:`, error); // Log de erro detalhado
+                console.error(`Erro ao carregar ou processar ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
                 // Limpa os dados carregados parcialmente em caso de erro
@@ -256,13 +314,13 @@ function setupFileUpload() {
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Agora vá para o Dashboard.';
         uploadStatus.className = 'status-message success';
-        console.log('Todos os arquivos processados. Dados carregados no mapa e dashboard.'); // Log final de sucesso
+        console.log('Todos os arquivos processados. Dados carregados no mapa e dashboard.'); 
     });
 }
 
 // 4. Renderiza as Camadas no Mapa
 function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
-    console.log('renderLayersOnMap: Renderizando camadas...'); // Log para depuração
+    console.log('renderLayersOnMap: Renderizando camadas...'); 
     // Remove camadas existentes do mapa se houver
     if (lotesLayer) map.removeLayer(lotesLayer);
     if (appLayer) map.removeLayer(appLayer);
@@ -276,12 +334,12 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
         }).addTo(map);
         // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
         map.fitBounds(lotesLayer.getBounds());
-        console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); // Log para depuração
+        console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
     } else {
         // Se não houver lotes, centraliza o mapa no Brasil e limpa a camada de lotes
         map.setView([-15.7801, -47.9292], 5);
         document.getElementById('toggleLotes').checked = false; // Desmarca o checkbox
-        console.log('renderLayersOnMap: Nenhum lote para exibir, mapa centralizado.'); // Log para depuração
+        console.log('renderLayersOnMap: Nenhum lote para exibir, mapa centralizado.'); 
     }
 
     // Carrega APP (não adiciona ao mapa por padrão, apenas o cria)
@@ -306,7 +364,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
         // Garante que o checkbox do APP esteja desmarcado e a camada invisível
         document.getElementById('toggleAPP').checked = false;
         if (map.hasLayer(appLayer)) map.removeLayer(appLayer); // Apenas para garantir
-        console.log('renderLayersOnMap: Camada APP carregada (mas invisível por padrão).'); // Log para depuração
+        console.log('renderLayersOnMap: Camada APP carregada (mas invisível por padrão).'); 
     }
 
     // Carrega Poligonais diversas (infraestrutura, etc.)
@@ -331,7 +389,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
         // Garante que o checkbox de poligonais esteja desmarcado e a camada invisível
         document.getElementById('togglePoligonais').checked = false;
         if (map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer); // Apenas para garantir
-        console.log('renderLayersOnMap: Camada Poligonais carregada (mas invisível por padrão).'); // Log para depuração
+        console.log('renderLayersOnMap: Camada Poligonais carregada (mas invisível por padrão).'); 
     }
 }
 
@@ -377,7 +435,7 @@ function onEachFeatureLotes(feature, layer) {
 
 // 5. Atualiza o Dashboard
 function updateDashboard(features) {
-    console.log('updateDashboard: Atualizando cards do dashboard com', features.length, 'lotes.'); // Log para depuração
+    console.log('updateDashboard: Atualizando cards do dashboard com', features.length, 'lotes.'); 
     document.getElementById('totalLotes').innerText = features.length;
 
     let lotesRiscoCount = 0;
@@ -396,11 +454,15 @@ function updateDashboard(features) {
             lotesRiscoCount++;
         }
         
-        // Para APP: assume que a propriedade 'app' existe e é booleana ou string 'sim'/'nao'
+        // CORREÇÃO AQUI: Verifique o nome da propriedade 'app' no seu GeoJSON
+        // Use o nome exato da propriedade. Ex: se for 'em_app', mude abaixo.
+        // O valor deve ser true/false ou "sim"/"não"
         if (feature.properties.app === true || String(feature.properties.app).toLowerCase() === 'sim') {
             lotesAppCount++;
         }
-        // Assume que 'custo_intervencao' é uma propriedade numérica
+        // CORREÇÃO AQUI: Verifique o nome da propriedade 'custo_intervencao' no seu GeoJSON
+        // Use o nome exato. Ex: se for 'custo', mude abaixo.
+        // O valor deve ser numérico
         custoTotal += (feature.properties.custo_intervencao || 0);
     });
 
@@ -419,7 +481,7 @@ function updateDashboard(features) {
 
 // 6. Preenche o Filtro de Núcleos
 function populateNucleusFilter(nucleos) {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); // Log para depuração
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); 
     const filterSelect = document.getElementById('nucleusFilter');
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
@@ -448,7 +510,7 @@ function populateNucleusFilter(nucleos) {
 
 // 7. Aplica Filtros no Dashboard (e mapa)
 document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-    console.log('Evento: Botão "Aplicar Filtros" clicado.'); // Log para depuração
+    console.log('Evento: Botão "Aplicar Filtros" clicado.'); 
     const selectedNucleus = document.getElementById('nucleusFilter').value;
     let filteredFeatures = allLotesGeoJSON.features;
 
@@ -467,7 +529,7 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
 
 // 8. Tabela de Lotes Detalhados
 function updateLotesTable(features) {
-    console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); // Log para depuração
+    console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
     const tableBody = document.querySelector('#lotesDataTable tbody');
     tableBody.innerHTML = ''; // Limpa a tabela
 
@@ -485,6 +547,7 @@ function updateLotesTable(features) {
         row.insertCell().textContent = props.tipo_uso || 'N/A';
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
         row.insertCell().textContent = props.risco || 'N/A';
+        // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
         row.insertCell().textContent = (props.app === true || String(props.app).toLowerCase() === 'sim') ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
@@ -525,7 +588,7 @@ document.getElementById('lotSearch').addEventListener('keyup', (e) => {
 
 // Exportar Tabela para CSV
 document.getElementById('exportTableBtn').addEventListener('click', () => {
-    console.log('Evento: Botão "Exportar Tabela" clicado.'); // Log para depuração
+    console.log('Evento: Botão "Exportar Tabela" clicado.'); 
     const table = document.getElementById('lotesDataTable');
     let csv = [];
     // Cabeçalho
@@ -563,12 +626,12 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
 
 // FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
 function setupGeneralInfoForm() {
-    console.log('setupGeneralInfoForm: Configurando formulário de informações gerais.'); // Log para depuração
+    console.log('setupGeneralInfoForm: Configurando formulário de informações gerais.'); 
     const saveButton = document.getElementById('saveGeneralInfoBtn');
     const statusMessage = document.getElementById('generalInfoStatus');
 
     saveButton.addEventListener('click', () => {
-        console.log('Evento: Botão "Salvar Informações Gerais" clicado.'); // Log para depuração
+        console.log('Evento: Botão "Salvar Informações Gerais" clicado.'); 
         // Função auxiliar para pegar valor de radio button group
         const getRadioValue = (name) => {
             const radios = document.getElementsByName(name);
@@ -623,20 +686,20 @@ function setupGeneralInfoForm() {
 
         statusMessage.textContent = 'Informações gerais salvas com sucesso!';
         statusMessage.className = 'status-message success';
-        console.log('Informações Gerais Salvas:', generalProjectInfo); // Log para depuração
+        console.log('Informações Gerais Salvas:', generalProjectInfo); 
     });
 }
 
 
 // 9. Gerador de Relatórios com IA (Simulada)
 document.getElementById('generateReportBtn').addEventListener('click', () => {
-    console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); // Log para depuração
+    console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); 
     const reportType = document.getElementById('reportType').value;
     const nucleosAnalise = document.getElementById('nucleosAnalise').value;
     const incDadosGerais = document.getElementById('incDadosGerais').checked;
     const incAnaliseRiscos = document.getElementById('incAnaliseRiscos').checked;
     const incAreasPublicas = document.getElementById('incAreasPublicas').checked;
-    const incInformacoesGerais = document.getElementById('incInformacoesGerais').checked; // Esta puxa do formulário manual
+    const incInformacoesGerais = document.getElementById('incInformacoesGerais').checked; 
     const incInfraestrutura = document.getElementById('incInfraestrutura').checked;
     const generatedReportContent = document.getElementById('generatedReportContent');
 
@@ -761,7 +824,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
         reportText += `  - Medidas Compensatórias: ${info.medidasCompensatorias || 'Não informado'}.\n\n`;
 
-        reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
+        reportText += `Esta seção reflete informações gerais sobre o área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
     } else if (incInformacoesGerais) {
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
         reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
@@ -790,7 +853,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
 // Exportar Relatório (botão no header)
 document.getElementById('exportReportBtn').addEventListener('click', () => {
-    console.log('Evento: Botão "Exportar Relatório" clicado.'); // Log para depuração
+    console.log('Evento: Botão "Exportar Relatório" clicado.'); 
     const reportContent = document.getElementById('generatedReportContent').textContent;
     if (reportContent.includes('Nenhum relatório gerado ainda') || reportContent.includes('Nenhum dado de lotes disponível')) {
         alert('Por favor, gere um relatório primeiro na aba "Relatórios".');
