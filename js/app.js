@@ -28,7 +28,14 @@ const riscoStyles = {
 // SE SEUS DADOS FOREM DE OUTRA ZONA UTM OU OUTRO DATUM, VOCÊ PRECISA MUDAR A DEFINIÇÃO ABAIXO.
 // Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
 if (typeof proj4 !== 'undefined') {
+    // Definimos a projeção para SIRGAS 2000 / UTM Zone 23S (EPSG:31983)
+    // Para outras zonas, mude o 'zone=XX' e possivelmente o 'south'/'north' e o EPSG.
+    // Ex: para Zona 24S: '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+    // Você pode adicionar mais definições se tiver dados de múltiplas zonas e selecioná-los dinamicamente
+    // Ex: proj4.defs('EPSG:31984', '...');
+    // Ex: proj4.defs('EPSG:XXXX', '...');
+
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará.");
 }
@@ -38,7 +45,7 @@ if (typeof proj4 !== 'undefined') {
 // 1. Inicializa o Mapa
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
-    map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
+    map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas iniciais (centro do Brasil)
     console.log('initMap: Objeto mapa criado.'); 
 
     // Basemap Esri World Street Map (Mais robusto para ser o padrão e carregar sempre)
@@ -243,20 +250,21 @@ function setupFileUpload() {
                 let featuresToLoad = [];
 
                 // Heurística para detectar UTM: verifica se a primeira coordenada tem valores grandes de Northing e Easting
-                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined') {
+                // e se proj4js está disponível para a reprojeção
+                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { // Verifica se a definição UTM existe
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
-                        let sampleCoord;
-                        // Extrai uma coordenada válida para verificação, lidando com diferentes tipos de geometria
-                        if (sampleFeature.geometry.type === 'Point') {
-                            sampleCoord = sampleFeature.geometry.coordinates;
-                        } else if (sampleFeature.geometry.type === 'LineString' || sampleFeature.geometry.type === 'MultiPoint') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0];
-                        } else if (sampleFeature.geometry.type === 'Polygon' || sampleFeature.geometry.type === 'MultiLineString') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0][0];
-                        } else if (sampleFeature.geometry.type === 'MultiPolygon') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0][0][0];
-                        }
+                        let sampleCoord = [];
+                        // Função auxiliar para extrair a primeira coordenada de qualquer geometria
+                        const extractFirstCoord = (coords) => {
+                            if (!coords || coords.length === 0) return null;
+                            if (typeof coords[0] === 'number') return coords; // Point
+                            if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') return coords[0]; // LineString, MultiPoint
+                            if (Array.isArray(coords[0]) && Array.isArray(coords[0][0]) && typeof coords[0][0][0] === 'number') return coords[0][0][0]; // Polygon, MultiLineString
+                            if (Array.isArray(coords[0]) && Array.isArray(coords[0][0]) && Array.isArray(coords[0][0][0]) && typeof coords[0][0][0][0] === 'number') return coords[0][0][0][0]; // MultiPolygon
+                            return null;
+                        };
+                        sampleCoord = extractFirstCoord(sampleFeature.geometry.coordinates);
                         
                         if (sampleCoord && sampleCoord.length >= 2) {
                             const easting = sampleCoord[0]; // X
@@ -264,23 +272,26 @@ function setupFileUpload() {
 
                             // Heurística para UTM no Brasil (especialmente Zonas 22S, 23S, 24S)
                             // Easting entre 100.000 e 900.000 (False Easting para não ter negativos)
-                            // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
+                            // Northing grande (acima de ~1 milhão para sul)
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log("Coordenadas detectadas como UTM. Reprojetando para WGS84...");
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84...`);
                                 // Define o CRS para o Leaflet.Proj com base na definição do proj4.defs()
-                                const utmCrs = new L.Proj.CRS('EPSG:31983'); // Usa a definição já criada no proj4.defs
+                                // ASSUME EPSG:31983. SE SEUS DADOS SÃO DE OUTRA ZONA, VOCÊ DEVE MUDAR O proj4.defs() NO INÍCIO DESTE ARQUIVO.
+                                const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 
                                 // O L.Proj.geoJson aceita um GeoJSON e um objeto de opções, onde crs é o CRS de ENTRADA do GeoJSON
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
+                                console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
                             }
                         }
                     }
                 }
                 
-                // Se não detectou UTM ou proj4/proj4leaflet não estão carregados, carrega as feições como estão (assumindo WGS84)
+                // Se não detectou UTM, proj4/proj4leaflet não estão carregados, ou reprojeção não ocorreu,
+                // carrega as feições como estão (assumindo WGS84)
                 if (featuresToLoad.length === 0 && geojsonData.features.length > 0) {
                     featuresToLoad = geojsonData.features;
-                    console.log("Coordenadas carregadas como WGS84 ou reprojeção não aplicável.");
+                    console.log(`Coordenadas de ${file.name} carregadas como WGS84 ou reprojeção não aplicável.`);
                 }
 
 
@@ -297,7 +308,7 @@ function setupFileUpload() {
                 } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura)
                     allPoligonaisGeoJSON.features.push(...featuresToLoad);
                 }
-                console.log(`Arquivo ${file.name} processado com sucesso.`); 
+                console.log(`Arquivo ${file.name} adicionado às camadas. Total de lotes até agora: ${allLotesGeoJSON.features.length}`); 
 
             } catch (error) {
                 console.error(`Erro ao carregar ou processar ${file.name}:`, error); 
@@ -423,20 +434,26 @@ function onEachFeatureLotes(feature, layer) {
         // Itera sobre todas as propriedades e adiciona ao popup
         for (let key in feature.properties) {
             let value = feature.properties[key];
-            if (value === null || value === undefined) value = 'N/A'; // Trata valores nulos/indefinidos
+            if (value === null || value === undefined || value === "") value = 'N/A'; // Trata valores nulos/indefinidos/vazios
 
             if (key.toLowerCase().includes('area') && typeof value === 'number') {
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
             // CORREÇÃO AQUI: Verifique o nome da propriedade de custo no seu GeoJSON
-            // Ex: se for 'valor_total_custo', mude aqui 'custo_intervencao' para 'valor_total_custo'
-            if (key.toLowerCase().includes('custo') && typeof value === 'number') { // Mantém genérico para 'custo'
-                value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            // Ex: se a propriedade de custo no seu GeoJSON for 'VALOR_CUSTO', mude 'custo_intervencao' para 'VALOR_CUSTO'
+            if (key.toLowerCase().includes('custo') || key.toLowerCase().includes('valor_intervencao')) { // Inclui uma verificação mais ampla
+                if (typeof value === 'number') {
+                   value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
             }
             // CORREÇÃO AQUI: Verifique o nome da propriedade de APP no seu GeoJSON
-            // Ex: se for 'dentro_app', mude aqui 'app' para 'dentro_app'
-            if (key.toLowerCase() === 'app' && typeof value === 'boolean') { // Mantém genérico para 'app'
-                value = value ? 'Sim' : 'Não';
+            // Ex: se a propriedade de APP no seu GeoJSON for 'DENTRO_APP', mude 'app' para 'DENTRO_APP'
+            if (key.toLowerCase() === 'app' || key.toLowerCase().includes('area_preservacao')) { // Inclui uma verificação mais ampla
+                if (typeof value === 'boolean') {
+                    value = value ? 'Sim' : 'Não';
+                } else if (typeof value === 'string') { // Trata "Sim"/"Não" como string
+                    value = value.toLowerCase() === 'sim' ? 'Sim' : 'Não';
+                }
             }
 
             popupContent += `<strong>${key}:</strong> ${value}<br>`;
@@ -456,26 +473,31 @@ function updateDashboard(features) {
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     features.forEach(feature => {
-        // Assume que 'risco' e 'app' são propriedades do GeoJSON dos lotes
-        const risco = feature.properties.risco || 'N/A';
-        if (riskCounts.hasOwnProperty(risco)) { // Verifica se a categoria de risco existe
+        // Assume que 'risco' é a propriedade para o risco
+        const risco = feature.properties.risco || 'N/A'; // Verifique se esta é a propriedade exata no seu GeoJSON
+        if (riskCounts.hasOwnProperty(risco)) { 
             riskCounts[risco]++;
         }
         
-        if (risco !== 'Baixo' && risco !== 'N/A') { // Conta lotes com risco diferente de "Baixo"
+        if (risco !== 'Baixo' && risco !== 'N/A') { 
             lotesRiscoCount++;
         }
         
         // CORREÇÃO AQUI: Verifique o nome da propriedade 'app' no seu GeoJSON
         // Use o nome exato da propriedade. Ex: se for 'em_app', mude abaixo.
-        // O valor deve ser true/false ou "sim"/"não"
-        if (feature.properties.app === true || String(feature.properties.app).toLowerCase() === 'sim') {
+        // O valor deve ser true/false ou "sim"/"não" (case-insensitive)
+        const appStatus = feature.properties.app || feature.properties.area_preservacao || ''; // Exemplo: verifica 'app' ou 'area_preservacao'
+        if (appStatus === true || String(appStatus).toLowerCase() === 'sim') {
             lotesAppCount++;
         }
+
         // CORREÇÃO AQUI: Verifique o nome da propriedade 'custo_intervencao' no seu GeoJSON
-        // Use o nome exato. Ex: se for 'custo', mude abaixo.
+        // Use o nome exato. Ex: se for 'custo_total', mude abaixo.
         // O valor deve ser numérico
-        custoTotal += (feature.properties.custo_intervencao || 0);
+        const custoValor = feature.properties.custo_intervencao || feature.properties.valor_custo || 0; // Exemplo: verifica 'custo_intervencao' ou 'valor_custo'
+        if (typeof custoValor === 'number') {
+            custoTotal += custoValor;
+        }
     });
 
     document.getElementById('lotesRisco').innerText = lotesRiscoCount;
@@ -513,7 +535,7 @@ function populateNucleusFilter(nucleos) {
             const option = document.createElement('option');
             option.value = nucleo;
             option.textContent = nucleo;
-            reportNucleosSelect.appendChild(option);
+            filterSelect.appendChild(option);
         });
     } else {
         reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
@@ -561,7 +583,8 @@ function updateLotesTable(features) {
         row.insertCell().textContent = props.risco || 'N/A';
         // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
         // Use o nome exato da propriedade 'app' do seu GeoJSON
-        row.insertCell().textContent = (props.app === true || String(props.app).toLowerCase() === 'sim') ? 'Sim' : 'Não';
+        const appStatus = props.app || props.area_preservacao || ''; // Exemplo: verifica 'app' ou 'area_preservacao'
+        row.insertCell().textContent = (appStatus === true || String(appStatus).toLowerCase() === 'sim') ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
         const viewBtn = document.createElement('button');
@@ -776,7 +799,12 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
 
     if (incAreasPublicas) {
-        const lotesEmAPP = filteredFeatures.filter(f => f.properties.app === true || String(f.properties.app).toLowerCase() === 'sim').length;
+        // CORREÇÃO AQUI: Verifique a propriedade 'app' ou 'area_preservacao' no seu GeoJSON
+        const lotesEmAPP = filteredFeatures.filter(f => {
+            const appStatus = f.properties.app || f.properties.area_preservacao || ''; // Exemplo: verifica 'app' ou 'area_preservacao'
+            return appStatus === true || String(appStatus).toLowerCase() === 'sim';
+        }).length;
+
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
         reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
         if (lotesEmAPP > 0) {
@@ -788,7 +816,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
     // SEÇÃO: Informações Gerais do Projeto (Puxa do Formulário Manual)
     if (incInformacoesGerais && Object.keys(generalProjectInfo).length > 0) {
-        const info = generalProjectInfo; // Usa as propriedades do objeto generalProjectInfo
+        const info = generalProjectInfo; 
 
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
         
