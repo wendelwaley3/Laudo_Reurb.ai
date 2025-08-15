@@ -21,6 +21,7 @@
             <a href="#" data-section="dashboard" class="active">Dashboard</a>
             <a href="#" data-section="upload">Upload de Dados</a>
             <a href="#" data-section="informacoes-gerais">Informações Gerais</a>
+            <a href="#" data-section="lotes-detalhados">Dados Lotes</a> <!-- NOVA ABA PARA TABELA DE LOTES -->
             <a href="#" data-section="relatorios">Relatórios</a>
             <a href="#" data-section="instrucoes">Instruções</a>
         </nav>
@@ -100,7 +101,9 @@
                 <!-- Opcional: Adicionar um canvas aqui para Chart.js se for implementar gráficos -->
                 <!-- <canvas id="myChart"></canvas> -->
             </div>
-
+            
+            <!-- REMOVIDA DAQUI - AGORA EM NOVA ABA "Dados Lotes" -->
+            <!--
             <h2>Dados Detalhados dos Lotes</h2>
             <div class="data-table-controls">
                 <input type="text" id="lotSearch" placeholder="Buscar lote...">
@@ -124,6 +127,7 @@
                     </tbody>
                 </table>
             </div>
+            -->
         </section>
 
         <!-- Upload Section -->
@@ -316,6 +320,33 @@
             <p id="generalInfoStatus" class="status-message"></p>
         </section>
 
+        <!-- NOVA SEÇÃO: Dados Detalhados dos Lotes -->
+        <section id="lotes-detalhados" class="container">
+            <h2>Dados Detalhados dos Lotes</h2>
+            <div class="data-table-controls">
+                <input type="text" id="lotSearch" placeholder="Buscar lote...">
+                <button id="exportTableBtn">Exportar</button>
+            </div>
+            <div class="table-scroll-wrapper">
+                <table id="lotesDataTable">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Núcleo</th>
+                            <th>Tipo de Uso</th>
+                            <th>Área (m²)</th>
+                            <th>Status Risco</th>
+                            <th>APP</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
 
         <!-- Relatórios Section -->
         <section id="relatorios" class="container">
@@ -340,9 +371,9 @@
                     <div class="checkbox-group">
                         <label><input type="checkbox" id="incDadosGerais" checked> Dados Gerais dos Lotes</label>
                         <label><input type="checkbox" id="incAnaliseRiscos" checked> Análise de Riscos</label>
-                        <label><input type="checkbox" id="incAreasPublicas" checked> Áreas Públicas (APP)</label> <!-- Mudado para checked por padrão -->
+                        <label><input type="checkbox" id="incAreasPublicas" checked> Áreas Públicas (APP)</label> 
                         <label><input type="checkbox" id="incInformacoesGerais" checked> Informações Gerais do Projeto</label>
-                        <label><input type="checkbox" id="incInfraestrutura" checked> Infraestrutura (Poligonais)</label> <!-- Mudado para checked por padrão -->
+                        <label><input type="checkbox" id="incInfraestrutura" checked> Infraestrutura (Poligonais)</label> 
                     </div>
                     <button id="generateReportBtn">Gerar Relatório com IA</button>
                 </div>
@@ -369,7 +400,7 @@
                 <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estatístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
                 <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
-                <li><strong>Dados Detalhados:</strong> A tabela na parte inferior do Dashboard lista os lotes com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
+                <li><strong>Dados Lotes:</strong> Nesta nova aba, você pode ver a tabela detalhada de todos os lotes, com funcionalidades de busca e exportação.</li>
                 <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado.</li>
                 <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
             </ol>
