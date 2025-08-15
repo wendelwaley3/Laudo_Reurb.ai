@@ -27,16 +27,16 @@ const riscoStyles = {
 // ========================================================================================
 // CRÍTICO: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// CONFIRMADO AGORA: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
+// RECONFIRMADO: SEU DADO É EPSG:29193 (Córrego Alegre / UTM Zone 23S)
 // Esta é a definição EXATA para este EPSG.
 if (typeof proj4 !== 'undefined') {
-    proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+    proj4.defs('EPSG:29193', '+proj=utm +zone=23 +south +ellps=aust_SA +towgs84=-66.879,4.371,-38.528,0,0,0,0 +units=m +no_defs +type=crs');
     
-    // Se você tiver dados de MÚLTIPLAS ZONAS UTM (ex: 22S, 24S), você pode adicionar suas definições aqui:
+    // Se você tiver dados de MÚLTIPLAS ZONAS UTM ou outros datums, você pode adicionar mais definições aqui:
+    // proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 23S
     // proj4.defs('EPSG:31982', '+proj=utm +zone=22 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 22S
-    // proj4.defs('EPSG:31984', '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 24S
 
-    console.log("Definição EPSG:31983 (SIRGAS 2000 / UTM Zone 23S) carregada para reprojeção UTM.");
+    console.log("Definição EPSG:29193 (Córrego Alegre / UTM Zone 23S) carregada para reprojeção UTM.");
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
 }
@@ -55,8 +55,10 @@ function initMap() {
         minZoom: 0, 
         maxZoom: 19 
     }).on('tileerror', function(error, tile) {
-        console.warn('Erro ao carregar tile OSM:', error, tile);
-        // Se este erro persistir, o problema é na sua rede/navegador, não no código.
+        // Loga erros de carregamento de tiles do OSM
+        console.error('Erro CRÍTICO ao carregar tile OpenStreetMap:', error, tile);
+        // Pode tentar um fallback para outro provedor de tiles se o OSM falhar consistentemente
+        // Ex: map.addLayer(esriStreetMap);
     });
     osmLayer.addTo(map); // Define como o mapa base padrão
     console.log('initMap: Basemap OpenStreetMap adicionado como padrão.'); 
@@ -156,19 +158,25 @@ function setupFileUpload() {
 
     let selectedFiles = []; 
 
-    // Verifica se os elementos foram encontrados (para depuração)
-    if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput não encontrado!');
-    if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton não encontrado!');
+    // VERIFICA SE OS ELEMENTOS FORAM ENCONTRADOS ANTES DE ADICIONAR LISTENERS
+    if (!fileInput) {
+        console.error('setupFileUpload ERRO: #geojsonFileInput (input oculto) não encontrado! O upload não funcionará.');
+        uploadStatus.textContent = 'Erro interno: Campo de seleção de arquivos não encontrado.';
+        uploadStatus.className = 'status-message error';
+        return; // Sai da função se o elemento crítico não for encontrado
+    }
+    if (!selectFilesVisibleButton) {
+        console.error('setupFileUpload ERRO: #selectFilesVisibleButton (botão visível) não encontrado! O upload não funcionará.');
+        uploadStatus.textContent = 'Erro interno: Botão de seleção de arquivos não encontrado.';
+        uploadStatus.className = 'status-message error';
+        return; // Sai da função se o elemento crítico não for encontrado
+    }
 
     // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
-            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
-        });
-    } else {
-        console.error('setupFileUpload: Botão visível ou input de arquivo não encontrados. O upload não funcionará.');
-    }
+    selectFilesVisibleButton.addEventListener('click', () => {
+        console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
+        fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+    });
 
     // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
     fileInput.addEventListener('change', (e) => {
@@ -257,8 +265,8 @@ function setupFileUpload() {
                 // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
                 let featuresToLoad = [];
 
-                // Heurística para detectar UTM e reprojetar. USANDO EPSG:31983 CONFIRMADO!
-                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { 
+                // Heurística para detectar UTM e reprojetar. USANDO EPSG:29193 CONFIRMADO!
+                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:29193']) { // USANDO EPSG:29193
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
                         let sampleCoord = [];
@@ -276,22 +284,22 @@ function setupFileUpload() {
                             const easting = sampleCoord[0];
                             const northing = sampleCoord[1];
 
-                            // Heurística para UTM no Brasil (para SIRGAS 2000, zonas 22S, 23S, 24S)
-                            // Se a coordenada E/N se encaixa nos padrões UTM e a definição EPSG:31983 existe
+                            // Heurística para UTM no Brasil (para Córrego Alegre/SAD69, zonas 22S, 23S, 24S)
+                            // Valores de Easting e Northing devem estar dentro do range UTM esperado para o hemisfério sul
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:31983 provável). Reprojetando para WGS84...`);
-                                const utmCrs = new L.Proj.CRS('EPSG:31983'); 
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:29193). Reprojetando para WGS84...`);
+                                const utmCrs = new L.Proj.CRS('EPSG:29193'); // Usando o EPSG:29193
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
                                 console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
                             } else {
-                                console.log(`Coordenadas de ${file.name} não parecem ser UTM na Zona 23S. Carregando como WGS84.`);
+                                console.log(`Coordenadas de ${file.name} não parecem ser UTM (fora do range esperado para Brasil Sul). Carregando como WGS84.`);
                                 featuresToLoad = geojsonData.features; // Carrega como está (WGS84)
                             }
                         }
                     }
                 } else if (geojsonData.features.length > 0) { // Se proj4/proj4leaflet não estão disponíveis ou EPSG não definido
                     featuresToLoad = geojsonData.features;
-                    console.warn(`Proj4js/L.Proj não carregados ou definição EPSG:31983 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
+                    console.warn(`Proj4js/L.Proj não carregados ou definição EPSG:29193 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
                 }
                 
                 // Se o featuresToLoad ainda estiver vazio e o geojsonData original tiver features,
@@ -319,7 +327,7 @@ function setupFileUpload() {
                 console.log(`Arquivo ${file.name} adicionado às camadas. Total de lotes até agora: ${allLotesGeoJSON.features.length}`); 
 
             } catch (error) {
-                console.error(`Erro ao carregar ou processar ${file.name}:`, error); 
+                console.error(`Erro CRÍTICO ao carregar ou processar ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
                 // Limpa os dados carregados parcialmente em caso de erro
@@ -366,7 +374,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             map.fitBounds(lotesLayer.getBounds());
             console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
         } catch (e) {
-            console.error("Erro ao ajustar o mapa para a extensão dos lotes. Coordenadas podem estar inválidas ou fora da área visível.", e);
+            console.error("Erro ao ajustar o mapa para a extensão dos lotes. Coordenadas podem estar inválidas ou fora da área visível. Verifique o CRS de seus GeoJSONs.", e);
             map.setView([-15.7801, -47.9292], 5); // Volta para o centro do Brasil se falhar
         }
     } else {
@@ -715,11 +723,8 @@ async function fetchIbgeData(municipioNome) {
         if (municipioEncontrado) {
             const idMunicipio = municipioEncontrado.id;
             // Segundo, busca dados detalhados para o ID do município
-            const detailsUrl = `https://servicodados.ibge.gov.br/api/v3/malhas/municipios/${idMunicipio}/metadados`;
-            const detailsResponse = await fetch(detailsUrl);
-            const details = await detailsResponse.json();
-
-            // Extrai informações relevantes
+            // A API v3 (metadados) não retorna população diretamente e é mais complexa.
+            // Usaremos a API de agregados para população.
             const populacaoUrl = `https://servicodados.ibge.gov.br/api/v3/agregados/6579/periodos/2021/localidades/${idMunicipio}|BR/variaveis/9324?formato=json`;
             const populacaoResponse = await fetch(populacaoUrl);
             const populacaoData = await populacaoResponse.json();
@@ -845,7 +850,8 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `**NÚCLEO DE ANÁLISE: ${nucleosAnalise.toUpperCase()}**\n\n`;
         // Tenta pegar o nome do município do primeiro lote do núcleo selecionado
-        if (filteredFeatures.length > 0 && filteredFeatures[0].properties.municipio) {
+        // ATENÇÃO: Assumimos que a propriedade no seu GeoJSON que guarda o nome do município é 'municipio'
+        if (filteredFeatures.length > 0 && filteredFeatures[0].properties.municipio) { 
             municipioNome = filteredFeatures[0].properties.municipio;
         }
     } else {
@@ -869,7 +875,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
             reportText += `  - Microrregião: ${ibgeInfo.microrregiao || 'N/A'}\n`;
             reportText += `  - População (2021): ${ibgeInfo.populacao.toLocaleString('pt-BR') || 'Não disponível'}\n\n`;
         } else {
-            reportText += `  - Dados do IBGE para o município não puderam ser obtidos.\n\n`;
+            reportText += `  - Dados do IBGE para o município não puderam ser obtidos. Verifique o nome do município no GeoJSON ou a conexão com a internet.\n\n`;
         }
     } else {
          reportText += `  - Dados do IBGE não incluídos ou município não identificado.\n\n`;
