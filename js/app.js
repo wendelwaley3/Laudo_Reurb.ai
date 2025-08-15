@@ -285,11 +285,17 @@ function setupFileUpload() {
 
                             // Heurística para UTM no Brasil (SIRGAS 2000, zonas 22S, 23S, 24S)
                             // Valores de Easting e Northing devem estar dentro do range UTM esperado para o hemisfério sul
+                            // O Northing 7.xxx.xxx,xx e Easting 6xx.xxx,xx se encaixa para 31983.
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
                                 console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:31983). Reprojetando para WGS84...`);
                                 const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
                                 console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
+                                if (featuresToLoad.length > 0 && featuresToLoad[0].geometry && featuresToLoad[0].geometry.coordinates) {
+                                    const reprojectedSample = extractFirstCoord(featuresToLoad[0].geometry.coordinates);
+                                    console.log(`Amostra de coordenada reprojetada: Longitude ${reprojectedSample[0]}, Latitude ${reprojectedSample[1]}`);
+                                }
+
                             } else {
                                 console.log(`Coordenadas de ${file.name} não parecem ser UTM na Zona 23S. Carregando como WGS84.`);
                                 featuresToLoad = geojsonData.features; // Carrega como está (WGS84)
@@ -521,8 +527,8 @@ function updateDashboard(features) {
         } 
         
         // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
-        // Apenas para o card "Lotes em Risco", conta qualquer risco que não seja 'Baixo' ou 'N/A'
-        if (riscoValue !== 'Baixo' && riscoValue !== 'N/A') { 
+        // Esta contagem será a SOMA das categorias "Médio", "Alto", "Muito Alto"
+        if (['Médio', 'Alto', 'Muito Alto'].includes(riscoValue)) { 
             lotesRiscoCount++;
         }
         
@@ -550,7 +556,7 @@ function updateDashboard(features) {
     document.getElementById('riskHighCount').innerText = riskCategoryCounts['Alto'] || 0;
     document.getElementById('riskVeryHighCount').innerText = riskCategoryCounts['Muito Alto'] || 0;
 
-    // Atualiza o resumo de intervenções
+    // Atualiza o resumo de intervenções (agora consistente com lotesRiscoCount)
     document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
     document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
 }
@@ -603,10 +609,10 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     updateLotesTable(filteredFeatures); 
 });
 
-// 8. Tabela de Lotes Detalhados
+// 8. Tabela de Lotes Detalhados (Agora em aba própria)
 function updateLotesTable(features) {
     console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
-    const tableBody = document.querySelector('#lotesDataTable tbody');
+    const tableBody = document.querySelector('#lotes-detalhados table tbody'); // SELETOR CORRIGIDO
     tableBody.innerHTML = ''; // Limpa a tabela
 
     if (features.length === 0) {
@@ -639,7 +645,7 @@ function updateLotesTable(features) {
         viewBtn.textContent = 'Ver no Mapa';
         viewBtn.className = 'small-btn'; 
         viewBtn.onclick = () => {
-            document.querySelector('nav a[data-section="dashboard"]').click();
+            document.querySelector('nav a[data-section="dashboard"]').click(); // Vai para o dashboard
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
                     if (layer.feature && layer.feature.properties && layer.feature.properties.codigo === props.codigo) {
@@ -656,7 +662,8 @@ function updateLotesTable(features) {
 // Busca na tabela
 document.getElementById('lotSearch').addEventListener('keyup', (e) => {
     const searchTerm = e.target.value.toLowerCase();
-    const rows = document.querySelectorAll('#lotesDataTable tbody tr');
+    // CORREÇÃO: Selecionar as linhas da tabela na nova aba
+    const rows = document.querySelectorAll('#lotes-detalhados table tbody tr'); 
     rows.forEach(row => {
         const textContent = row.textContent.toLowerCase();
         if (textContent.includes(searchTerm)) {
@@ -670,7 +677,8 @@ document.getElementById('lotSearch').addEventListener('keyup', (e) => {
 // Exportar Tabela para CSV
 document.getElementById('exportTableBtn').addEventListener('click', () => {
     console.log('Evento: Botão "Exportar Tabela" clicado.'); 
-    const table = document.getElementById('lotesDataTable');
+    // CORREÇÃO: Selecionar a tabela na nova aba
+    const table = document.querySelector('#lotes-detalhados table'); 
     let csv = [];
     // Cabeçalho
     const headerRow = [];
@@ -722,8 +730,6 @@ async function fetchIbgeData(municipioNome) {
         if (municipioEncontrado) {
             const idMunicipio = municipioEncontrado.id;
             // Segundo, busca dados detalhados para o ID do município
-            // A API v3 (metadados) não retorna população diretamente e é mais complexa.
-            // Usaremos a API de agregados para população.
             const populacaoUrl = `https://servicodados.ibge.gov.br/api/v3/agregados/6579/periodos/2021/localidades/${idMunicipio}|BR/variaveis/9324?formato=json`;
             const populacaoResponse = await fetch(populacaoUrl);
             const populacaoData = await populacaoResponse.json();
@@ -789,7 +795,7 @@ function setupGeneralInfoForm() {
             minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
             linhaFerrea: getRadioValue('linhaFerrea'),
             aeroporto: getRadioValue('aeroporto'),
-            limitacoesOutras: document.getElementById('limitacoesOutras').value.trim(), // Agora é campo de texto
+            limitacoesOutras: document.getElementById('limitacoesOutras').value.trim(), 
             processoMP: getRadioValue('processoMP'),
             processosJudiciais: getRadioValue('processosJudiciais'),
             comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
@@ -818,7 +824,7 @@ function setupGeneralInfoForm() {
 
 
 // 9. Gerador de Relatórios com IA (Simulada)
-document.getElementById('generateReportBtn').addEventListener('click', async () => { // Adicionado 'async'
+document.getElementById('generateReportBtn').addEventListener('click', async () => { 
     console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); 
     const reportType = document.getElementById('reportType').value;
     const nucleosAnalise = document.getElementById('nucleosAnalise').value;
@@ -849,13 +855,12 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `**NÚCLEO DE ANÁLISE: ${nucleosAnalise.toUpperCase()}**\n\n`;
         // Tenta pegar o nome do município do primeiro lote do núcleo selecionado
-        // ATENÇÃO: Assumimos que a propriedade no seu GeoJSON que guarda o nome do município é 'municipio'
         if (filteredFeatures.length > 0 && filteredFeatures[0].properties.municipio) { 
             municipioNome = filteredFeatures[0].properties.municipio;
         }
     } else {
         reportText += `**ANÁLISE ABRANGENTE (TODOS OS NÚCLEOS)**\n\n`;
-        // Pega o nome do município do primeiro lote general se disponível
+        // Pega o nome do município do primeiro lote geral se disponível
         if (allLotesGeoJSON.features.length > 0 && allLotesGeoJSON.features[0].properties.municipio) {
             municipioNome = allLotesGeoJSON.features[0].properties.municipio;
         }
@@ -921,6 +926,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
             }
         });
 
+        // Contagem correta para "Lotes com Risco Elevado" no relatório
         const lotesComRiscoElevado = riskCategoryCounts['Médio'] + riskCategoryCounts['Alto'] + riskCategoryCounts['Muito Alto'] + Object.values(otherRisks).reduce((a, b) => a + b, 0);
         const percRiscoElevado = (lotesComRiscoElevado / filteredFeatures.length * 100 || 0).toFixed(2);
 
