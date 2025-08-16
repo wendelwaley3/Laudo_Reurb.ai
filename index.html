@@ -380,7 +380,7 @@
                                 </ul>
                             </li>
                             <li>Arquivos com "app" no nome serão tratados como Áreas de Preservação Permanente.</li>
-                            <li>Outros arquivos GeoJSON (como "tabela_geral" ou poligonais de infraestrutura) serão carregados como "Poligonais" genéricas no mapa.</li>
+                            <li>Outros arquivos GeoJSON (como "tabela_geral" no seu caso) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
                         </ul>
                     </p>
                 </li>
@@ -406,6 +406,7 @@
     <!-- ATENÇÃO: Atributo 'integrity' REMOVIDO para evitar bloqueios -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <!-- Inclui proj4js e proj4leaflet para futuras necessidades de reprojeção (não usado ativamente agora) -->
+    <!-- Se seus dados UTM não aparecerem, é provável que precise converter o GeoJSON para WGS84 no QGIS antes do upload. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
     <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
     <!-- Inclui o Turf.js para operações geoespaciais client-side (se for usar extensivamente) -->
