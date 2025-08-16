@@ -80,7 +80,6 @@ document.querySelectorAll('nav a').forEach(link => {
         document.getElementById(targetSectionId).classList.add('active');
         this.classList.add('active');
 
-        // Garante que o mapa renderize corretamente após a seção do dashboard se tornar visível
         if (targetSectionId === 'dashboard' && map) {
             console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
             map.invalidateSize();
@@ -94,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap(); 
     setupFileUpload(); 
     setupGeneralInfoForm(); 
-    // Garante que o dashboard esteja visível por padrão ao carregar a página
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
@@ -199,17 +197,14 @@ function setupFileUpload() {
                      console.warn(`Arquivo ${file.name} não é um FeatureCollection, pode não ser processado corretamente.`);
                 }
 
-                // Lógica para determinar o tipo de camada pelo nome do arquivo
-                // E CORREÇÃO DE NOMES DE PROPRIEDADES COM BASE NAS SUAS TABELAS
                 if (file.name.toLowerCase().includes('lotes')) {
                     allLotesGeoJSON.features.push(...geojsonData.features);
                     geojsonData.features.forEach(f => {
-                        // Usa a propriedade 'desc_nucleo' para o filtro de núcleos
-                        if (f.properties && f.properties.desc_nucleo) {
+                        if (f.properties && f.properties.desc_nucleo) { // Usa desc_nucleo
                             nucleosSet.add(f.properties.desc_nucleo);
                         }
                     });
-                    console.log("Propriedades da primeira feição de lotes:", geojsonData.features[0]?.properties); // DEBUG: ver propriedades
+                    console.log("Propriedades da primeira feição de lotes:", geojsonData.features[0]?.properties); 
                 } else if (file.name.toLowerCase().includes('app')) {
                     allAPPGeoJSON.features.push(...geojsonData.features);
                 } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura, tabela_geral)
@@ -231,7 +226,7 @@ function setupFileUpload() {
         renderLayersOnMap();
         updateDashboard(allLotesGeoJSON.features);
         populateNucleusFilter(Array.from(nucleosSet));
-        updateLotesTable(allLotesGeoJSON.features); // Atualiza a tabela na nova aba "Dados Lotes"
+        updateLotesTable(allLotesGeoJSON.features); 
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Agora vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
@@ -251,6 +246,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             onEachFeature: onEachFeatureLotes,
             style: styleLotes
         }).addTo(map);
+        // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
         map.fitBounds(lotesLayer.getBounds());
         console.log('Bounds dos lotes (Lat/Lon):', lotesLayer.getBounds()); // DEBUG: Checar se as coordenadas fazem sentido
         console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
@@ -332,7 +328,6 @@ function styleLotes(feature) {
 function onEachFeatureLotes(feature, layer) {
     if (feature.properties) {
         let popupContent = "<h3>Detalhes do Lote:</h3>";
-        // Itera sobre todas as propriedades e adiciona ao popup
         for (let key in feature.properties) {
             let value = feature.properties[key];
             if (value === null || value === undefined) value = 'N/A'; 
@@ -340,14 +335,13 @@ function onEachFeatureLotes(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { // Usa 'valor' para custo
+            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
-            // Propriedade 'dentro_app' para verificar se está em APP
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
                 value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
             }
-            // Mapeamento de nomes de propriedades para exibição no popup
+            // Mapeamento de nomes de propriedades para exibição no popup (adaptado para suas tabelas)
             let displayKey = key;
             switch(key.toLowerCase()){
                 case 'cod_lote': displayKey = 'Código do Lote'; break;
@@ -357,6 +351,10 @@ function onEachFeatureLotes(feature, layer) {
                 case 'risco': displayKey = 'Status de Risco'; break;
                 case 'dentro_app': displayKey = 'Em APP'; break;
                 case 'valor': displayKey = 'Custo de Intervenção'; break;
+                case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
+                case 'nm_mun': displayKey = 'Município'; break; // Nome do município do lote
+                case 'nome_logradouro': displayKey = 'Logradouro'; break;
+                case 'numero_postal': displayKey = 'CEP'; break;
                 // Adicione mais mapeamentos se precisar renomear outras propriedades para o popup
             }
 
@@ -377,7 +375,6 @@ function updateDashboard(features) {
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     features.forEach(feature => {
-        // Usa a propriedade 'risco' para a contagem de risco
         const risco = feature.properties.risco || 'N/A'; 
         if (riskCounts.hasOwnProperty(risco)) { 
             riskCounts[risco]++;
@@ -387,12 +384,11 @@ function updateDashboard(features) {
             lotesRiscoCount++;
         }
         
-        // Usa a propriedade 'dentro_app' para verificar APP
         const dentroApp = feature.properties.dentro_app;
         if (typeof dentroApp === 'number' && dentroApp > 0) { 
             lotesAppCount++;
         }
-        // Usa a propriedade 'valor' para custo de intervenção
+        
         custoTotal += (feature.properties.valor || 0); 
     });
 
@@ -411,12 +407,12 @@ function updateDashboard(features) {
 
 // 6. Preenche o Filtro de Núcleos
 function populateNucleusFilter(nucleos) {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', nucleos); // DEBUG: Verificar quais núcleos estão sendo passados
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', nucleos); 
     const filterSelect = document.getElementById('nucleusFilter');
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
         nucleos.sort().forEach(nucleo => {
-            if (nucleo) { // Garante que o núcleo não seja vazio/nulo
+            if (nucleo) { 
                 const option = document.createElement('option');
                 option.value = nucleo;
                 option.textContent = nucleo;
@@ -429,7 +425,7 @@ function populateNucleusFilter(nucleos) {
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
         nucleos.sort().forEach(nucleo => {
-            if (nucleo) { // Garante que o núcleo não seja vazio/nulo
+            if (nucleo) { 
                 const option = document.createElement('option');
                 option.value = nucleo;
                 option.textContent = nucleo;
@@ -448,8 +444,7 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     let filteredFeatures = allLotesGeoJSON.features;
 
     if (selectedNucleus !== 'all') {
-        // Filtra pela propriedade 'desc_nucleo'
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus); 
     }
 
     renderLayersOnMap(filteredFeatures);
@@ -460,7 +455,7 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
 // 8. Tabela de Lotes Detalhados (AGORA NA NOVA ABA "Dados Lotes")
 function updateLotesTable(features) {
     console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
-    const tableBody = document.querySelector('#lotesDataTable tbody'); // O seletor continua o mesmo, mas agora está dentro da nova seção
+    const tableBody = document.querySelector('#lotesDataTable tbody'); 
     tableBody.innerHTML = ''; 
 
     if (features.length === 0) {
@@ -478,7 +473,6 @@ function updateLotesTable(features) {
         row.insertCell().textContent = props.tipo_uso || 'N/A';
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
         row.insertCell().textContent = props.risco || 'N/A';
-        // Lógica para 'APP' baseada em 'dentro_app'
         row.insertCell().textContent = (typeof props.dentro_app === 'number' && props.dentro_app > 0) ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
@@ -486,13 +480,9 @@ function updateLotesTable(features) {
         viewBtn.textContent = 'Ver no Mapa';
         viewBtn.className = 'small-btn'; 
         viewBtn.onclick = () => {
-            // Navega para o dashboard primeiro
             document.querySelector('nav a[data-section="dashboard"]').click();
-            
-            // Encontra a camada do lote específico e centraliza o mapa
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
-                    // Usa a propriedade 'cod_lote' para encontrar o lote
                     if (layer.feature && layer.feature.properties && layer.feature.properties.cod_lote === props.cod_lote) { 
                         map.setView(layer.getBounds().getCenter(), 18); 
                         layer.openPopup(); 
@@ -523,7 +513,6 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     console.log('Evento: Botão "Exportar Tabela" clicado.'); 
     const table = document.getElementById('lotesDataTable');
     let csv = [];
-    // Cabeçalho
     const headerRow = [];
     table.querySelectorAll('thead th').forEach(th => {
         if (th.textContent !== 'Ações') { 
@@ -532,7 +521,6 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     });
     csv.push(headerRow.join(';')); 
 
-    // Linhas de dados
     table.querySelectorAll('tbody tr').forEach(tr => {
         const row = [];
         tr.querySelectorAll('td').forEach((td, index) => {
@@ -615,7 +603,7 @@ function setupGeneralInfoForm() {
 }
 
 
-// 9. Gerador de Relatórios com IA (Simulada)
+// 9. Gerador de Relatórios com IA (Simulada para GitHub Pages)
 document.getElementById('generateReportBtn').addEventListener('click', () => {
     console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); 
     const reportType = document.getElementById('reportType').value;
@@ -641,7 +629,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
     let filteredFeatures = allLotesGeoJSON.features;
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise); // Filtra por 'desc_nucleo'
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise); 
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
     } else {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
@@ -651,7 +639,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
         reportText += `Total de Lotes Analisados: ${filteredFeatures.length}\n`;
         
-        const totalArea = filteredFeatures.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0); // Usa 'area_m2'
+        const totalArea = filteredFeatures.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0); 
         reportText += `Área Total dos Lotes: ${totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²\n\n`;
 
         const uniqueTiposUso = new Set(filteredFeatures.map(f => f.properties.tipo_uso).filter(Boolean));
@@ -663,7 +651,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         filteredFeatures.forEach(f => {
-            const risco = f.properties.risco || 'N/A'; // Usa 'risco'
+            const risco = f.properties.risco || 'N/A'; 
             if (riskCounts.hasOwnProperty(risco)) riskCounts[risco]++;
         });
         const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
@@ -685,7 +673,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
 
     if (incAreasPublicas) {
-        // Lógica para APP baseada em 'dentro_app'
         const lotesEmAPP = filteredFeatures.filter(f => typeof f.properties.dentro_app === 'number' && f.properties.dentro_app > 0).length;
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
         reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
@@ -754,7 +741,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `A presença e adequação da infraestrutura existente é um fator chave para a viabilidade e qualidade da regularização. Recomenda-se verificação detalhada da situação da infraestrutura básica (água, esgoto, energia, drenagem, acesso) em relação aos lotes.\n\n`;
     }
     
-    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.valor || 0), 0); // Usa 'valor' para custo
+    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.valor || 0), 0); 
     reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
     reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
     reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
