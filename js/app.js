@@ -18,21 +18,24 @@ const riscoStyles = {
     'Médio': { fillColor: '#f39c12', color: 'white' },        // Laranja
     'Alto': { fillColor: '#e74c3c', color: 'white' },         // Vermelho
     'Muito Alto': { fillColor: '#c0392b', color: 'white' },   // Vermelho escuro
-    'N/A': { fillColor: '#3498db', color: 'white' },           // Azul padrão para risco não definido
-    'Geológico': { fillColor: '#e74c3c', color: 'white' }     // NOVO: Estilo para "Geológico" (exemplo: Alto risco)
+    'N/A': { fillColor: '#3498db', color: 'white' }           // Azul padrão para risco não definido
 };
 
 // ========================================================================================
 // IMPORTANTE: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
 // Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S (EPSG:31983).
-// É CRÍTICO QUE VOCÊ CONFIRME O EPSG EXATO DOS SEUS DADOS.
+// SE SEUS DADOS FOREM DE OUTRA ZONA UTM OU OUTRO DATUM (OUTRO EPSG), VOCÊ PRECISA MUDAR A DEFINIÇÃO ABAIXO.
 // Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
 if (typeof proj4 !== 'undefined') {
     // Definimos a projeção para SIRGAS 2000 / UTM Zone 23S (EPSG:31983)
-    // Se precisar de outra zona, mude o 'zone=XX' e possivelmente o 'south'/'north' e o EPSG.
+    // Ex: para Zona 24S (EPSG:31984): '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     
+    // ATENÇÃO: Se você tiver dados de MÚLTIPLAS ZONAS UTM, o aplicativo precisa de uma forma de saber
+    // qual EPSG usar para cada GeoJSON. Uma solução seria pedir ao usuário para selecionar a zona UTM
+    // para cada arquivo durante o upload. Por enquanto, assumimos a Zona 23S para todos os UTMs detectados.
+
     console.log("Definição EPSG:31983 carregada para reprojeção UTM.");
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
@@ -46,20 +49,19 @@ function initMap() {
     map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas iniciais (centro do Brasil)
     console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap OpenStreetMap (Voltando ao OSM puro, que geralmente funciona)
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        minZoom: 0, 
-        maxZoom: 19 
-    });
-    osmLayer.addTo(map); // Define como o mapa base padrão
-    console.log('initMap: Basemap OpenStreetMap adicionado como padrão.'); 
-
-    // Basemap Esri World Street Map (Agora como opção)
+    // Basemap Esri World Street Map (Mais robusto para ser o padrão e carregar sempre)
     const esriStreetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
         minZoom: 0,
         maxZoom: 19
+    });
+    esriStreetMap.addTo(map); // Define como o mapa base padrão
+
+    // Basemap OpenStreetMap (Adicionado como opção)
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        minZoom: 0, 
+        maxZoom: 19 
     });
 
     // Basemap Esri World Imagery (Satélite)
@@ -69,8 +71,8 @@ function initMap() {
 
     // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
-        "OpenStreetMap": osmLayer, // Agora é o padrão
-        "Esri World Street Map": esriStreetMap, 
+        "Esri World Street Map": esriStreetMap, // Agora é o padrão
+        "OpenStreetMap": osmLayer,
         "Esri World Imagery (Satélite)": esriWorldImagery 
     };
     L.control.layers(baseMaps).addTo(map); 
@@ -248,7 +250,8 @@ function setupFileUpload() {
                 // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
                 let featuresToLoad = [];
 
-                // Heurística para detectar UTM e reprojetar
+                // Heurística para detectar UTM: verifica se a primeira coordenada tem valores grandes de Northing e Easting
+                // e se proj4js está disponível para a reprojeção
                 if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { 
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
@@ -271,10 +274,11 @@ function setupFileUpload() {
                             // Easting entre 100.000 e 900.000
                             // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84 usando EPSG:31983...`);
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84...`);
+                                // Tenta usar o EPSG 31983 como padrão. Se precisar de outra zona, o proj4.defs() precisa ser ajustado.
                                 const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
-                                console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
+                                console.log(`Feições de ${file.name} reprojetadas com sucesso usando EPSG:31983.`);
                             }
                         }
                     }
@@ -368,7 +372,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Área de Preservação Permanente (APP)</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
@@ -393,7 +397,7 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Informações da Poligonal</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
@@ -408,25 +412,15 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
 
 // Estilo dos lotes baseado no risco
 function styleLotes(feature) {
-    // Busca a propriedade de risco, normaliza para maiúscula inicial
-    let risco = feature.properties.risco || feature.properties['Status Risco'] || 'N/A'; 
-    if (risco && typeof risco === 'string') {
-        risco = risco.trim().charAt(0).toUpperCase() + risco.trim().slice(1).toLowerCase();
-    }
-    
-    // Mapeia "Geológico" para "Alto" para fins de cor e contagem
-    if (risco === 'Geologico') {
-        risco = 'Alto'; // Ou 'Muito Alto' se preferir mais impacto visual
-    }
-    
-    const style = riscoStyles[risco] || riscoStyles['N/A']; 
+    const risco = feature.properties.risco || 'N/A'; // Pega o risco ou 'N/A' se não definido
+    const style = riscoStyles[risco] || riscoStyles['N/A']; // Pega o estilo correspondente ou o padrão
 
     return {
         fillColor: style.fillColor,
         weight: 1,
         opacity: 1,
-        color: 'white', 
-        dashArray: '3', 
+        color: 'white', // Cor da borda
+        dashArray: '3', // Borda tracejada
         fillOpacity: 0.7
     };
 }
@@ -440,26 +434,27 @@ function onEachFeatureLotes(feature, layer) {
             let value = feature.properties[key];
             if (value === null || value === undefined || value === "") value = 'N/A'; // Trata valores nulos/indefinidos/vazios
 
-            // Lógica para formatar campos específicos
             if (key.toLowerCase().includes('area') && typeof value === 'number') {
                 value = value.toLocaleString('pt-BR') + ' m²';
-            } else if (key.toLowerCase() === 'risco' || key.toLowerCase() === 'status risco') {
-                // Formata a exibição do risco no popup
-                if (value.toLowerCase() === 'geologico') {
-                    value = 'Geológico (Risco Alto)'; 
-                }
-            } else if (key.toLowerCase() === 'dentro_app') { // Usa 'dentro_app'
-                value = (value === 'Sim' || value === true) ? 'Sim' : 'Não';
-            } else if (key.toLowerCase() === 'valor') { // Usa 'valor' para custo, se houver 'intervencao'
-                if (feature.properties.intervencao && typeof value === 'number') {
-                    value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    key = 'Custo de Intervenção (associado a ' + feature.properties.intervencao + ')'; // Renomeia e adiciona contexto
-                }
-            } else if (key.toLowerCase() === 'tipo_uso' && typeof value === 'string') {
-                 value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
             }
-            
-            // Adiciona a propriedade e seu valor ao popup
+            // CORREÇÃO AQUI: Usa a propriedade 'valor' para o custo
+            if (key.toLowerCase() === 'intervencao' && typeof feature.properties.valor === 'number') { // Se "intervencao" existir E "valor" for número
+                value = 'R$ ' + feature.properties.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else if (key.toLowerCase().includes('custo') || key.toLowerCase().includes('valor_total')) { // Outras tentativas para custo
+                if (typeof value === 'number') {
+                   value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+            }
+            // CORREÇÃO AQUI: Usa a propriedade 'app' como está no código, ou você deve especificar o nome exato.
+            // Ex: se for 'em_app', mude 'app' para 'em_app'
+            if (key.toLowerCase() === 'app' || key.toLowerCase().includes('area_preservacao')) { 
+                if (typeof value === 'boolean') {
+                    value = value ? 'Sim' : 'Não';
+                } else if (typeof value === 'string') { // Trata "Sim"/"Não" como string
+                    value = value.toLowerCase() === 'sim' ? 'Sim' : 'Não';
+                }
+            }
+
             popupContent += `<strong>${key}:</strong> ${value}<br>`;
         }
         layer.bindPopup(popupContent);
@@ -471,67 +466,57 @@ function updateDashboard(features) {
     console.log('updateDashboard: Atualizando cards do dashboard com', features.length, 'lotes.'); 
     document.getElementById('totalLotes').innerText = features.length;
 
-    let lotesRiscoCount = 0; // Contagem geral de lotes em risco (que não são "Baixo")
-    let lotesAppCount = 0; // Contagem de lotes em APP
-    let custoTotal = 0; // Soma do custo
-    
-    // Contagem por categoria de risco para "Análise de Riscos"
-    let riskCategoryCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 }; 
+    let lotesRiscoCount = 0;
+    let lotesAppCount = 0;
+    let custoTotal = 0;
+    let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     features.forEach(feature => {
-        // Lógica para 'risco': verifica 'risco' ou 'Status Risco'
-        let riscoValue = feature.properties.risco || feature.properties['Status Risco'] || 'N/A'; 
-        if (riscoValue && typeof riscoValue === 'string') {
-            riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase();
+        // Assume que 'risco' é a propriedade para o risco
+        const risco = feature.properties.risco || 'N/A'; // Verifique se esta é a propriedade exata no seu GeoJSON
+        if (riskCounts.hasOwnProperty(risco)) { 
+            riskCounts[risco]++;
         }
         
-        // Mapeia "Geológico" para "Alto" para fins de contagem nos cards e seção "Análise de Riscos"
-        if (riscoValue === 'Geologico') {
-            riscoValue = 'Alto'; 
-        }
-        
-        // Conta por categoria de risco para a seção "Análise de Riscos"
-        if (riskCategoryCounts.hasOwnProperty(riscoValue)) { 
-            riskCategoryCounts[riscoValue]++;
-        } 
-        
-        // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
-        if (riscoValue !== 'Baixo' && riscoValue !== 'N/A') { 
+        if (risco !== 'Baixo' && risco !== 'N/A') { 
             lotesRiscoCount++;
         }
         
-        // CONTAGEM DE Lotes em APP: Usa a propriedade 'dentro_app'
-        const appStatus = feature.properties.dentro_app; 
-        if (appStatus === 'Sim' || appStatus === true) { 
+        // CORREÇÃO AQUI: Usa a propriedade 'app' como está, ou você deve especificar o nome exato.
+        // O valor deve ser true/false ou "sim"/"não" (case-insensitive)
+        const appStatus = feature.properties.app || feature.properties.area_preservacao || ''; 
+        if (appStatus === true || String(appStatus).toLowerCase() === 'sim') {
             lotesAppCount++;
         }
 
-        // CONTAGEM DE Custo de Intervenção: Usa a propriedade 'valor'
-        // Assume que 'intervencao' e 'valor' andam juntos, e 'valor' é o custo numérico.
+        // CORREÇÃO AQUI: Usa a propriedade 'valor' para o custo
+        // Verifica se 'intervencao' existe E se 'valor' é um número
         if (feature.properties.intervencao && typeof feature.properties.valor === 'number') {
             custoTotal += feature.properties.valor;
+        } else { // Fallback para outras propriedades de custo se 'intervencao'/'valor' não for o caso
+            const custoValorFallback = feature.properties.custo_intervencao || feature.properties.valor_custo || 0;
+            if (typeof custoValorFallback === 'number') {
+                custoTotal += custoValorFallback;
+            }
         }
     });
 
-    // Atualiza os cards principais do dashboard
     document.getElementById('lotesRisco').innerText = lotesRiscoCount;
     document.getElementById('lotesApp').innerText = lotesAppCount;
     document.getElementById('custoEstimado').innerText = custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // Atualiza as contagens na seção "Análise de Riscos"
-    document.getElementById('riskLowCount').innerText = riskCategoryCounts['Baixo'] || 0;
-    document.getElementById('riskMediumCount').innerText = riskCategoryCounts['Médio'] || 0;
-    document.getElementById('riskHighCount').innerText = riskCategoryCounts['Alto'] || 0;
-    document.getElementById('riskVeryHighCount').innerText = riskCategoryCounts['Muito Alto'] || 0;
+    document.getElementById('riskLowCount').innerText = riskCounts['Baixo'] || 0;
+    document.getElementById('riskMediumCount').innerText = riskCounts['Médio'] || 0;
+    document.getElementById('riskHighCount').innerText = riskCounts['Alto'] || 0;
+    document.getElementById('riskVeryHighCount').innerText = riskCounts['Muito Alto'] || 0;
 
-    // Atualiza o resumo de intervenções
     document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
-    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; // Ajuste se a lógica de intervenção for diferente da identificação de risco
+    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
 }
 
 // 6. Preenche o Filtro de Núcleos
 function populateNucleusFilter(nucleos) {
-    console.log('populateNucleoFilter: Preenchendo filtro de núcleos.'); 
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); 
     const filterSelect = document.getElementById('nucleusFilter');
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
@@ -565,6 +550,7 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     let filteredFeatures = allLotesGeoJSON.features;
 
     if (selectedNucleus !== 'all') {
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para filtrar
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
     }
 
@@ -593,32 +579,30 @@ function updateLotesTable(features) {
         const props = feature.properties;
 
         row.insertCell().textContent = props.codigo || 'N/A';
-        row.insertCell().textContent = props.desc_nucleo || 'N/A'; // Exibe o núcleo
-        row.insertCell().textContent = (typeof props.tipo_uso === 'string') ? props.tipo_uso.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : 'N/A';
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para exibir
+        row.insertCell().textContent = props.desc_nucleo || 'N/A'; 
+        row.insertCell().textContent = props.tipo_uso || 'N/A';
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
-        
-        // Lógica para exibir o risco na tabela
-        let riscoTabela = props.risco || props['Status Risco'] || 'N/A';
-        if (riscoTabela.toLowerCase() === 'geologico') {
-            riscoTabela = 'Geológico'; // Exibe "Geológico" na tabela
-        }
-        row.insertCell().textContent = riscoTabela;
-
-        // USA A PROPRIEDADE 'dentro_app' PARA EXIBIR O STATUS DE APP
-        const appStatus = props.dentro_app; 
-        row.insertCell().textContent = (appStatus === 'Sim' || appStatus === true) ? 'Sim' : 'Não';
+        row.insertCell().textContent = props.risco || 'N/A';
+        // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
+        // Use o nome exato da propriedade 'app' do seu GeoJSON
+        const appStatus = props.app || props.area_preservacao || ''; 
+        row.insertCell().textContent = (appStatus === true || String(appStatus).toLowerCase() === 'sim') ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
         const viewBtn = document.createElement('button');
         viewBtn.textContent = 'Ver no Mapa';
-        viewBtn.className = 'small-btn'; 
+        viewBtn.className = 'small-btn'; // Classe para estilizar o botão pequeno
         viewBtn.onclick = () => {
+            // Navega para o dashboard primeiro
             document.querySelector('nav a[data-section="dashboard"]').click();
+            
+            // Encontra a camada do lote específico e centraliza o mapa
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
                     if (layer.feature && layer.feature.properties && layer.feature.properties.codigo === props.codigo) {
-                        map.setView(layer.getBounds().getCenter(), 18); 
-                        layer.openPopup(); 
+                        map.setView(layer.getBounds().getCenter(), 18); // Centraliza e dá zoom
+                        layer.openPopup(); // Abre o popup de detalhes
                     }
                 });
             }
@@ -649,17 +633,19 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     // Cabeçalho
     const headerRow = [];
     table.querySelectorAll('thead th').forEach(th => {
-        if (th.textContent !== 'Ações') { 
-            headerRow.push(`"${th.textContent.trim()}"`); 
+        if (th.textContent !== 'Ações') { // Exclui a coluna de ações
+            headerRow.push(`"${th.textContent.trim()}"`); // Adiciona aspas para lidar com vírgulas no texto
         }
     });
-    csv.push(headerRow.join(';')); 
+    csv.push(headerRow.join(';')); // Usa ponto e vírgula como separador para CSV pt-BR
 
     // Linhas de dados
     table.querySelectorAll('tbody tr').forEach(tr => {
         const row = [];
         tr.querySelectorAll('td').forEach((td, index) => {
+            // Exclui a última coluna (Ações)
             if (index < tr.querySelectorAll('td').length - 1) {
+                // Remove quebras de linha e aspas internas, adiciona aspas para campos com vírgulas
                 let text = td.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
                 row.push(`"${text}"`);
             }
@@ -685,6 +671,7 @@ function setupGeneralInfoForm() {
 
     saveButton.addEventListener('click', () => {
         console.log('Evento: Botão "Salvar Informações Gerais" clicado.'); 
+        // Função auxiliar para pegar valor de radio button group
         const getRadioValue = (name) => {
             const radios = document.getElementsByName(name);
             for (let i = 0; i < radios.length; i++) {
@@ -692,10 +679,12 @@ function setupGeneralInfoForm() {
                     return radios[i].value;
                 }
             }
-            return ''; 
+            return ''; // Retorna vazio se nada for selecionado
         };
 
+        // Coleta todos os valores dos campos
         generalProjectInfo = {
+            // Infraestrutura Básica
             ucConservacao: getRadioValue('ucConservacao'),
             protecaoMananciais: getRadioValue('protecaoMananciais'),
             tipoAbastecimento: document.getElementById('tipoAbastecimento').value.trim(),
@@ -706,6 +695,7 @@ function setupGeneralInfoForm() {
             drenagemInadequada: getRadioValue('drenagemInadequada'),
             logradourosIdentificados: getRadioValue('logradourosIdentificados'),
             
+            // Restrições e Conflitos
             linhaTransmissao: getRadioValue('linhaTransmissao'),
             minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
             linhaFerrea: getRadioValue('linhaFerrea'),
@@ -715,6 +705,7 @@ function setupGeneralInfoForm() {
             processosJudiciais: getRadioValue('processosJudiciais'),
             comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
             
+            // Aspectos Legais e Fundiários
             titularidadeArea: getRadioValue('titularidadeArea'),
             terraLegal: getRadioValue('terraLegal'),
             instrumentoJuridico: document.getElementById('instrumentoJuridico').value.trim(),
@@ -726,6 +717,7 @@ function setupGeneralInfoForm() {
             matriculasOrigem: document.getElementById('matriculasOrigem').value.trim(),
             matriculasIdentificadas: document.getElementById('matriculasIdentificadas').value.trim(),
 
+            // Ações e Medidas Propostas
             adequacaoDesconformidades: getRadioValue('adequacaoDesconformidades'),
             obrasInfraestrutura: getRadioValue('obrasInfraestrutura'),
             medidasCompensatorias: getRadioValue('medidasCompensatorias')
@@ -754,6 +746,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         generatedReportContent.textContent = "Nenhum dado de lotes disponível para gerar o relatório. Faça o upload das camadas primeiro.";
         return;
     }
+    // Verifica se as informações gerais foram preenchidas e salvas, se a seção for marcada para inclusão
     if (incInformacoesGerais && Object.keys(generalProjectInfo).length === 0) {
         generatedReportContent.textContent = "Seção 'Informações Gerais do Projeto' selecionada, mas nenhum dado foi salvo. Por favor, preencha e salve as informações na aba 'Informações Gerais'.";
         return;
@@ -764,6 +757,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
     let filteredFeatures = allLotesGeoJSON.features;
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
+        // CORREÇÃO: Usa a propriedade 'desc_nucleo' para filtrar
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
     } else {
@@ -785,60 +779,36 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
 
     if (incAnaliseRiscos) {
-        const riskCategoryCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
-        const otherRisks = {}; // Para riscos que não se encaixam nas categorias padrão
-
+        const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         filteredFeatures.forEach(f => {
-            let riscoValue = f.properties.risco || f.properties['Status Risco'] || 'N/A'; 
-            if (riscoValue && typeof riscoValue === 'string') {
-                riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase(); // Capitalize
-            }
-
-            // Mapeia "Geológico" para "Alto" para o relatório
-            if (riscoValue === 'Geologico') {
-                riscoValue = 'Alto'; 
-            }
-
-            if (riskCategoryCounts.hasOwnProperty(riscoValue)) { 
-                riskCategoryCounts[riscoValue]++;
-            } else if (riscoValue !== 'N/A') { 
-                if (otherRisks[riscoValue]) {
-                    otherRisks[riscoValue]++;
-                } else {
-                    otherRisks[riscoValue] = 1;
-                }
+            const risco = f.properties.risco || 'N/A'; 
+            if (riskCounts.hasOwnProperty(risco)) { 
+                riskCounts[risco]++;
             }
         });
-
-        const lotesComRiscoElevado = riskCategoryCounts['Médio'] + riskCategoryCounts['Alto'] + riskCategoryCounts['Muito Alto'] + Object.values(otherRisks).reduce((a, b) => a + b, 0);
+        const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
         const percRiscoElevado = (lotesComRiscoElevado / filteredFeatures.length * 100 || 0).toFixed(2);
 
         reportText += `--- 2. Análise de Riscos Geológicos e Ambientais ---\n`;
         reportText += `Distribuição de Risco dos Lotes:\n`;
-        reportText += `- Baixo Risco: ${riskCategoryCounts['Baixo'] || 0} lotes\n`;
-        reportText += `- Médio Risco: ${riskCategoryCounts['Médio'] || 0} lotes\n`;
-        reportText += `- Alto Risco: ${riskCategoryCounts['Alto'] || 0} lotes\n`;
-        reportText += `- Muito Alto Risco: ${riskCategoryCounts['Muito Alto'] || 0} lotes\n`;
-        
-        // Adiciona outros tipos de risco encontrados (como "Geológico")
-        for (const riskType in otherRisks) {
-            reportText += `- ${riskType}: ${otherRisks[riskType]} lotes\n`;
-        }
-        reportText += `\n`;
-        reportText += `Total de Lotes com Risco Elevado (considerando Médio, Alto, Muito Alto e Outros Tipos): ${lotesComRiscoElevado} (${percRiscoElevado}% do total)\n`;
+        reportText += `- Baixo Risco: ${riskCounts['Baixo'] || 0} lotes\n`;
+        reportText += `- Médio Risco: ${riskCounts['Médio'] || 0} lotes\n`;
+        reportText += `- Alto Risco: ${riskCounts['Alto'] || 0} lotes\n`;
+        reportText += `- Muito Alto Risco: ${riskCounts['Muito Alto'] || 0} lotes\n\n`;
+        reportText += `Total de Lotes com Risco Elevado (Médio, Alto, Muito Alto): ${lotesComRiscoElevado} (${percRiscoElevado}% do total)\n`;
         
         if (lotesComRiscoElevado > 0) {
-            reportText += `Recomendação: Áreas com risco demandam estudos geotécnicos aprofundados e, possivelmente, intervenções estruturais para mitigação de riscos ou realocação, conforme a legislação vigente de REURB e plano de contingência municipal.\n\n`;
+            reportText += `Recomendação: Áreas com risco médio a muito alto demandam estudos geotécnicos aprofundados e, possivelmente, intervenções estruturais para mitigação de riscos ou realocação, conforme a legislação vigente de REURB e plano de contingência municipal.\n\n`;
         } else {
             reportText += `Recomendação: A área analisada apresenta um perfil de baixo risco predominante, o que facilita o processo de regularização fundiária.\n\n`;
         }
     }
 
     if (incAreasPublicas) {
-        // USA A PROPRIEDADE 'dentro_app' para APP
+        // CORREÇÃO AQUI: Usa a propriedade 'app' OU 'area_preservacao' OU SEU NOME EXATO para APP
         const lotesEmAPP = filteredFeatures.filter(f => {
-            const appStatus = f.properties.dentro_app; 
-            return (appStatus === 'Sim' || appStatus === true); 
+            const appStatus = f.properties.app || f.properties.area_preservacao || ''; 
+            return appStatus === true || String(appStatus).toLowerCase() === 'sim';
         }).length;
 
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
@@ -886,7 +856,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `**Aspectos Legais e Fundiários:**\n`;
         reportText += `  - Titularidade da Área: ${info.titularidadeArea || 'Não informado'}.\n`;
         reportText += `  - Programa Terra Legal: ${info.terraLegal || 'Não informado'}.\n`;
-        reportText += `  - - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
+        reportText += `  - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
         reportText += `  - Legislação Municipal REURB: ${info.legislacaoReurb || 'Não informada'}.\n`;
         reportText += `  - Legislação Municipal Ambiental: ${info.legislacaoAmbiental || 'Não informada'}.\n`;
         reportText += `  - Plano Diretor Municipal: ${info.planoDiretor || 'Não informado'}.\n`;
@@ -916,10 +886,14 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     
     // Custo de Intervenção (sempre incluído no final do relatório)
     const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => {
-        // USA A PROPRIEDADE 'valor' PARA O CUSTO.
+        // CORREÇÃO: Prioriza 'valor' se 'intervencao' existe, caso contrário, usa 'custo_intervencao' ou 'valor_custo'
         let custoValor = 0;
-        if (typeof f.properties.valor === 'number') {
+        if (f.properties.intervencao && typeof f.properties.valor === 'number') {
             custoValor = f.properties.valor;
+        } else if (typeof f.properties.custo_intervencao === 'number') {
+            custoValor = f.properties.custo_intervencao;
+        } else if (typeof f.properties.valor_custo === 'number') {
+            custoValor = f.properties.valor_custo;
         }
         return acc + custoValor;
     }, 0);
