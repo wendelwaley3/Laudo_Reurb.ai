@@ -234,8 +234,8 @@ h3 {
     border: 1px solid rgba(0,0,0,0.2);
 }
 .risk-low::before { background-color: #2ecc71; } /* Verde */
-.risk-medium::before { background-color: #f39c12; } /* Laranja */
-.risk-high::before { background-color: #e74c3c; } /* Vermelho */
+.risk-medium::before { background-color: #f1c40f; } /* Amarelo */
+.risk-high::before { background-color: #e67e22; } /* Laranja */
 .risk-very-high::before { background-color: #c0392b; } /* Vermelho escuro */
 
 .click-info {
@@ -594,8 +594,5 @@ footer {
         margin-left: -15px; /* Ajusta para preencher a largura */
         margin-right: -15px;
         width: calc(100% + 30px);
-    }
-    .form-grid {
-        grid-template-columns: 1fr; /* Colunas empilham em telas menores */
     }
 }
