@@ -483,6 +483,7 @@ function onEachLoteFeature(feature, layer) {
             let value = feature.properties[key];
             if (value === null || value === undefined || value === '') value = 'N/A'; 
 
+            // Formatação de valores específicos conforme as suas tabelas
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
@@ -651,6 +652,7 @@ function refreshDashboard() {
         const p = f.properties || {};
         const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
         if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
         else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
         else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
@@ -729,10 +731,11 @@ function fillLotesTable() {
     });
     tbody.appendChild(fragment);
 
+    // **CORREÇÃO AQUI**: Adiciona listeners para os botões "Ver no Mapa"
     tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const codLoteToZoom = btn.getAttribute('data-codlote');
-            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) === codLoteToZoom);
+            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote == codLoteToZoom)); // '==' para comparar string com número se necessário
             
             if (loteToZoom) {
                 document.querySelector('nav a[data-section="dashboard"]').click();
@@ -743,7 +746,7 @@ function fillLotesTable() {
                     console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
                 }
                 state.layers.lotes.eachLayer(layer => {
-                    if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) === codLoteToZoom && layer.openPopup) {
+                    if (layer.feature?.properties?.cod_lote == codLoteToZoom && layer.openPopup) { // '==' para comparar string com número
                         layer.openPopup();
                     }
                 });
@@ -753,6 +756,7 @@ function fillLotesTable() {
         });
     });
 
+    // Funcionalidade de busca na tabela
     const searchInput = document.getElementById('lotSearch');
     searchInput.addEventListener('input', () => {
         const searchTerm = searchInput.value.toLowerCase();
@@ -762,6 +766,7 @@ function fillLotesTable() {
         });
     });
 
+    // Funcionalidade de exportar CSV da tabela
     document.getElementById('exportTableBtn').onclick = () => {
         const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
         Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
