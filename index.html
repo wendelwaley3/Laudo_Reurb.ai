@@ -109,13 +109,13 @@
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
-                <!-- REESTRUTURAÇÃO AQUI: INPUT TYPE="FILE" AGORA DENTRO DO LABEL -->
-                <label class="drag-drop-area">
+                <!-- REESTRUTURAÇÃO AQUI: INPUT TYPE="FILE" SEPARADO, BOTÃO COM ID, LABEL APENAS PARA A ÁREA DRAG/DROP -->
+                <label for="geojsonFileInput" class="drag-drop-area">
                     <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
                     <p>ou clique para selecionar</p>
-                    <button type="button">Selecionar Arquivos</button> 
-                    <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
+                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button> 
                 </label>
+                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;"> <!-- AGORA O INPUT É ESPECIFICAMENTE REFERENCIADO PELO BOTÃO VISÍVEL VIA JS -->
             </div>
             <div class="uploaded-files-preview">
                 <h3>Arquivos Selecionados:</h3>
