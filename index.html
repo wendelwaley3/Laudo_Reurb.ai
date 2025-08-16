@@ -21,7 +21,6 @@
             <a href="#" data-section="dashboard" class="active">Dashboard</a>
             <a href="#" data-section="upload">Upload de Dados</a>
             <a href="#" data-section="informacoes-gerais">Informações Gerais</a>
-            <a href="#" data-section="lotes-detalhados">Dados Lotes</a> <!-- NOVA ABA PARA TABELA DE LOTES -->
             <a href="#" data-section="relatorios">Relatórios</a>
             <a href="#" data-section="instrucoes">Instruções</a>
         </nav>
@@ -101,9 +100,7 @@
                 <!-- Opcional: Adicionar um canvas aqui para Chart.js se for implementar gráficos -->
                 <!-- <canvas id="myChart"></canvas> -->
             </div>
-            
-            <!-- REMOVIDA DAQUI - AGORA EM NOVA ABA "Dados Lotes" -->
-            <!--
+
             <h2>Dados Detalhados dos Lotes</h2>
             <div class="data-table-controls">
                 <input type="text" id="lotSearch" placeholder="Buscar lote...">
@@ -127,7 +124,6 @@
                     </tbody>
                 </table>
             </div>
-            -->
         </section>
 
         <!-- Upload Section -->
@@ -267,3 +263,136 @@
                         <label for="legislacaoReurb">Legislação Municipal Própria para REURB:</label>
                         <input type="text" id="legislacaoReurb" placeholder="Ex: Lei Municipal Nº XXXX">
                     </div>
+                     <div class="form-question">
+                        <label>Legislação Municipal Ambiental Própria?</label>
+                        <label><input type="radio" name="legislacaoAmbiental" value="Sim"> Sim</label>
+                        <label><input type="radio" name="legislacaoAmbiental" value="Não" checked> Não</label>
+                    </div>
+                    <div class="form-question">
+                        <label>Município Possui Plano Diretor?</label>
+                        <label><input type="radio" name="planoDiretor" value="Sim"> Sim</label>
+                        <label><input type="radio" name="planoDiretor" value="Não" checked> Não</label>
+                    </div>
+                    <div class="form-question">
+                        <label>Município Possui Lei de Uso e Ocupação do Solo/Zoneamento?</label>
+                        <label><input type="radio" name="zoneamento" value="Sim"> Sim</label>
+                        <label><input type="radio" name="zoneamento" value="Não" checked> Não</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="municipioOriginal">Município a que Pertencia o Núcleo (se diferente):</label>
+                        <input type="text" id="municipioOriginal" placeholder="Ex: Nome do Município Antigo">
+                    </div>
+                    <div class="form-group">
+                        <label for="matriculasOrigem">Matrículas de Origem e/ou Afetadas (se aplicável):</label>
+                        <textarea id="matriculasOrigem" rows="2" placeholder="Ex: Matrícula 12345, Livro 2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="matriculasIdentificadas">Matrículas Identificadas (se aplicável):</label>
+                        <textarea id="matriculasIdentificadas" rows="2" placeholder="Ex: Matrícula 67890"></textarea>
+                    </div>
+                </div>
+
+                <!-- Seção 4: Ações e Medidas Propostas -->
+                <div class="form-group-section">
+                    <h3>Ações e Medidas Propostas</h3>
+                    <div class="form-question">
+                        <label>Adequação para Correção das Desconformidades Necessária?</label>
+                        <label><input type="radio" name="adequacaoDesconformidades" value="Sim"> Sim</label>
+                        <label><input type="radio" name="adequacaoDesconformidades" value="Não" checked> Não</label>
+                    </div>
+                    <div class="form-question">
+                        <label>Obras de Infraestrutura Essencial Necessárias?</label>
+                        <label><input type="radio" name="obrasInfraestrutura" value="Sim"> Sim</label>
+                        <label><input type="radio" name="obrasInfraestrutura" value="Não" checked> Não</label>
+                    </div>
+                    <div class="form-question">
+                        <label>Medidas Compensatórias Necessárias?</label>
+                        <label><input type="radio" name="medidasCompensatorias" value="Sim"> Sim</label>
+                        <label><input type="radio" name="medidasCompensatorias" value="Não" checked> Não</label>
+                    </div>
+                </div>
+            </div>
+            <button id="saveGeneralInfoBtn">Salvar Informações Gerais</button>
+            <p id="generalInfoStatus" class="status-message"></p>
+        </section>
+
+
+        <!-- Relatórios Section -->
+        <section id="relatorios" class="container">
+            <h2>Gerador de Relatórios com IA</h2>
+            <div class="report-generator-grid">
+                <div class="report-config">
+                    <h3>Configurações do Relatório</h3>
+                    <label for="reportType">Tipo de Relatório</label>
+                    <select id="reportType">
+                        <option value="completo">Relatório Completo</option>
+                        <option value="resumido">Relatório Resumido</option>
+                        <option value="risco">Análise de Risco</option>
+                    </select>
+
+                    <label for="nucleosAnalise">Núcleos para Análise</label>
+                    <select id="nucleosAnalise">
+                        <option value="none">Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>
+                        <!-- Opções de núcleo serão adicionadas via JS -->
+                    </select>
+
+                    <h4>Seções a Incluir</h4>
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="incDadosGerais" checked> Dados Gerais dos Lotes</label>
+                        <label><input type="checkbox" id="incAnaliseRiscos" checked> Análise de Riscos</label>
+                        <label><input type="checkbox" id="incAreasPublicas"> Áreas Públicas (APP)</label>
+                        <label><input type="checkbox" id="incInformacoesGerais" checked> Informações Gerais do Projeto</label>
+                        <label><input type="checkbox" id="incInfraestrutura"> Infraestrutura (Poligonais)</label>
+                    </div>
+                    <button id="generateReportBtn">Gerar Relatório com IA</button>
+                </div>
+                <div class="report-output">
+                    <h3>Relatório Gerado</h3>
+                    <div id="generatedReportContent" class="report-content">
+                        Nenhum relatório gerado ainda. Configure as opções e clique em "Gerar Relatório".
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instruções Section -->
+        <section id="instrucoes" class="container">
+            <h2>Instruções de Uso</h2>
+            <p>Bem-vindo ao GeoLaudo.AI! Este aplicativo foi projetado para auxiliar na análise e geração de relatórios para Regularização Fundiária Urbana (REURB), funcionando completamente no seu navegador.</p>
+            <h3>Como usar:</h3>
+            <ol>
+                <li><strong>Upload de Dados:</strong> Navegue até a aba "Upload de Dados". Arraste e solte seus arquivos GeoJSON (para lotes, APPs, infraestrutura, poligonais etc.) ou clique em "Selecionar Arquivos".
+                    <p class="note"><strong>Importante:</strong> Para que a "Análise de Riscos" e "Lotes em APP" funcionem corretamente no dashboard e relatórios, é fundamental que o GeoJSON dos seus lotes já contenha propriedades como <code>risco</code> (ex: "Baixo", "Médio", "Alto", "Muito Alto"), <code>app</code> (ex: <code>true</code> ou <code>false</code>, ou "sim"/"não"), <code>nucleo</code> e <code>custo_intervencao</code>.</p>
+                </li>
+                <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto, como infraestrutura básica, restrições legais e ambientais, e aspectos fundiários. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
+                <li><strong>Processar e Carregar:</strong> Após selecionar os arquivos GeoJSON, clique em "Processar e Carregar Dados". O aplicativo irá ler, processar e exibir suas camadas no mapa.</li>
+                <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estadístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
+                <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
+                <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
+                <li><strong>Dados Detalhados:</strong> A tabela na parte inferior do Dashboard lista os lotes com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
+                <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado.</li>
+                <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
+            </ol>
+            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados. Para datasets muito grandes ou análises espaciais complexas em tempo real (como interseção de várias camadas grandes), uma solução com backend seria mais adequada.</p>
+            <p>Esperamos que o GeoLaudo.AI seja uma ferramenta útil para você!</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 GeoLaudo.AI. Todos os direitos reservados.</p>
+    </footer>
+
+    <!-- Inclui o JS do Leaflet -->
+    <!-- ATENÇÃO: Atributo 'integrity' REMOVIDO para evitar bloqueios -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <!-- Inclui proj4js para definição de sistemas de coordenadas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
+    <!-- Inclui proj4leaflet para integração Leaflet com proj4js -->
+    <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+    <!-- Inclui o Turf.js para operações geoespaciais client-side (se for usar extensivamente) -->
+    <!-- Embora não seja amplamente usado neste template, está aqui para referência futura. -->
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <!-- Inclui seu JS personalizado -->
+    <script src="js/app.js"></script>
+</body>
+</html>
