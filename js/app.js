@@ -7,7 +7,7 @@ const state = {
         app: null,   // Será inicializado como L.featureGroup() em initMap
         poligonais: null // Será inicializado como L.featureGroup() em initMap
     },
-    allLotes: [],           // Array de todas as features de lotes carregadas
+    allLotes: [],           // Array de todas as feições de lotes carregadas
     nucleusSet: new Set(),  // Set para armazenar nomes de núcleos únicos
     currentNucleusFilter: 'all', // Núcleo selecionado no filtro do Dashboard
     utmOptions: { useUtm: false, zone: 23, south: true }, // Configurações para reprojeção UTM client-side
@@ -45,7 +45,7 @@ function featureAreaM2(feature) {
     }
 }
 
-/** Garante que um polígono seja fechado (primeiro e último ponto iguais). */
+/** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
 function ensurePolygonClosed(coords) {
     if (!coords || coords.length === 0) return coords;
     const first = coords[0];
@@ -79,48 +79,40 @@ function utmToLngLat(x, y, zone, south) {
  */
 function reprojectGeoJSONFromUTM(geojson, zone, south) {
     // Cria uma cópia profunda para não modificar o objeto original.
-    // Usamos JSON.parse(JSON.stringify) para uma cópia simples e rápida de objetos JSON-compatíveis.
     const converted = JSON.parse(JSON.stringify(geojson)); 
 
-    function convertGeometry(geometry) {
-        if (!geometry || !geometry.type) return geometry;
+    function convertGeometryCoords(coords, geomType) {
+        if (!coords || coords.length === 0) return coords;
 
-        const type = geometry.type;
-        if (type === 'Point') {
-            geometry.coordinates = utmToLngLat(geometry.coordinates[0], geometry.coordinates[1], zone, south);
-        } else if (type === 'LineString' || type === 'MultiPoint') {
-            geometry.coordinates = geometry.coordinates.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
-        } else if (type === 'Polygon') {
-            geometry.coordinates = geometry.coordinates.map(ring => 
-                ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)))
-            );
-        } else if (type === 'MultiLineString') {
-            geometry.coordinates = geometry.coordinates.map(line => 
-                line.map(coord => utmToLngLat(coord[0], coord[1], zone, south))
-            );
-        } else if (type === 'MultiPolygon') {
-            geometry.coordinates = geometry.coordinates.map(polygon => 
-                polygon.map(ring => 
-                    ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)))
-                )
+        if (geomType === 'Point') {
+            return utmToLngLat(coords[0], coords[1], zone, south);
+        } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
+            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
+        } else if (geomType === 'Polygon') {
+            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
+        } else if (geomType === 'MultiLineString') {
+            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
+        } else if (geomType === 'MultiPolygon') {
+            return coords.map(polygon => 
+                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
             );
         }
-        return geometry;
+        return coords; // Retorna as coordenadas originais para tipos não mapeados
     }
 
     if (converted.type === 'FeatureCollection') {
         converted.features = converted.features.map(feature => {
             if (feature.geometry) {
-                feature.geometry = convertGeometry(feature.geometry);
+                feature.geometry.coordinates = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
             }
             return feature;
         });
     } else if (converted.type === 'Feature') {
         if (converted.geometry) {
-            converted.geometry = convertGeometry(converted.geometry);
+            converted.geometry.coordinates = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
         }
     } else { // Assume que é um objeto de geometria
-        return convertGeometry(converted);
+        converted.coordinates = convertGeometryCoords(converted.coordinates, converted.type);
     }
 
     return converted;
@@ -137,53 +129,16 @@ const ibgeDataSimulado = {
         populacao: "131.200 (estimativa 2023)",
         area_km2: "367.359"
     },
-    "Lima Dias": { // Exemplo de outro núcleo para Conselheiro Lafaiete
-        municipio: "Conselheiro Lafaiete",
-        regiao: "Sudeste",
-        populacao: "131.200 (estimativa 2023)",
-        area_km2: "367.359"
-    },
-    "Jardim das Flores": { // Exemplo de outro núcleo para Conselheiro Lafaiete
-        municipio: "Conselheiro Lafaiete",
-        regiao: "Sudeste",
-        populacao: "131.200 (estimativa 2023)",
-        area_km2: "367.359"
-    },
-    "Gagé I": { // Exemplo de outro núcleo para Conselheiro Lafaiete
-        municipio: "Conselheiro Lafaiete",
-        regiao: "Sudeste",
-        populacao: "131.200 (estimativa 2023)",
-        area_km2: "367.359"
-    },
-    "Jardim do Sol": { // Exemplo de outro núcleo para Conselheiro Lafaiete
-        municipio: "Conselheiro Lafaiete",
-        regiao: "Sudeste",
-        populacao: "131.200 (estimativa 2023)",
-        area_km2: "367.359"
-    },
-    "Outro Município A": {
-        municipio: "Outro Município A",
-        regiao: "Nordeste",
-        populacao: "50.000 (estimativa 2023)",
-        area_km2: "800"
-    },
-    "Outro Município B": {
-        municipio: "Outro Município B",
-        regiao: "Sul",
-        populacao: "250.000 (estimativa 2023)",
-        area_km2: "1200"
-    },
-    // Adicione mais dados simulados para outros municípios se quiser.
+    // Adicione mais dados simulados para outros municípios ou núcleos se quiser.
+    // O GeoJSON de lotes precisa ter a propriedade 'nm_mun' ou 'municipio' para que isso funcione.
 };
 
 /** Simula a busca de dados do IBGE para um município. */
 function getSimulatedMunicipioData(nomeMunicipio) {
-    // Tenta encontrar o município na nossa base de dados simulada
     const data = ibgeDataSimulado[nomeMunicipio];
     if (data) {
         return data;
     }
-    // Se não encontrar, retorna dados genéricos
     return {
         municipio: nomeMunicipio,
         regiao: "Não informado",
@@ -198,7 +153,6 @@ function generateSimulatedAILaudo(promptData) {
     laudo += `**Tema Principal:** ${promptData.tema}\n`;
     laudo += `**Detalhes da Análise:** ${promptData.detalhes}\n\n`;
 
-    // Incluir dados do IBGE se disponíveis
     if (promptData.dados_ibge && promptData.dados_ibge.municipio) {
         laudo += `--- Dados IBGE para ${promptData.dados_ibge.municipio} ---\n`;
         laudo += `Região: ${promptData.dados_ibge.regiao}\n`;
@@ -221,19 +175,21 @@ function generateSimulatedAILaudo(promptData) {
 }
 
 
-// ===================== Inicialização do Mapa =====================
+// ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
-    console.log('initMap: Iniciando mapa...'); 
-    state.map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
+    console.log('initMap: Iniciando mapa Leaflet...'); 
+    state.map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
     console.log('initMap: Objeto mapa criado.'); 
 
     // Camadas base (tiles)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     });
     osmLayer.addTo(state.map); 
 
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18, // Max zoom para Esri é 18
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
@@ -245,16 +201,16 @@ function initMap() {
     L.control.layers(baseMaps).addTo(state.map); 
     console.log('initMap: Controle de camadas base adicionado.'); 
 
-    // Inicializa os FeatureGroups vazios e adiciona ao mapa
+    // Inicializa os FeatureGroups vazios e os adiciona ao mapa
     state.layers.lotes = L.featureGroup().addTo(state.map);
-    state.layers.app = L.featureGroup().addTo(state.map); // Adiciona APP ao mapa por padrão para que o toggle funcione
-    state.layers.poligonais = L.featureGroup().addTo(state.map); // Adiciona Poligonais ao mapa por padrão
+    state.layers.app = L.featureGroup().addTo(state.map); 
+    state.layers.poligonais = L.featureGroup().addTo(state.map); 
 
-    // Remove as camadas do mapa por padrão, pois os checkboxes estão desmarcados (exceto lotes)
+    // Remove as camadas APP e Poligonais do mapa por padrão, para que o usuário as ative pela legenda
     state.map.removeLayer(state.layers.app);
     state.map.removeLayer(state.layers.poligonais);
 
-    // Garante que o mapa renderize corretamente
+    // Garante que o mapa renderize corretamente após estar visível no DOM
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
 }
@@ -267,6 +223,7 @@ function initNav() {
             const targetSectionId = this.getAttribute('data-section');
             console.log(`Navegação: Clicado em ${targetSectionId}`); 
 
+            // Remove 'active' de todas as seções e links
             document.querySelectorAll('main section').forEach(section => {
                 section.classList.remove('active');
             });
@@ -274,6 +231,7 @@ function initNav() {
                 navLink.classList.remove('active');
             });
 
+            // Adiciona 'active' à seção e link clicados
             document.getElementById(targetSectionId).classList.add('active');
             this.classList.add('active');
 
@@ -290,11 +248,10 @@ function initNav() {
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...'); 
     const fileInput = document.getElementById('geojsonFileInput');
-    const dragDropArea = document.querySelector('.drag-drop-area');
+    const dragDropArea = document.querySelector('.drag-drop-area'); // A div que é a área de drop
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
 
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
@@ -306,27 +263,26 @@ function initUpload() {
     useUtmCheckbox.addEventListener('change', () => {
         state.utmOptions.useUtm = useUtmCheckbox.checked;
         utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
+        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
     });
     // Listeners para os campos de configuração UTM
-    utmZoneInput.addEventListener('input', () => { state.utmOptions.zone = Number(utmZoneInput.value) || 23; });
-    utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); });
-
-    // Listener para o botão "Selecionar Arquivos" (visível)
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            fileInput.click(); 
-        });
-    } else {
-        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
-    }
+    utmZoneInput.addEventListener('input', () => { 
+        state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
+        console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
+    });
+    utmHemisphereSelect.addEventListener('change', () => { 
+        state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
+        console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
+    });
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
-        fileListElement.innerHTML = ''; 
+        console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
         const selectedFilesArray = Array.from(e.target.files);
         if (selectedFilesArray.length === 0) {
             fileListElement.innerHTML = '<li>Nenhum arquivo selecionado.</li>';
         } else {
+            fileListElement.innerHTML = ''; // Limpa a lista antes de adicionar novos
             selectedFilesArray.forEach(file => {
                 const li = document.createElement('li');
                 li.textContent = file.name;
@@ -335,7 +291,7 @@ function initUpload() {
         }
     });
 
-    // Listener para arrastar e soltar
+    // Listener para arrastar e soltar (na área de drag-drop)
     dragDropArea.addEventListener('dragover', (e) => {
         e.preventDefault(); 
         dragDropArea.classList.add('dragging');
@@ -348,9 +304,9 @@ function initUpload() {
         dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.geojson') || file.name.endsWith('.json'));
         fileInput.files = new FileListItems(droppedFiles); // Simula a FileList
-        fileInput.dispatchEvent(new Event('change')); // Dispara o evento change
+        fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
-    // Classe auxiliar para simular FileList, necessária para o drag and drop
+    // Classe auxiliar para simular FileList (para drag and drop)
     function FileListItems(files) {
         const b = new ClipboardEvent("").clipboardData || new DataTransfer();
         for (let i = 0, len = files.length; i < len; i++) b.items.add(files[i]);
@@ -443,30 +399,33 @@ function initUpload() {
             }
         }
 
-        // Adiciona as feições coletadas aos FeatureGroups do estado
-        // E extrai núcleos para o filtro
-        state.allLotes = newLotesFeatures; // Define a lista completa de lotes
-        newLotesFeatures.forEach(f => {
-            if (f.properties && f.properties.desc_nucleo) { // Usa desc_nucleo
-                state.nucleusSet.add(f.properties.desc_nucleo);
-            }
-        });
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        // Adiciona as feições coletadas aos FeatureGroups do Leaflet para exibição no mapa
+        // É importante que os FeatureGroups já estejam adicionados ao mapa (feito em initMap)
         L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
         L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         
-        // Garante que a camada de lotes seja adicionada e visível (será filtrada depois)
+        // Processa lotes e extrai núcleos
+        state.allLotes = newLotesFeatures; 
+        newLotesFeatures.forEach(f => {
+            if (f.properties && f.properties.desc_nucleo) { 
+                state.nucleusSet.add(f.properties.desc_nucleo);
+            }
+        });
+        // Adiciona a camada de lotes ao FeatureGroup (ela será exibida/filtrada depois)
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
         const allLayersGroup = L.featureGroup([state.layers.lotes, state.layers.app, state.layers.poligonais]);
         if (allLayersGroup.getLayers().length > 0) {
-            try { state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] }); } catch (e) {
+            try { 
+                state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] }); 
+                console.log('Mapa ajustado para os bounds dos dados carregados.');
+            } catch (e) {
                 console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas dos seus GeoJSONs.", e);
             }
         } else {
             state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
+            console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
         }
 
         // Atualiza UI
@@ -476,7 +435,7 @@ function initUpload() {
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
-        console.log('Todos os arquivos processados e dados carregados.'); 
+        console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
 }
 
@@ -515,12 +474,6 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
                 value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
             }
-            if (key.toLowerCase() === 'municipio' && feature.properties.nm_mun) {
-                 // Evita duplicar se 'nm_mun' já for o município principal
-                 continue; 
-            }
-
-
             // Mapeamento de nomes de propriedades para exibição no popup (adaptado para suas tabelas)
             let displayKey = key;
             switch(key.toLowerCase()){
@@ -532,10 +485,10 @@ function onEachLoteFeature(feature, layer) {
                 case 'dentro_app': displayKey = 'Em APP'; break;
                 case 'valor': displayKey = 'Custo de Intervenção'; break;
                 case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
-                case 'nm_mun': displayKey = 'Município'; break; 
+                case 'nm_mun': displayKey = 'Município'; break; // Nome do município do lote
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
-                // As outras propriedades que você adicionou para o laudo também aparecerão aqui.
+                // Adicione mais mapeamentos se precisar renomear outras propriedades para o popup
             }
 
             popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
@@ -606,7 +559,7 @@ async function buscarInfoCidade(nomeCidade) {
     
     let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
     info += `- Região: ${dadosSimulados.regiao}\n`;
-    info += `- População: ${dadosSimulados.populacao}\n`;
+    info += `- População Estimada: ${dadosSimulados.populacao}\n`;
     info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
     info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
 
@@ -618,6 +571,7 @@ async function buscarInfoCidade(nomeCidade) {
 
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
@@ -643,7 +597,6 @@ function populateNucleusFilter() {
             }
         });
     }
-    // Adiciona listener apenas uma vez no initMainButtons
 }
 
 /** Filtra os lotes com base no núcleo selecionado. */
@@ -664,7 +617,7 @@ function zoomToFilter() {
     }
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
     try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
-        console.warn("Não foi possível ajustar o mapa ao filtro. Verifique as coordenadas.", e);
+        console.warn("Não foi possível ajustar o mapa ao filtro. Verifique as coordenadas dos lotes filtrados.", e);
     }
 }
 
@@ -681,21 +634,21 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); // Adapta para 'risco' ou 'status_risco'
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
         if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
         else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
         else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
         else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
 
-        const dentroApp = Number(p.dentro_app || p.app || 0); // Usa 'dentro_app' ou 'app'
+        const dentroApp = Number(p.dentro_app || p.app || 0); 
         if (dentroApp > 0) lotesAppCount++;
 
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0); // Usa 'valor' ou 'custo_intervencao'
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
         custoTotal += isNaN(valorCusto) ? 0 : valorCusto;
     });
 
-    lotesRiscoCount = riskCounts['Alto'] + riskCounts['Muito Alto']; // Total de lotes em Alto e Muito Alto risco
+    lotesRiscoCount = riskCounts['Alto'] + riskCounts['Muito Alto']; 
 
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesRiscoCount;
@@ -715,7 +668,7 @@ function refreshDashboard() {
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
     const tbody = document.querySelector('#lotesDataTable tbody');
-    const feats = filteredLotes(); // Obtém os lotes filtrados
+    const feats = filteredLotes(); 
     tbody.innerHTML = '';
 
     if (feats.length === 0) {
@@ -730,7 +683,6 @@ function fillLotesTable() {
         const p = f.properties || {};
         const tr = document.createElement('tr');
 
-        // Usa as propriedades corretas das suas tabelas
         const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`;
         const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
         const tipoUso = p.tipo_uso || 'N/A';
@@ -759,13 +711,11 @@ function fillLotesTable() {
             const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) === codLoteToZoom);
             
             if (loteToZoom) {
-                // Navega para o dashboard e dá zoom
                 document.querySelector('nav a[data-section="dashboard"]').click();
-                const tempLayer = L.geoJSON(loteToZoom); // Cria uma camada temporária para pegar os bounds
+                const tempLayer = L.geoJSON(loteToZoom); 
                 try { state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); } catch (e) {
                     console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas.", e);
                 }
-                // Tenta abrir o popup se o lote já estiver na camada visível
                 state.layers.lotes.eachLayer(layer => {
                     if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) === codLoteToZoom && layer.openPopup) {
                         layer.openPopup();
@@ -791,7 +741,7 @@ function fillLotesTable() {
     document.getElementById('exportTableBtn').onclick = () => {
         const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
         Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-            if (tr.style.display === 'none') return; // Respeita o filtro de busca
+            if (tr.style.display === 'none') return; 
             const tds = tr.querySelectorAll('td');
             if (tds.length >= 6) rows.push([
                 tds[0].textContent, tds[1].textContent, tds[2].textContent,
@@ -867,7 +817,7 @@ function initGeneralInfoForm() {
 
             adequacaoDesconformidades: getRadioValue('adequacaoDesconformidades'),
             obrasInfraestrutura: getRadioValue('obrasInfraestrutura'),
-            medidasCompensatorias: getRadioValue('medidasCompraNsatorias') // corrigir erro de digitação se necessário
+            medidasCompensatorias: getRadioValue('medidasCompensatorias')
         };
 
         statusMessage.textContent = 'Informações gerais salvas com sucesso (localmente)!';
@@ -901,11 +851,10 @@ async function gerarRelatorioIA() {
     let reportText = `RELATÓRIO GEOLAUDO.AI - ${reportType.toUpperCase()}\n`;
     reportText += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}\n\n`;
 
-    let featuresToAnalyze = filteredLotes(); // Usa a função filteredLotes()
-    let municipioDoNucleo = "Não informado"; // Para puxar dados do IBGE simulado
+    let featuresToAnalyze = filteredLotes(); 
+    let municipioDoNucleo = "Não informado"; 
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none' && featuresToAnalyze.length > 0) {
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
-        // Pega o nome do município do primeiro lote do núcleo filtrado
         municipioDoNucleo = featuresToAnalyze[0].properties?.nm_mun || featuresToAnalyze[0].properties?.municipio || "Não informado";
     } else {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
@@ -926,7 +875,6 @@ async function gerarRelatorioIA() {
         reportText += `  - Dados do município (${municipioDoNucleo}) não encontrados ou não informados nos lotes. (Simulado)\n\n`;
     }
 
-    // Conteúdo do relatório baseado nas opções selecionadas
     if (incDadosGerais) {
         reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
         reportText += `Total de Lotes Analisados: ${featuresToAnalyze.length}\n`;
@@ -1027,13 +975,13 @@ async function gerarRelatorioIA() {
         reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
     }
 
-    if (incInfraestrutura && state.layers.poligonais.getLayers().length > 0) { // Verifica se há camadas poligonais carregadas
+    if (incInfraestrutura && state.layers.poligonais.getLayers().length > 0) { 
         reportText += `--- 5. Análise de Infraestrutura e Equipamentos Urbanos (Camadas Geoespaciais) ---\n`;
         reportText += `Foram detectadas ${state.layers.poligonais.getLayers().length} poligonais de infraestrutura ou outras áreas de interesse (como vias, áreas verdes, equipamentos comunitários) nas camadas carregadas.\n`;
         reportText += `A presença e adequação da infraestrutura existente é um fator chave para a viabilidade e qualidade da regularização. Recomenda-se verificação detalhada da situação da infraestrutura básica (água, esgoto, energia, drenagem, acesso) em relação aos lotes.\n\n`;
     }
     
-    const custoTotalFiltrado = featuresToAnalyze.reduce((acc, f) => acc + (f.properties.valor || 0), 0); // Usa 'valor' para custo
+    const custoTotalFiltrado = featuresToAnalyze.reduce((acc, f) => acc + (f.properties.valor || 0), 0); 
     reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
     reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
     reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
@@ -1042,23 +990,23 @@ async function gerarRelatorioIA() {
     reportText += `--- Fim do Relatório ---\n`;
     reportText += `Este relatório foi gerado automaticamente pelo GeoLaudo.AI. Para análises mais aprofundadas e validação legal, consulte um especialista qualificado e os órgãos competentes.`;
 
-    state.lastReportText = reportText; // Salva o relatório gerado no estado
-    generatedReportContent.textContent = reportText; // Exibe no HTML
-    generatedReportContent.scrollTop = 0; // Volta para o topo do relatório
+    state.lastReportText = reportText; 
+    generatedReportContent.textContent = reportText; 
+    generatedReportContent.scrollTop = 0; 
 }
 
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
-    initMap(); // Inicializa o mapa Leaflet e suas camadas
-    initNav(); // Configura a navegação entre abas
-    initUpload(); // Configura o formulário de upload de GeoJSON
-    initLegendToggles(); // Configura os checkboxes da legenda do mapa
-    initGeneralInfoForm(); // Configura o formulário de informações gerais (manual)
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
 
     // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; // Atualiza o filtro selecionado
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
         refreshDashboard();
         fillLotesTable();
         zoomToFilter();
@@ -1077,8 +1025,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Estado inicial: Dashboard ativo e preenchido (vazio no início)
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    refreshDashboard(); // Inicializa o dashboard com 0s
-    fillLotesTable(); // Inicializa a tabela de lotes vazia
-    populateNucleusFilter(); // Inicializa o filtro de núcleos vazio
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
