@@ -240,6 +240,10 @@ function initNav() {
                 console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
                 state.map.invalidateSize();
             }
+            // Garante que a tabela de lotes seja atualizada ao entrar na aba "Dados Lotes"
+            if (targetSectionId === 'dados-lotes') {
+                fillLotesTable();
+            }
         });
     });
 }
@@ -303,14 +307,16 @@ function initUpload() {
         e.preventDefault();
         dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.geojson') || file.name.endsWith('.json'));
-        fileInput.files = new FileListItems(droppedFiles); // Simula a FileList
+        // Agora, o input[type="file"] é o alvo, não a FileListItems
+        fileInput.files = createFileList(droppedFiles); // Usa a função auxiliar
         fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
-    // Classe auxiliar para simular FileList (para drag and drop)
-    function FileListItems(files) {
-        const b = new ClipboardEvent("").clipboardData || new DataTransfer();
-        for (let i = 0, len = files.length; i < len; i++) b.items.add(files[i]);
-        return b.files;
+
+    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
+    function createFileList(files) {
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        return dataTransfer.files;
     }
 
 
@@ -399,19 +405,18 @@ function initUpload() {
             }
         }
 
-        // Adiciona as feições coletadas aos FeatureGroups do Leaflet para exibição no mapa
-        // É importante que os FeatureGroups já estejam adicionados ao mapa (feito em initMap)
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
-        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
-            if (f.properties && f.properties.desc_nucleo) { 
+            if (f.properties && f.properties.desc_nucleo) { // Usa desc_nucleo
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
-        // Adiciona a camada de lotes ao FeatureGroup (ela será exibida/filtrada depois)
+        
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        // ATENÇÃO: É CRÍTICO QUE state.layers.lotes, .app, .poligonais JÁ ESTEJAM INICIALIZADOS E NO MAPA em initMap
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
@@ -431,7 +436,7 @@ function initUpload() {
         // Atualiza UI
         populateNucleusFilter();
         refreshDashboard();
-        fillLotesTable();
+        fillLotesTable(); // Preenche a tabela de lotes na nova aba
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
@@ -443,11 +448,16 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = feature.properties.risco || 'N/A'; // Usa a propriedade 'risco'
-    const style = riscoStyles[risco] || riscoStyles['N/A']; 
+    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); // Usa 'risco' ou 'status_risco'
+    let color;
+    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      // Verde
+    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; // Laranja
+    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; // Vermelho
+    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; // Vermelho escuro
+    else color = '#3498db'; // Azul padrão
 
     return {
-        fillColor: style.fillColor,
+        fillColor: color,
         weight: 1,
         opacity: 1,
         color: 'white', 
@@ -468,7 +478,7 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
+            if (key.toLowerCase() === 'valor' && typeof value === 'number') { // Usa 'valor' para custo
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
@@ -488,6 +498,7 @@ function onEachLoteFeature(feature, layer) {
                 case 'nm_mun': displayKey = 'Município'; break; // Nome do município do lote
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
+                case 'status_risco': displayKey = 'Status Risco'; break; // Adicionado para consistência
                 // Adicione mais mapeamentos se precisar renomear outras propriedades para o popup
             }
 
@@ -555,7 +566,7 @@ async function onEachPoligonalFeature(feature, layer) {
 // Esta função é chamada ao clicar no botão no popup de poligonais.
 async function buscarInfoCidade(nomeCidade) {
     alert(`Buscando dados simulados para ${nomeCidade}...`);
-    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); // Usa a função simulada IBGE
+    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
     
     let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
     info += `- Região: ${dadosSimulados.regiao}\n`;
@@ -563,7 +574,6 @@ async function buscarInfoCidade(nomeCidade) {
     info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
     info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
 
-    // Exibe as informações em um alerta ou em um modal mais sofisticado
     alert(info);
     console.log("Dados do município simulados:", dadosSimulados);
 }
@@ -575,7 +585,6 @@ function populateNucleusFilter() {
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
-    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
@@ -584,7 +593,7 @@ function populateNucleusFilter() {
     } else {
         const sortedNucleos = Array.from(state.nucleusSet).sort();
         sortedNucleos.forEach(nucleo => {
-            if (nucleo && nucleo.trim() !== '') { // Garante que o núcleo não seja vazio/nulo
+            if (nucleo && nucleo.trim() !== '') { 
                 const option1 = document.createElement('option');
                 option1.value = nucleo;
                 option1.textContent = nucleo;
@@ -601,6 +610,7 @@ function populateNucleusFilter() {
 
 /** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
+    // AQUI: A variável de estado 'currentNucleusFilter' é usada
     if (state.currentNucleusFilter === 'all') return state.allLotes;
     return state.allLotes.filter(f => {
         const nuc = (f.properties?.desc_nucleo || f.properties?.nucleo || '');
@@ -627,49 +637,69 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoCount = 0; // Alto + Muito Alto
+    let lotesRiscoAltoMuitoAlto = 0; // Contagem para o card 'Lotes em Risco'
     let lotesAppCount = 0;
     let custoTotal = 0;
+    let custoMin = Infinity;
+    let custoMax = -Infinity;
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); // Adapta para 'risco' ou 'status_risco'
         
+        // Contagem por nível de risco
         if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
         else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
         else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
         else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); // Debug para riscos desconhecidos
 
-        const dentroApp = Number(p.dentro_app || p.app || 0); 
+
+        // Lotes em Risco (para o card principal, que é Alto + Muito Alto)
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+            lotesRiscoAltoMuitoAlto++;
+        }
+        
+        // Lotes em APP
+        const dentroApp = Number(p.dentro_app || p.app || 0); // Usa 'dentro_app' ou 'app'
         if (dentroApp > 0) lotesAppCount++;
 
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
-        custoTotal += isNaN(valorCusto) ? 0 : valorCusto;
+        // Custo de Intervenção
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0); // Usa 'valor' ou 'custo_intervencao'
+        if (!isNaN(valorCusto) && valorCusto > 0) { // Considera apenas custos válidos e > 0
+            custoTotal += valorCusto;
+            if (valorCusto < custoMin) custoMin = valorCusto;
+            if (valorCusto > custoMax) custoMax = valorCusto;
+        }
     });
 
-    lotesRiscoCount = riskCounts['Alto'] + riskCounts['Muito Alto']; 
-
+    // Atualiza os Cards do Dashboard
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoCount;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; // Card: Lotes em Risco (Alto+Muito Alto)
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
+    // Atualiza a Análise de Riscos (Listas Detalhadas)
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoCount; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoCount; 
+    // Atualiza o Resumo de Intervenções (Custos Mínimo e Máximo)
+    document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
+    document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
+    
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; // Reuso da contagem de risco
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; // Exemplo: todos em risco precisam de intervenção
 }
 
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
     const tbody = document.querySelector('#lotesDataTable tbody');
-    const feats = filteredLotes(); 
-    tbody.innerHTML = '';
+    const feats = filteredLotes(); // Obtém os lotes filtrados
+    tbody.innerHTML = ''; // Limpa a tabela
 
     if (feats.length === 0) {
         const tr = document.createElement('tr');
@@ -683,13 +713,15 @@ function fillLotesTable() {
         const p = f.properties || {};
         const tr = document.createElement('tr');
 
-        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`;
+        // Usa as propriedades corretas das suas tabelas
+        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`; // Adapta para 'cod_lote' ou 'codigo'
         const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
         const tipoUso = p.tipo_uso || 'N/A';
         const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
-        const statusRisco = p.risco || 'N/A';
-        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não';
-
+        const statusRisco = p.risco || p.status_risco || 'N/A'; // Adapta para 'risco' ou 'status_risco'
+        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; // Adapta para 'dentro_app' ou 'app'
+        
+        // Botão "Ver no Mapa" na última coluna
         const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
         tr.innerHTML = `
             <td>${codLote}</td>
@@ -708,21 +740,29 @@ function fillLotesTable() {
     tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const codLoteToZoom = btn.getAttribute('data-codlote');
+            // Encontra o lote na lista total (state.allLotes) para ter a geometria completa
             const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) === codLoteToZoom);
             
             if (loteToZoom) {
+                // Navega para o dashboard (onde está o mapa)
                 document.querySelector('nav a[data-section="dashboard"]').click();
+                
+                // Cria uma camada Leaflet temporária para obter os limites (bounds) do lote
                 const tempLayer = L.geoJSON(loteToZoom); 
-                try { state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); } catch (e) {
-                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas.", e);
+                try { 
+                    // Ajusta o zoom do mapa para o lote selecionado
+                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                } catch (e) {
+                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
                 }
+                // Tenta abrir o popup do lote no mapa
                 state.layers.lotes.eachLayer(layer => {
                     if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) === codLoteToZoom && layer.openPopup) {
                         layer.openPopup();
                     }
                 });
             } else {
-                console.warn(`Lote com código ${codLoteToZoom} não encontrado para zoom.`);
+                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
             }
         });
     });
@@ -741,7 +781,7 @@ function fillLotesTable() {
     document.getElementById('exportTableBtn').onclick = () => {
         const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
         Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-            if (tr.style.display === 'none') return; 
+            if (tr.style.display === 'none') return; // Respeita o filtro de busca
             const tds = tr.querySelectorAll('td');
             if (tds.length >= 6) rows.push([
                 tds[0].textContent, tds[1].textContent, tds[2].textContent,
@@ -891,8 +931,11 @@ async function gerarRelatorioIA() {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         featuresToAnalyze.forEach(f => {
-            const risco = f.properties.risco || 'N/A'; 
-            if (riskCounts.hasOwnProperty(risco)) riskCounts[risco]++;
+            const risco = String(f.properties.risco || f.properties.status_risco || 'N/A').toLowerCase();
+            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
         });
         const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
         const percRiscoElevado = (lotesComRiscoElevado / featuresToAnalyze.length * 100 || 0).toFixed(2);
@@ -1009,7 +1052,8 @@ document.addEventListener('DOMContentLoaded', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
         refreshDashboard();
         fillLotesTable();
-        zoomToFilter();
+        // Não chama zoomToFilter aqui, ele é chamado na mudança do filtro do select,
+        // ou ao clicar no botão "Aplicar Filtros" (já está ok)
     });
 
     document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
@@ -1021,6 +1065,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         downloadText('relatorio_geolaudo.txt', state.lastReportText);
     });
+    
+    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+    });
+
 
     // Estado inicial: Dashboard ativo e preenchido (vazio no início)
     document.getElementById('dashboard').classList.add('active');
