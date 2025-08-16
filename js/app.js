@@ -24,33 +24,30 @@ const riscoStyles = {
 // 1. Inicializa o Mapa
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
-    // AQUI: Inicializamos o objeto 'map' com L.map()
-    map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas do centro do Brasil
+    map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
+    console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap OpenStreetMap (Padrão)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     });
-    osmLayer.addTo(map); // Adiciona o OSM como camada padrão
+    osmLayer.addTo(map); 
+    console.log('initMap: Basemap OpenStreetMap adicionado.'); 
 
-    // Basemap Esri World Imagery (Satélite) - similar ao Google Maps Satélite
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
-    // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
         "OpenStreetMap": osmLayer,
-        "Esri World Imagery (Satélite)": esriWorldImagery // Nome mais claro para o usuário
+        "Esri World Imagery (Satélite)": esriWorldImagery 
     };
-    L.control.layers(baseMaps).addTo(map); // AQUI: Adiciona o controle de camadas ao mapa JÁ INICIALIZADO
+    L.control.layers(baseMaps).addTo(map); 
+    console.log('initMap: Controle de camadas base adicionado.'); 
 
-    // Adiciona listeners para os checkboxes da legenda personalizada
     document.getElementById('toggleLotes').addEventListener('change', (e) => toggleLayerVisibility(lotesLayer, e.target.checked));
     document.getElementById('togglePoligonais').addEventListener('change', (e) => toggleLayerVisibility(poligonaisLayer, e.target.checked));
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
-    // IMPORTANTE: map.invalidateSize() deve ser chamado depois que o mapa está visível no DOM
     map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
 }
@@ -73,7 +70,6 @@ document.querySelectorAll('nav a').forEach(link => {
         const targetSectionId = this.getAttribute('data-section');
         console.log(`Navegação: Clicado em ${targetSectionId}`); 
 
-        // Remove 'active' de todas as seções e links
         document.querySelectorAll('main section').forEach(section => {
             section.classList.remove('active');
         });
@@ -81,7 +77,6 @@ document.querySelectorAll('nav a').forEach(link => {
             navLink.classList.remove('active');
         });
 
-        // Adiciona 'active' à seção e link clicados
         document.getElementById(targetSectionId).classList.add('active');
         this.classList.add('active');
 
@@ -96,9 +91,9 @@ document.querySelectorAll('nav a').forEach(link => {
 // 3. Funções de Upload e Processamento de GeoJSON
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded: Página e DOM carregados.'); 
-    initMap(); // Inicializa o mapa ao carregar a página
-    setupFileUpload(); // Configura o upload de arquivos
-    setupGeneralInfoForm(); // Configura o formulário de informações gerais
+    initMap(); 
+    setupFileUpload(); 
+    setupGeneralInfoForm(); 
     // Garante que o dashboard esteja visível por padrão ao carregar a página
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
@@ -112,33 +107,28 @@ function setupFileUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    // SELECIONA O BOTÃO VISÍVEL PELO ID: CRÍTICO PARA O UPLOAD FUNCIONAR
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
 
     let selectedFiles = []; 
 
-    // Verifica se os elementos foram encontrados (para depuração)
     if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput (input oculto) não encontrado!');
     if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton (botão visível) não encontrado!');
 
-    // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL PARA DISPARAR O CLIQUE NO INPUT DE ARQUIVO OCULTO
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
-            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+            fileInput.click(); 
         });
     } else {
         console.error('setupFileUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
     }
 
-    // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
     fileInput.addEventListener('change', (e) => {
         console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
         selectedFiles = Array.from(e.target.files);
         displaySelectedFiles(selectedFiles);
     });
 
-    // Lida com o arrastar e soltar
     dragDropArea.addEventListener('dragover', (e) => {
         e.preventDefault(); 
         dragDropArea.classList.add('dragging');
@@ -153,7 +143,6 @@ function setupFileUpload() {
         displaySelectedFiles(selectedFiles);
     });
 
-    // Exibe os nomes dos arquivos selecionados na lista
     function displaySelectedFiles(files) {
         console.log('displaySelectedFiles: Exibindo arquivos selecionados.'); 
         fileListElement.innerHTML = ''; 
@@ -168,7 +157,6 @@ function setupFileUpload() {
         }
     }
 
-    // Botão Processar e Carregar Dados
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         if (selectedFiles.length === 0) {
@@ -180,12 +168,10 @@ function setupFileUpload() {
         uploadStatus.textContent = 'Processando e carregando dados...';
         uploadStatus.className = 'status-message info';
 
-        // Limpa os dados globais e camadas do mapa antes de carregar novos
         allLotesGeoJSON.features = [];
         allAPPGeoJSON.features = [];
         allPoligonaisGeoJSON.features = [];
         
-        // Remove as camadas atuais do mapa e do controle de legenda
         if (lotesLayer) map.removeLayer(lotesLayer);
         if (appLayer) map.removeLayer(appLayer);
         if (poligonaisLayer) map.removeLayer(poligonaisLayer);
@@ -193,8 +179,7 @@ function setupFileUpload() {
         appLayer = null;
         poligonaisLayer = null;
 
-
-        const nucleosSet = new Set(); // Para coletar núcleos únicos dos lotes
+        const nucleosSet = new Set(); 
 
         for (const file of selectedFiles) {
             try {
@@ -207,7 +192,6 @@ function setupFileUpload() {
                 });
                 const geojsonData = JSON.parse(fileContent);
 
-                // Validação básica do GeoJSON
                 if (!geojsonData.type || !geojsonData.features) {
                      throw new Error('Arquivo GeoJSON inválido: missing "type" or "features" property.');
                 }
@@ -225,6 +209,7 @@ function setupFileUpload() {
                             nucleosSet.add(f.properties.desc_nucleo);
                         }
                     });
+                    console.log("Propriedades da primeira feição de lotes:", geojsonData.features[0]?.properties); // DEBUG: ver propriedades
                 } else if (file.name.toLowerCase().includes('app')) {
                     allAPPGeoJSON.features.push(...geojsonData.features);
                 } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura, tabela_geral)
@@ -236,24 +221,19 @@ function setupFileUpload() {
                 console.error(`Erro ao carregar ou processar ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
-                // Limpa os dados carregados parcialmente em caso de erro
                 allLotesGeoJSON.features = [];
                 allAPPGeoJSON.features = [];
                 allPoligonaisGeoJSON.features = [];
-                return; // Para de processar outros arquivos se um falhar
+                return; 
             }
         }
 
-        // Carrega as camadas processadas no mapa
         renderLayersOnMap();
-        // Atualiza o dashboard
         updateDashboard(allLotesGeoJSON.features);
-        // Preenche o filtro de núcleos
         populateNucleusFilter(Array.from(nucleosSet));
-        // Atualiza a tabela
-        updateLotesTable(allLotesGeoJSON.features);
+        updateLotesTable(allLotesGeoJSON.features); // Atualiza a tabela na nova aba "Dados Lotes"
 
-        uploadStatus.textContent = 'Dados carregados e processados com sucesso! Agora vá para o Dashboard.';
+        uploadStatus.textContent = 'Dados carregados e processados com sucesso! Agora vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados. Dados carregados no mapa e dashboard.'); 
     });
@@ -262,32 +242,28 @@ function setupFileUpload() {
 // 4. Renderiza as Camadas no Mapa
 function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
     console.log('renderLayersOnMap: Renderizando camadas...'); 
-    // Remove camadas existentes do mapa se houver
     if (lotesLayer) map.removeLayer(lotesLayer);
     if (appLayer) map.removeLayer(appLayer);
     if (poligonaisLayer) map.removeLayer(poligonaisLayer);
 
-    // Carrega lotes
     if (featuresToDisplay.length > 0) {
         lotesLayer = L.geoJSON(featuresToDisplay, {
             onEachFeature: onEachFeatureLotes,
             style: styleLotes
         }).addTo(map);
-        // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
         map.fitBounds(lotesLayer.getBounds());
+        console.log('Bounds dos lotes (Lat/Lon):', lotesLayer.getBounds()); // DEBUG: Checar se as coordenadas fazem sentido
         console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
     } else {
-        // Se não houver lotes, centraliza o mapa no Brasil e limpa a camada de lotes
         map.setView([-15.7801, -47.9292], 5);
-        document.getElementById('toggleLotes').checked = false; // Desmarca o checkbox
+        document.getElementById('toggleLotes').checked = false; 
         console.log('renderLayersOnMap: Nenhum lote para exibir, mapa centralizado.'); 
     }
 
-    // Carrega APP (não adiciona ao mapa por padrão, apenas o cria)
     if (allAPPGeoJSON && allAPPGeoJSON.features.length > 0) {
         appLayer = L.geoJSON(allAPPGeoJSON, {
             style: {
-                color: '#e74c3c', // Vermelho para APP
+                color: '#e74c3c', 
                 weight: 2,
                 opacity: 0.7,
                 fillOpacity: 0.2
@@ -302,17 +278,15 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                 }
             }
         });
-        // Garante que o checkbox do APP esteja desmarcado e a camada invisível
         document.getElementById('toggleAPP').checked = false;
-        if (map.hasLayer(appLayer)) map.removeLayer(appLayer); // Apenas para garantir
+        if (map.hasLayer(appLayer)) map.removeLayer(appLayer); 
         console.log('renderLayersOnMap: Camada APP carregada (mas invisível por padrão).'); 
     }
 
-    // Carrega Poligonais diversas (infraestrutura, etc.)
     if (allPoligonaisGeoJSON && allPoligonaisGeoJSON.features.length > 0) {
         poligonaisLayer = L.geoJSON(allPoligonaisGeoJSON, {
             style: {
-                color: '#2ecc71', // Verde para poligonais
+                color: '#2ecc71', 
                 weight: 2,
                 opacity: 0.7,
                 fillOpacity: 0.2
@@ -320,23 +294,27 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             onEachFeature: (feature, layer) => {
                  if (feature.properties) {
                     let popupContent = "<h3>Informações da Poligonal</h3>";
+                    // Para 'tabela_geral', exibir o nome do município e área se existirem
+                    if (feature.properties.municipio) popupContent += `<strong>Município:</strong> ${feature.properties.municipio}<br>`;
+                    if (feature.properties.area_m2) popupContent += `<strong>Área (m²):</strong> ${feature.properties.area_m2.toLocaleString('pt-BR')} m²<br>`;
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
+                        // Evitar duplicar ou exibir chaves já tratadas
+                        if (!['municipio', 'area_m2'].includes(key)) {
+                            popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
+                        }
                     }
                     layer.bindPopup(popupContent);
                 }
             }
         });
-        // Garante que o checkbox de poligonais esteja desmarcado e a camada invisível
         document.getElementById('togglePoligonais').checked = false;
-        if (map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer); // Apenas para garantir
+        if (map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer); 
         console.log('renderLayersOnMap: Camada Poligonais carregada (mas invisível por padrão).'); 
     }
 }
 
 // Estilo dos lotes baseado no risco
 function styleLotes(feature) {
-    // Usa a propriedade 'risco' para a coloração
     const risco = feature.properties.risco || 'N/A'; 
     const style = riscoStyles[risco] || riscoStyles['N/A']; 
 
@@ -344,8 +322,8 @@ function styleLotes(feature) {
         fillColor: style.fillColor,
         weight: 1,
         opacity: 1,
-        color: 'white', // Cor da borda
-        dashArray: '3', // Borda tracejada
+        color: 'white', 
+        dashArray: '3', 
         fillOpacity: 0.7
     };
 }
@@ -357,9 +335,9 @@ function onEachFeatureLotes(feature, layer) {
         // Itera sobre todas as propriedades e adiciona ao popup
         for (let key in feature.properties) {
             let value = feature.properties[key];
-            if (value === null || value === undefined) value = 'N/A'; // Trata valores nulos/indefinidos
+            if (value === null || value === undefined) value = 'N/A'; 
 
-            if (key.toLowerCase().includes('area_m2') && typeof value === 'number') { // Usa area_m2
+            if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
             if (key.toLowerCase() === 'valor' && typeof value === 'number') { // Usa 'valor' para custo
@@ -367,19 +345,22 @@ function onEachFeatureLotes(feature, layer) {
             }
             // Propriedade 'dentro_app' para verificar se está em APP
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
-                value = (value > 0) ? `Sim (${value}%)` : 'Não'; // Se >0%, está em APP
+                value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
             }
-            // Propriedade 'desc_nucleo' para o núcleo
-            if (key.toLowerCase() === 'desc_nucleo') {
-                key = 'Núcleo'; // Renomeia para exibição
-            }
-            // Propriedade 'cod_lote' para o código do lote
-            if (key.toLowerCase() === 'cod_lote') {
-                key = 'Código Lote'; // Renomeia para exibição
+            // Mapeamento de nomes de propriedades para exibição no popup
+            let displayKey = key;
+            switch(key.toLowerCase()){
+                case 'cod_lote': displayKey = 'Código do Lote'; break;
+                case 'desc_nucleo': displayKey = 'Núcleo'; break;
+                case 'tipo_uso': displayKey = 'Tipo de Uso'; break;
+                case 'area_m2': displayKey = 'Área (m²)'; break;
+                case 'risco': displayKey = 'Status de Risco'; break;
+                case 'dentro_app': displayKey = 'Em APP'; break;
+                case 'valor': displayKey = 'Custo de Intervenção'; break;
+                // Adicione mais mapeamentos se precisar renomear outras propriedades para o popup
             }
 
-
-            popupContent += `<strong>${key}:</strong> ${value}<br>`;
+            popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
         }
         layer.bindPopup(popupContent);
     }
@@ -430,27 +411,30 @@ function updateDashboard(features) {
 
 // 6. Preenche o Filtro de Núcleos
 function populateNucleusFilter(nucleos) {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); 
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', nucleos); // DEBUG: Verificar quais núcleos estão sendo passados
     const filterSelect = document.getElementById('nucleusFilter');
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
         nucleos.sort().forEach(nucleo => {
-            const option = document.createElement('option');
-            option.value = nucleo;
-            option.textContent = nucleo;
-            filterSelect.appendChild(option);
+            if (nucleo) { // Garante que o núcleo não seja vazio/nulo
+                const option = document.createElement('option');
+                option.value = nucleo;
+                option.textContent = nucleo;
+                filterSelect.appendChild(option);
+            }
         });
     }
 
-    // Preenche o filtro de núcleos do relatório também
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
         nucleos.sort().forEach(nucleo => {
-            const option = document.createElement('option');
-            option.value = nucleo;
-            option.textContent = nucleo;
-            reportNucleosSelect.appendChild(option);
+            if (nucleo) { // Garante que o núcleo não seja vazio/nulo
+                const option = document.createElement('option');
+                option.value = nucleo;
+                option.textContent = nucleo;
+                reportNucleosSelect.appendChild(option);
+            }
         });
     } else {
         reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
@@ -468,20 +452,16 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
     }
 
-    // Re-renderiza a camada de lotes no mapa com os dados filtrados
     renderLayersOnMap(filteredFeatures);
-    
-    // Atualiza o dashboard com os dados filtrados
     updateDashboard(filteredFeatures);
-    // Atualiza a tabela com dados filtrados
     updateLotesTable(filteredFeatures); 
 });
 
-// 8. Tabela de Lotes Detalhados
+// 8. Tabela de Lotes Detalhados (AGORA NA NOVA ABA "Dados Lotes")
 function updateLotesTable(features) {
     console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
-    const tableBody = document.querySelector('#lotesDataTable tbody');
-    tableBody.innerHTML = ''; // Limpa a tabela
+    const tableBody = document.querySelector('#lotesDataTable tbody'); // O seletor continua o mesmo, mas agora está dentro da nova seção
+    tableBody.innerHTML = ''; 
 
     if (features.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro ou ajuste os filtros.</td></tr>';
@@ -512,9 +492,10 @@ function updateLotesTable(features) {
             // Encontra a camada do lote específico e centraliza o mapa
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
-                    if (layer.feature && layer.feature.properties && layer.feature.properties.cod_lote === props.cod_lote) { // Usa cod_lote
-                        map.setView(layer.getBounds().getCenter(), 18); // Centraliza e dá zoom
-                        layer.openPopup(); // Abre o popup de detalhes
+                    // Usa a propriedade 'cod_lote' para encontrar o lote
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.cod_lote === props.cod_lote) { 
+                        map.setView(layer.getBounds().getCenter(), 18); 
+                        layer.openPopup(); 
                     }
                 });
             }
@@ -545,19 +526,17 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     // Cabeçalho
     const headerRow = [];
     table.querySelectorAll('thead th').forEach(th => {
-        if (th.textContent !== 'Ações') { // Exclui a coluna de ações
-            headerRow.push(`"${th.textContent.trim()}"`); // Adiciona aspas para lidar com vírgulas no texto
+        if (th.textContent !== 'Ações') { 
+            headerRow.push(`"${th.textContent.trim()}"`); 
         }
     });
-    csv.push(headerRow.join(';')); // Usa ponto e vírgula como separador para CSV pt-BR
+    csv.push(headerRow.join(';')); 
 
     // Linhas de dados
     table.querySelectorAll('tbody tr').forEach(tr => {
         const row = [];
         tr.querySelectorAll('td').forEach((td, index) => {
-            // Exclui a última coluna (Ações)
             if (index < tr.querySelectorAll('td').length - 1) {
-                // Remove quebras de linha e aspas internas, adiciona aspas para campos com vírgulas
                 let text = td.innerText.replace(/"/g, '""').replace(/\n/g, ' ').trim();
                 row.push(`"${text}"`);
             }
@@ -583,7 +562,6 @@ function setupGeneralInfoForm() {
 
     saveButton.addEventListener('click', () => {
         console.log('Evento: Botão "Salvar Informações Gerais" clicado.'); 
-        // Função auxiliar para pegar valor de radio button group
         const getRadioValue = (name) => {
             const radios = document.getElementsByName(name);
             for (let i = 0; i < radios.length; i++) {
@@ -591,12 +569,10 @@ function setupGeneralInfoForm() {
                     return radios[i].value;
                 }
             }
-            return ''; // Retorna vazio se nada for selecionado
+            return ''; 
         };
 
-        // Coleta todos os valores dos campos
         generalProjectInfo = {
-            // Infraestrutura Básica
             ucConservacao: getRadioValue('ucConservacao'),
             protecaoMananciais: getRadioValue('protecaoMananciais'),
             tipoAbastecimento: document.getElementById('tipoAbastecimento').value.trim(),
@@ -607,7 +583,6 @@ function setupGeneralInfoForm() {
             drenagemInadequada: getRadioValue('drenagemInadequada'),
             logradourosIdentificados: getRadioValue('logradourosIdentificados'),
             
-            // Restrições e Conflitos
             linhaTransmissao: getRadioValue('linhaTransmissao'),
             minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
             linhaFerrea: getRadioValue('linhaFerrea'),
@@ -617,7 +592,6 @@ function setupGeneralInfoForm() {
             processosJudiciais: getRadioValue('processosJudiciais'),
             comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
             
-            // Aspectos Legais e Fundiários
             titularidadeArea: getRadioValue('titularidadeArea'),
             terraLegal: getRadioValue('terraLegal'),
             instrumentoJuridico: document.getElementById('instrumentoJuridico').value.trim(),
@@ -629,7 +603,6 @@ function setupGeneralInfoForm() {
             matriculasOrigem: document.getElementById('matriculasOrigem').value.trim(),
             matriculasIdentificadas: document.getElementById('matriculasIdentificadas').value.trim(),
 
-            // Ações e Medidas Propostas
             adequacaoDesconformidades: getRadioValue('adequacaoDesconformidades'),
             obrasInfraestrutura: getRadioValue('obrasInfraestrutura'),
             medidasCompensatorias: getRadioValue('medidasCompensatorias')
@@ -658,7 +631,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         generatedReportContent.textContent = "Nenhum dado de lotes disponível para gerar o relatório. Faça o upload das camadas primeiro.";
         return;
     }
-    // Verifica se as informações gerais foram preenchidas e salvas, se a seção for marcada para inclusão
     if (incInformacoesGerais && Object.keys(generalProjectInfo).length === 0) {
         generatedReportContent.textContent = "Seção 'Informações Gerais do Projeto' selecionada, mas nenhum dado foi salvo. Por favor, preencha e salve as informações na aba 'Informações Gerais'.";
         return;
@@ -675,7 +647,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
     }
 
-    // Conteúdo do relatório baseado nas opções selecionadas (IA SIMULADA)
     if (incDadosGerais) {
         reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
         reportText += `Total de Lotes Analisados: ${filteredFeatures.length}\n`;
@@ -725,13 +696,11 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         }
     }
 
-    // SEÇÃO: Informações Gerais do Projeto (Puxa do Formulário Manual)
     if (incInformacoesGerais && Object.keys(generalProjectInfo).length > 0) {
-        const info = generalProjectInfo; // Usa as propriedades do objeto generalProjectInfo
+        const info = generalProjectInfo; 
 
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
         
-        // Infraestrutura Básica
         reportText += `**Infraestrutura Básica:**\n`;
         reportText += `  - Unidades de Conservação Próximas: ${info.ucConservacao || 'Não informado'}.\n`;
         reportText += `  - Proteção de Mananciais na Área: ${info.protecaoMananciais || 'Não informado'}.\n`;
@@ -741,7 +710,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Lotes com Drenagem Inadequada: ${info.drenagemInadequada || 'Não informado'}.\n`;
         reportText += `  - Logradouros: ${info.logradourosIdentificados || 'Não informado'}.\n\n`;
 
-        // Restrições e Conflitos
         reportText += `**Restrições e Conflitos:**\n`;
         if (info.linhaTransmissao === 'Sim' || info.minerodutoGasoduto === 'Sim' || info.linhaFerrea === 'Sim' || info.aeroporto === 'Sim' || info.limitacoesOutras === 'Sim') {
             reportText += `  - Foram identificadas as seguintes restrições/infraestruturas de grande porte:\n`;
@@ -757,7 +725,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Processos Judiciais Existentes: ${info.processosJudiciais || 'Não informado'}.\n`;
         reportText += `  - Comarcas do CRI: ${info.comarcasCRI || 'Não informado/Não aplicável'}.\n\n`;
 
-        // Aspectos Legais e Fundiários
         reportText += `**Aspectos Legais e Fundiários:**\n`;
         reportText += `  - Titularidade da Área: ${info.titularidadeArea || 'Não informado'}.\n`;
         reportText += `  - Programa Terra Legal: ${info.terraLegal || 'Não informado'}.\n`;
@@ -770,7 +737,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Matrículas de Origem/Afetadas: ${info.matriculasOrigem || 'Não informadas.'}\n`;
         reportText += `  - Matrículas Identificadas: ${info.matriculasIdentificadas || 'Não informadas.'}\n\n`;
 
-        // Ações e Medidas Propostas
         reportText += `**Ações e Medidas Propostas:**\n`;
         reportText += `  - Adequação para Correção de Desconformidades: ${info.adequacaoDesconformidades || 'Não informado'}.\n`;
         reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
@@ -782,15 +748,13 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
     }
 
-
     if (incInfraestrutura && allPoligonaisGeoJSON && allPoligonaisGeoJSON.features.length > 0) {
         reportText += `--- 5. Análise de Infraestrutura e Equipamentos Urbanos (Camadas Geoespaciais) ---\n`;
         reportText += `Foram detectadas ${allPoligonaisGeoJSON.features.length} poligonais de infraestrutura ou outras áreas de interesse (como vias, áreas verdes, equipamentos comunitários) nas camadas carregadas.\n`;
         reportText += `A presença e adequação da infraestrutura existente é um fator chave para a viabilidade e qualidade da regularização. Recomenda-se verificação detalhada da situação da infraestrutura básica (água, esgoto, energia, drenagem, acesso) em relação aos lotes.\n\n`;
     }
     
-    // Custo de Intervenção (sempre incluído no final do relatório)
-    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.valor || 0), 0); // Usa 'valor'
+    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.valor || 0), 0); // Usa 'valor' para custo
     reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
     reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
     reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
@@ -800,7 +764,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     reportText += `Este relatório foi gerado automaticamente pelo GeoLaudo.AI. Para análises mais aprofundadas e validação legal, consulte um especialista qualificado e os órgãos competentes.`;
 
     generatedReportContent.textContent = reportText;
-    generatedReportContent.scrollTop = 0; // Volta para o topo do relatório
+    generatedReportContent.scrollTop = 0; 
 });
 
 // Exportar Relatório (botão no header)
