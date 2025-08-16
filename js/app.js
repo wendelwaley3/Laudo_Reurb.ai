@@ -7,9 +7,6 @@ let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] };
 // VARIÁVEL PARA INFORMAÇÕES GERAIS (MANUAL)
 let generalProjectInfo = {}; 
 
-// NOVO: Cache para dados do IBGE
-let ibgeDataCache = {}; 
-
 // Camadas Leaflet no mapa
 let lotesLayer = null;
 let appLayer = null;
@@ -21,22 +18,22 @@ const riscoStyles = {
     'Médio': { fillColor: '#f39c12', color: 'white' },        // Laranja
     'Alto': { fillColor: '#e74c3c', color: 'white' },         // Vermelho
     'Muito Alto': { fillColor: '#c0392b', color: 'white' },   // Vermelho escuro
-    'N/A': { fillColor: '#3498db', color: 'white' }            // Azul padrão para risco não definido
+    'N/A': { fillColor: '#3498db', color: 'white' },           // Azul padrão para risco não definido
+    'Geológico': { fillColor: '#e74c3c', color: 'white' }     // NOVO: Estilo para "Geológico" (exemplo: Alto risco)
 };
 
 // ========================================================================================
-// CRÍTICO: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
+// IMPORTANTE: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
 // ========================================================================================
-// CONFIRMADO AGORA: SEU DADO É EPSG:31983 (SIRGAS 2000 / UTM Zone 23S)
-// Esta é a definição EXATA para este EPSG.
+// Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S (EPSG:31983).
+// É CRÍTICO QUE VOCÊ CONFIRME O EPSG EXATO DOS SEUS DADOS.
+// Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
 if (typeof proj4 !== 'undefined') {
+    // Definimos a projeção para SIRGAS 2000 / UTM Zone 23S (EPSG:31983)
+    // Se precisar de outra zona, mude o 'zone=XX' e possivelmente o 'south'/'north' e o EPSG.
     proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
     
-    // Se você tiver dados de MÚLTIPLAS ZONAS UTM ou outros datums, você pode adicionar mais definições aqui:
-    // proj4.defs('EPSG:31982', '+proj=utm +zone=22 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 22S
-    // proj4.defs('EPSG:31984', '+proj=utm +zone=24 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'); // SIRGAS 2000 / UTM Zone 24S
-
-    console.log("Definição EPSG:31983 (SIRGAS 2000 / UTM Zone 23S) carregada para reprojeção UTM.");
+    console.log("Definição EPSG:31983 carregada para reprojeção UTM.");
 } else {
     console.error("Proj4js não carregado. A reprojeção UTM não funcionará. Certifique-se que o script proj4.min.js está no index.html.");
 }
@@ -49,15 +46,11 @@ function initMap() {
     map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas iniciais (centro do Brasil)
     console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap OpenStreetMap (Geralmente o mais compatível)
+    // Basemap OpenStreetMap (Voltando ao OSM puro, que geralmente funciona)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         minZoom: 0, 
         maxZoom: 19 
-    }).on('tileerror', function(error, tile) {
-        console.error('Erro CRÍTICO ao carregar tile OpenStreetMap:', error, tile);
-        // Se este erro persistir, o problema é na sua rede/navegador, não no código.
-        // Verifique o console do navegador (F12) na aba "Rede" e "Console" para mais detalhes.
     });
     osmLayer.addTo(map); // Define como o mapa base padrão
     console.log('initMap: Basemap OpenStreetMap adicionado como padrão.'); 
@@ -67,15 +60,11 @@ function initMap() {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
         minZoom: 0,
         maxZoom: 19
-    }).on('tileerror', function(error, tile) {
-        console.warn('Erro ao carregar tile Esri Street Map:', error, tile);
     });
 
     // Basemap Esri World Imagery (Satélite)
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-    }).on('tileerror', function(error, tile) {
-        console.warn('Erro ao carregar tile Esri World Imagery:', error, tile);
     });
 
     // Controle de camadas base para o usuário escolher o basemap
@@ -92,6 +81,7 @@ function initMap() {
     document.getElementById('togglePoligonais').addEventListener('change', (e) => toggleLayerVisibility(poligonaisLayer, e.target.checked));
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
+    // map.invalidateSize() é chamado em DOMContentLoaded e na mudança de abas
     console.log('initMap: Mapa inicializado com sucesso.'); 
 }
 
@@ -128,7 +118,7 @@ document.querySelectorAll('nav a').forEach(link => {
         // Garante que o mapa renderize corretamente após a seção do dashboard se tornar visível
         if (targetSectionId === 'dashboard' && map) {
             console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
-            map.invalidateSize(); // Garante que o mapa aparece corretamente quando a aba é selecionada
+            map.invalidateSize();
         }
     });
 });
@@ -157,25 +147,19 @@ function setupFileUpload() {
 
     let selectedFiles = []; 
 
-    // VERIFICA SE OS ELEMENTOS FORAM ENCONTRADOS ANTES DE ADICIONAR LISTENERS
-    if (!fileInput) {
-        console.error('setupFileUpload ERRO: #geojsonFileInput (input oculto) não encontrado! O upload não funcionará.');
-        uploadStatus.textContent = 'Erro interno: Campo de seleção de arquivos não encontrado.';
-        uploadStatus.className = 'status-message error';
-        return; // Sai da função se o elemento crítico não for encontrado
-    }
-    if (!selectFilesVisibleButton) {
-        console.error('setupFileUpload ERRO: #selectFilesVisibleButton (botão visível) não encontrado! O upload não funcionará.');
-        uploadStatus.textContent = 'Erro interno: Botão de seleção de arquivos não encontrado.';
-        uploadStatus.className = 'status-message error';
-        return; // Sai da função se o elemento crítico não for encontrado
-    }
+    // Verifica se os elementos foram encontrados (para depuração)
+    if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput não encontrado!');
+    if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton não encontrado!');
 
     // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL
-    selectFilesVisibleButton.addEventListener('click', () => {
-        console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
-        fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
-    });
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
+            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+        });
+    } else {
+        console.error('setupFileUpload: Botão visível ou input de arquivo não encontrados. O upload não funcionará.');
+    }
 
     // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
     fileInput.addEventListener('change', (e) => {
@@ -264,7 +248,7 @@ function setupFileUpload() {
                 // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
                 let featuresToLoad = [];
 
-                // Heurística para detectar UTM e reprojetar. AGORA USANDO EPSG:31983 CONFIRMADO!
+                // Heurística para detectar UTM e reprojetar
                 if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined' && proj4.defs['EPSG:31983']) { 
                     const sampleFeature = geojsonData.features[0];
                     if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
@@ -283,35 +267,24 @@ function setupFileUpload() {
                             const easting = sampleCoord[0];
                             const northing = sampleCoord[1];
 
-                            // Heurística para UTM no Brasil (SIRGAS 2000, zonas 22S, 23S, 24S)
-                            // Valores de Easting e Northing devem estar dentro do range UTM esperado para o hemisfério sul
-                            // O Northing 7.xxx.xxx,xx e Easting 6xx.xxx,xx se encaixa para 31983.
+                            // Heurística para UTM no Brasil (para SIRGAS 2000, zonas 22S, 23S, 24S)
+                            // Easting entre 100.000 e 900.000
+                            // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
                             if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log(`Coordenadas de ${file.name} detectadas como UTM (EPSG:31983). Reprojetando para WGS84...`);
+                                console.log(`Coordenadas de ${file.name} detectadas como UTM. Reprojetando para WGS84 usando EPSG:31983...`);
                                 const utmCrs = new L.Proj.CRS('EPSG:31983'); 
                                 featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
                                 console.log(`Feições de ${file.name} reprojetadas com sucesso.`);
-                                if (featuresToLoad.length > 0 && featuresToLoad[0].geometry && featuresToLoad[0].geometry.coordinates) {
-                                    const reprojectedSample = extractFirstCoord(featuresToLoad[0].geometry.coordinates);
-                                    console.log(`Amostra de coordenada reprojetada: Longitude ${reprojectedSample[0]}, Latitude ${reprojectedSample[1]}`);
-                                }
-
-                            } else {
-                                console.log(`Coordenadas de ${file.name} não parecem ser UTM na Zona 23S. Carregando como WGS84.`);
-                                featuresToLoad = geojsonData.features; // Carrega como está (WGS84)
                             }
                         }
                     }
-                } else if (geojsonData.features.length > 0) { // Se proj4/proj4leaflet não estão disponíveis ou EPSG não definido
-                    featuresToLoad = geojsonData.features;
-                    console.warn(`Proj4js/L.Proj não carregados ou definição EPSG:31983 ausente. Carregando GeoJSON sem reprojeção.`, file.name);
                 }
                 
-                // Se o featuresToLoad ainda estiver vazio e o geojsonData original tiver features,
-                // significa que não houve detecção/reprojeção, então carregamos o original.
+                // Se não detectou UTM ou proj4/proj4leaflet não estão carregados, ou reprojeção não ocorreu,
+                // carrega as feições como estão (assumindo WGS84)
                 if (featuresToLoad.length === 0 && geojsonData.features.length > 0) {
                     featuresToLoad = geojsonData.features;
-                    console.log(`Carregando ${file.name} como WGS84 (assumido).`);
+                    console.log(`Coordenadas de ${file.name} carregadas como WGS84 ou reprojeção não aplicável.`);
                 }
 
 
@@ -332,7 +305,7 @@ function setupFileUpload() {
                 console.log(`Arquivo ${file.name} adicionado às camadas. Total de lotes até agora: ${allLotesGeoJSON.features.length}`); 
 
             } catch (error) {
-                console.error(`Erro CRÍTICO ao carregar ou processar ${file.name}:`, error); 
+                console.error(`Erro ao carregar ou processar ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
                 // Limpa os dados carregados parcialmente em caso de erro
@@ -372,23 +345,17 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
             onEachFeature: onEachFeatureLotes,
             style: styleLotes
         }).addTo(map);
-        try {
-            // Tenta ajustar o mapa para a extensão dos dados.
-            // Se as coordenadas estiverem inválidas (NaN, Infinity) ou fora do range esperado,
-            // getBounds() pode falhar, daí o try/catch.
-            map.fitBounds(lotesLayer.getBounds());
-            console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
-        } catch (e) {
-            console.error("Erro ao ajustar o mapa para a extensão dos lotes. Coordenadas podem estar inválidas ou fora da área visível. Verifique o CRS de seus GeoJSONs.", e);
-            map.setView([-15.7801, -47.9292], 5); // Volta para o centro do Brasil se falhar
-        }
+        // Ajusta o mapa para a extensão dos dados SOMENTE se houver dados
+        map.fitBounds(lotesLayer.getBounds());
+        console.log('renderLayersOnMap: Lotes adicionados e mapa ajustado.'); 
     } else {
+        // Se não houver lotes, centraliza o mapa no Brasil e limpa a camada de lotes
         map.setView([-15.7801, -47.9292], 5);
-        document.getElementById('toggleLotes').checked = false; 
+        document.getElementById('toggleLotes').checked = false; // Desmarca o checkbox
         console.log('renderLayersOnMap: Nenhum lote para exibir, mapa centralizado.'); 
     }
 
-    // Carrega APP 
+    // Carrega APP (não adiciona ao mapa por padrão, apenas o cria)
     if (allAPPGeoJSON && allAPPGeoJSON.features.length > 0) {
         appLayer = L.geoJSON(allAPPGeoJSON, {
             style: {
@@ -401,15 +368,16 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Área de Preservação Permanente (APP)</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase().includes('area') ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
             }
         });
-        appLayer.addTo(map); // Adiciona a camada APP ao mapa por padrão
-        document.getElementById('toggleAPP').checked = true; // Marca o checkbox
-        console.log('renderLayersOnMap: Camada APP carregada e visível por padrão.'); 
+        // Garante que o checkbox do APP esteja desmarcado e a camada invisível
+        document.getElementById('toggleAPP').checked = false;
+        if (map.hasLayer(appLayer)) map.removeLayer(appLayer); // Apenas para garantir
+        console.log('renderLayersOnMap: Camada APP carregada (mas invisível por padrão).'); 
     }
 
     // Carrega Poligonais diversas (infraestrutura, etc.)
@@ -425,15 +393,16 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
                  if (feature.properties) {
                     let popupContent = "<h3>Informações da Poligonal</h3>";
                     for (let key in feature.properties) {
-                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase().includes('area') ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
+                        popupContent += `<strong>${key}:</strong> ${key.toLowerCase() === 'area' ? feature.properties[key].toLocaleString('pt-BR') + ' m²' : feature.properties[key]}<br>`;
                     }
                     layer.bindPopup(popupContent);
                 }
             }
         });
-        poligonaisLayer.addTo(map); // Adiciona a camada Poligonais ao mapa por padrão
-        document.getElementById('togglePoligonais').checked = true; // Marca o checkbox
-        console.log('renderLayersOnMap: Camada Poligonais carregada e visível por padrão.'); 
+        // Garante que o checkbox de poligonais esteja desmarcado e a camada invisível
+        document.getElementById('togglePoligonais').checked = false;
+        if (map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer); // Apenas para garantir
+        console.log('renderLayersOnMap: Camada Poligonais carregada (mas invisível por padrão).'); 
     }
 }
 
@@ -445,9 +414,9 @@ function styleLotes(feature) {
         risco = risco.trim().charAt(0).toUpperCase() + risco.trim().slice(1).toLowerCase();
     }
     
-    // Mapeia "Geologico" para "Alto" para fins de cor e contagem
+    // Mapeia "Geológico" para "Alto" para fins de cor e contagem
     if (risco === 'Geologico') {
-        risco = 'Alto'; 
+        risco = 'Alto'; // Ou 'Muito Alto' se preferir mais impacto visual
     }
     
     const style = riscoStyles[risco] || riscoStyles['N/A']; 
@@ -484,7 +453,7 @@ function onEachFeatureLotes(feature, layer) {
             } else if (key.toLowerCase() === 'valor') { // Usa 'valor' para custo, se houver 'intervencao'
                 if (feature.properties.intervencao && typeof value === 'number') {
                     value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    key = 'Custo de Intervenção (associado a ' + feature.properties.intervencao + ')'; 
+                    key = 'Custo de Intervenção (associado a ' + feature.properties.intervencao + ')'; // Renomeia e adiciona contexto
                 }
             } else if (key.toLowerCase() === 'tipo_uso' && typeof value === 'string') {
                  value = value.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
@@ -516,18 +485,17 @@ function updateDashboard(features) {
             riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase();
         }
         
-        // Mapeia "Geologico" para "Alto" para fins de contagem nos cards e seção "Análise de Riscos"
+        // Mapeia "Geológico" para "Alto" para fins de contagem nos cards e seção "Análise de Riscos"
         if (riscoValue === 'Geologico') {
             riscoValue = 'Alto'; 
         }
         
-        // Conta por categoria de risco
+        // Conta por categoria de risco para a seção "Análise de Riscos"
         if (riskCategoryCounts.hasOwnProperty(riscoValue)) { 
             riskCategoryCounts[riscoValue]++;
         } 
         
         // Contagem geral de lotes em risco (qualquer coisa que não seja "Baixo" ou "N/A")
-        // Apenas para o card "Lotes em Risco", conta qualquer risco que não seja 'Baixo' ou 'N/A'
         if (riscoValue !== 'Baixo' && riscoValue !== 'N/A') { 
             lotesRiscoCount++;
         }
@@ -558,12 +526,12 @@ function updateDashboard(features) {
 
     // Atualiza o resumo de intervenções
     document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
-    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
+    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; // Ajuste se a lógica de intervenção for diferente da identificação de risco
 }
 
 // 6. Preenche o Filtro de Núcleos
 function populateNucleusFilter(nucleos) {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos.'); 
+    console.log('populateNucleoFilter: Preenchendo filtro de núcleos.'); 
     const filterSelect = document.getElementById('nucleusFilter');
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     if (nucleos.length > 0) {
@@ -609,10 +577,10 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     updateLotesTable(filteredFeatures); 
 });
 
-// 8. Tabela de Lotes Detalhados (Agora em aba própria)
+// 8. Tabela de Lotes Detalhados
 function updateLotesTable(features) {
     console.log('updateLotesTable: Atualizando tabela de lotes com', features.length, 'recursos.'); 
-    const tableBody = document.querySelector('#lotes-detalhados table tbody'); // SELETOR CORRIGIDO
+    const tableBody = document.querySelector('#lotesDataTable tbody');
     tableBody.innerHTML = ''; // Limpa a tabela
 
     if (features.length === 0) {
@@ -645,7 +613,7 @@ function updateLotesTable(features) {
         viewBtn.textContent = 'Ver no Mapa';
         viewBtn.className = 'small-btn'; 
         viewBtn.onclick = () => {
-            document.querySelector('nav a[data-section="dashboard"]').click(); // Vai para o dashboard
+            document.querySelector('nav a[data-section="dashboard"]').click();
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
                     if (layer.feature && layer.feature.properties && layer.feature.properties.codigo === props.codigo) {
@@ -662,8 +630,7 @@ function updateLotesTable(features) {
 // Busca na tabela
 document.getElementById('lotSearch').addEventListener('keyup', (e) => {
     const searchTerm = e.target.value.toLowerCase();
-    // CORREÇÃO: Selecionar as linhas da tabela na nova aba
-    const rows = document.querySelectorAll('#lotes-detalhados table tbody tr'); 
+    const rows = document.querySelectorAll('#lotesDataTable tbody tr');
     rows.forEach(row => {
         const textContent = row.textContent.toLowerCase();
         if (textContent.includes(searchTerm)) {
@@ -677,8 +644,7 @@ document.getElementById('lotSearch').addEventListener('keyup', (e) => {
 // Exportar Tabela para CSV
 document.getElementById('exportTableBtn').addEventListener('click', () => {
     console.log('Evento: Botão "Exportar Tabela" clicado.'); 
-    // CORREÇÃO: Selecionar a tabela na nova aba
-    const table = document.querySelector('#lotes-detalhados table'); 
+    const table = document.getElementById('lotesDataTable');
     let csv = [];
     // Cabeçalho
     const headerRow = [];
@@ -710,57 +676,6 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     link.click();
     document.body.removeChild(link);
 });
-
-// FUNÇÃO AUXILIAR: Busca dados do IBGE para um município
-async function fetchIbgeData(municipioNome) {
-    if (ibgeDataCache[municipioNome]) {
-        console.log(`Dados IBGE para ${municipioNome} encontrados no cache.`);
-        return ibgeDataCache[municipioNome];
-    }
-
-    console.log(`Buscando dados do IBGE para ${municipioNome}...`);
-    try {
-        // Primeiro, busca o ID do município
-        const searchUrl = `https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome`;
-        const response = await fetch(searchUrl);
-        const municipios = await response.json();
-        
-        const municipioEncontrado = municipios.find(m => m.nome.toLowerCase() === municipioNome.toLowerCase());
-
-        if (municipioEncontrado) {
-            const idMunicipio = municipioEncontrado.id;
-            // Segundo, busca dados detalhados para o ID do município
-            const populacaoUrl = `https://servicodados.ibge.gov.br/api/v3/agregados/6579/periodos/2021/localidades/${idMunicipio}|BR/variaveis/9324?formato=json`;
-            const populacaoResponse = await fetch(populacaoUrl);
-            const populacaoData = await populacaoResponse.json();
-            const populacao = populacaoData[0]?.resultados[0]?.series[0]?._serie[2021] || 'Não disponível';
-
-
-            const uf = municipioEncontrado.microrregiao?.mesorregiao?.UF?.sigla || 'N/A';
-            const mesorregiao = municipioEncontrado.microrregiao?.mesorregiao?.nome || 'N/A';
-            const microrregiao = municipioEncontrado.microrregiao?.nome || 'N/A';
-            const regiaoGeografica = municipioEncontrado.microrregiao?.mesorregiao?.UF?.regiao?.nome || 'N/A';
-
-            const data = {
-                populacao: populacao,
-                uf: uf,
-                mesorregiao: mesorregiao,
-                microrregiao: microrregiao,
-                regiaoGeografica: regiaoGeografica
-            };
-            ibgeDataCache[municipioNome] = data; // Armazena em cache
-            console.log(`Dados IBGE para ${municipioNome} obtidos:`, data);
-            return data;
-        } else {
-            console.warn(`Município "${municipioNome}" não encontrado no IBGE.`);
-            return null;
-        }
-    } catch (error) {
-        console.error(`Erro ao buscar dados do IBGE para ${municipioNome}:`, error);
-        return null;
-    }
-}
-
 
 // FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
 function setupGeneralInfoForm() {
@@ -795,7 +710,7 @@ function setupGeneralInfoForm() {
             minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
             linhaFerrea: getRadioValue('linhaFerrea'),
             aeroporto: getRadioValue('aeroporto'),
-            limitacoesOutras: document.getElementById('limitacoesOutras').value.trim(), 
+            limitacoesOutras: getRadioValue('limitacoesOutras'),
             processoMP: getRadioValue('processoMP'),
             processosJudiciais: getRadioValue('processosJudiciais'),
             comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
@@ -824,7 +739,7 @@ function setupGeneralInfoForm() {
 
 
 // 9. Gerador de Relatórios com IA (Simulada)
-document.getElementById('generateReportBtn').addEventListener('click', async () => { 
+document.getElementById('generateReportBtn').addEventListener('click', () => {
     console.log('Evento: Botão "Gerar Relatório com IA" clicado.'); 
     const reportType = document.getElementById('reportType').value;
     const nucleosAnalise = document.getElementById('nucleosAnalise').value;
@@ -848,44 +763,12 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
     reportText += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}\n\n`;
 
     let filteredFeatures = allLotesGeoJSON.features;
-    let municipioNome = 'Não informado';
-    let ibgeInfo = null;
-
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
         filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise);
-        reportText += `**NÚCLEO DE ANÁLISE: ${nucleosAnalise.toUpperCase()}**\n\n`;
-        // Tenta pegar o nome do município do primeiro lote do núcleo selecionado
-        // AGORA USA A PROPRIEDADE 'nm_mun' PARA O NOME DO MUNICÍPIO
-        if (filteredFeatures.length > 0 && filteredFeatures[0].properties.nm_mun) { 
-            municipioNome = filteredFeatures[0].properties.nm_mun;
-        }
+        reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
     } else {
-        reportText += `**ANÁLISE ABRANGENTE (TODOS OS NÚCLEOS)**\n\n`;
-        // Pega o nome do município do primeiro lote general se disponível
-        if (allLotesGeoJSON.features.length > 0 && allLotesGeoJSON.features[0].properties.nm_mun) {
-            municipioNome = allLotesGeoJSON.features[0].properties.nm_mun;
-        }
+        reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
     }
-
-    reportText += `**MUNICÍPIO: ${municipioNome.toUpperCase()}**\n`;
-
-    // Busca dados do IBGE se o município for conhecido e a seção estiver marcada
-    if (municipioNome !== 'Não informado' && incInformacoesGerais) {
-        generatedReportContent.textContent = "Gerando relatório... Buscando dados do IBGE (pode demorar um pouco).";
-        ibgeInfo = await fetchIbgeData(municipioNome);
-        if (ibgeInfo) {
-            reportText += `  - UF: ${ibgeInfo.uf || 'N/A'}\n`;
-            reportText += `  - Região Geográfica: ${ibgeInfo.regiaoGeografica || 'N/A'}\n`;
-            reportText += `  - Mesorregião: ${ibgeInfo.mesorregiao || 'N/A'}\n`;
-            reportText += `  - Microrregião: ${ibgeInfo.microrregiao || 'N/A'}\n`;
-            reportText += `  - População (2021): ${ibgeInfo.populacao.toLocaleString('pt-BR') || 'Não disponível'}\n\n`;
-        } else {
-            reportText += `  - Dados do IBGE para o município não puderam ser obtidos. Verifique o nome do município no GeoJSON ou a conexão com a internet.\n\n`;
-        }
-    } else {
-         reportText += `  - Dados do IBGE não incluídos ou município não identificado.\n\n`;
-    }
-    
 
     // Conteúdo do relatório baseado nas opções selecionadas (IA SIMULADA)
     if (incDadosGerais) {
@@ -911,7 +794,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
                 riscoValue = riscoValue.trim().charAt(0).toUpperCase() + riscoValue.trim().slice(1).toLowerCase(); // Capitalize
             }
 
-            // Mapeia "Geologico" para "Alto" para o relatório
+            // Mapeia "Geológico" para "Alto" para o relatório
             if (riscoValue === 'Geologico') {
                 riscoValue = 'Alto'; 
             }
@@ -927,7 +810,6 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
             }
         });
 
-        // Contagem correta para "Lotes com Risco Elevado" no relatório
         const lotesComRiscoElevado = riskCategoryCounts['Médio'] + riskCategoryCounts['Alto'] + riskCategoryCounts['Muito Alto'] + Object.values(otherRisks).reduce((a, b) => a + b, 0);
         const percRiscoElevado = (lotesComRiscoElevado / filteredFeatures.length * 100 || 0).toFixed(2);
 
@@ -959,13 +841,8 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
             return (appStatus === 'Sim' || appStatus === true); 
         }).length;
 
-        // Porcentagem de lotes em APP
-        const totalLotes = filteredFeatures.length;
-        const percLotesEmAPP = totalLotes > 0 ? (lotesEmAPP / totalLotes * 100).toFixed(2) : 0;
-
-
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
-        reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP} (${percLotesEmAPP}% do total)\n`; // Adicionado percentual
+        reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
         if (lotesEmAPP > 0) {
             reportText += `Observação: A presença de lotes em Áreas de Preservação Permanente exige a aplicação de medidas específicas de regularização ambiental, como a recuperação da área degradada ou a compensação ambiental, conforme o Código Florestal e demais normativas ambientais aplicáveis à REURB.\n\n`;
         } else {
@@ -1009,7 +886,7 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
         reportText += `**Aspectos Legais e Fundiários:**\n`;
         reportText += `  - Titularidade da Área: ${info.titularidadeArea || 'Não informado'}.\n`;
         reportText += `  - Programa Terra Legal: ${info.terraLegal || 'Não informado'}.\n`;
-        reportText += `  - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
+        reportText += `  - - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
         reportText += `  - Legislação Municipal REURB: ${info.legislacaoReurb || 'Não informada'}.\n`;
         reportText += `  - Legislação Municipal Ambiental: ${info.legislacaoAmbiental || 'Não informada'}.\n`;
         reportText += `  - Plano Diretor Municipal: ${info.planoDiretor || 'Não informado'}.\n`;
@@ -1039,8 +916,9 @@ document.getElementById('generateReportBtn').addEventListener('click', async () 
     
     // Custo de Intervenção (sempre incluído no final do relatório)
     const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => {
+        // USA A PROPRIEDADE 'valor' PARA O CUSTO.
         let custoValor = 0;
-        if (typeof f.properties.valor === 'number') { 
+        if (typeof f.properties.valor === 'number') {
             custoValor = f.properties.valor;
         }
         return acc + custoValor;
