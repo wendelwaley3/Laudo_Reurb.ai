@@ -107,11 +107,11 @@
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
-                <label for="geojsonFileInput" class="drag-drop-area">
+                <!-- REESTRUTURAÇÃO AQUI: INPUT TYPE="FILE" AGORA DENTRO DO LABEL -->
+                <label class="drag-drop-area">
                     <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
                     <p>ou clique para selecionar</p>
-                    <!-- BOTÃO DE SELEÇÃO DE ARQUIVOS (COM ID) -->
-                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button>
+                    <button type="button">Selecionar Arquivos</button> <!-- ID 'selectFilesVisibleButton' não é mais estritamente necessário aqui, mas mantido por consistência se a lógica antiga persistir -->
                     <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
                 </label>
             </div>
@@ -128,7 +128,7 @@
                 <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
                 <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
                     <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:none; gap:10px; align-items:center;">
+                    <div id="utmOptionsContainer" style="display:flex; gap:10px; align-items:center; display:none;"> <!-- Display none por padrão -->
                         <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
                         <label>Hemisfério: 
                             <select id="utmHemisphereSelect">
@@ -400,15 +400,15 @@
                                     <li><code>cod_lote</code>: Código identificador do lote.</li>
                                     <li><code>area_m2</code>: Área do lote em metros quadrados.</li>
                                     <li><code>valor</code>: Custo de intervenção (se disponível por lote).</li>
-                                    <li><code>municipio</code>: Nome do município (para a camada de poligonais e informações IBGE).</li>
+                                    <li><code>municipio</code> ou <code>nm_mun</code>: Nome do município (para a camada de poligonais e informações IBGE).</li>
                                 </ul>
                             </li>
                             <li>Arquivos com "app" no nome serão tratados como Áreas de Preservação Permanente.</li>
-                            <li>Outros arquivos GeoJSON (como "tabela_geral" ou poligonais de infraestrutura) serão carregados como "Poligonais" genéricas no mapa.</li>
+                            <li>Outros arquivos GeoJSON (como "tabela_geral" no seu caso) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
                         </ul>
                     </p>
                 </li>
-                <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
+                <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto, como infraestrutura básica, restrições legais e ambientais, e aspectos fundiários. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
                 <li><strong>Processar e Carregar:</strong> Após selecionar os arquivos GeoJSON, clique em "Processar e Carregar Dados". O aplicativo irá ler, processar e exibir suas camadas no mapa.</li>
                 <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estatístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
