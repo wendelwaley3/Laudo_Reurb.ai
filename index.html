@@ -123,6 +123,25 @@
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
+            <!-- CONTROLE DE REPROJEÇÃO UTM (NOVO) -->
+            <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
+                <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
+                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
+                    <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
+                    <div id="utmOptionsContainer" style="display:none; gap:10px; align-items:center;">
+                        <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
+                        <label>Hemisfério: 
+                            <select id="utmHemisphereSelect">
+                                <option value="S">Sul</option>
+                                <option value="N">Norte</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <p style="font-size:0.85em; color:#666; margin-top:10px;">
+                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção de reprojeção UTM apenas se não puder converter previamente.
+                </p>
+            </div>
         </section>
 
         <!-- SEÇÃO: Informações Gerais (Preenchimento Manual) -->
@@ -368,7 +387,11 @@
                 <li><strong>Upload de Dados:</strong> Navegue até a aba "Upload de Dados". Arraste e solte seus arquivos GeoJSON (para lotes, APPs, infraestrutura, poligonais etc.) ou clique em "Selecionar Arquivos".
                     <p class="note"><strong>IMPORTANTE SOBRE SEUS DADOS GEOSPATIAIS:</strong>
                         <ul>
-                            <li>Todos os seus arquivos GeoJSON **DEVEM estar no sistema de coordenadas Latitude/Longitude (WGS84 - EPSG:4326)**. Seus dados com coordenadas N/E são provavelmente UTM e precisam ser convertidos para Lat/Lon **antes do upload**. Caso contrário, o mapa não exibirá os dados no local correto. Utilize softwares GIS (como QGIS) para fazer essa conversão.</li>
+                            <li>Todos os seus arquivos GeoJSON **DEVEM estar no sistema de coordenadas Latitude/Longitude (WGS84 - EPSG:4326)** para serem exibidos corretamente no mapa.
+                                <ul>
+                                    <li>**Opção Avançada (embutida no app):** Se seus dados GeoJSON estão em **UTM**, marque a opção "Meus arquivos GeoJSON estão em UTM" na aba Upload e configure a Zona UTM e Hemisfério. **ATENÇÃO: Reprojeção no navegador pode ser lenta para arquivos grandes e a precisão pode variar. A conversão via software GIS (QGIS) ANTES do upload é sempre a mais recomendada.**</li>
+                                </ul>
+                            </li>
                             <li>Para o Dashboard e Relatórios funcionarem, o arquivo GeoJSON principal dos lotes (que contiver "lotes" no nome) deve ter as seguintes propriedades (entre outras, conforme as suas tabelas):
                                 <ul>
                                     <li><code>desc_nucleo</code>: Nome do núcleo (para filtros).</li>
@@ -377,23 +400,24 @@
                                     <li><code>cod_lote</code>: Código identificador do lote.</li>
                                     <li><code>area_m2</code>: Área do lote em metros quadrados.</li>
                                     <li><code>valor</code>: Custo de intervenção (se disponível por lote).</li>
+                                    <li><code>municipio</code>: Nome do município (para a camada de poligonais e informações IBGE).</li>
                                 </ul>
                             </li>
                             <li>Arquivos com "app" no nome serão tratados como Áreas de Preservação Permanente.</li>
-                            <li>Outros arquivos GeoJSON (como "tabela_geral" no seu caso) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
+                            <li>Outros arquivos GeoJSON (como "tabela_geral" ou poligonais de infraestrutura) serão carregados como "Poligonais" genéricas no mapa.</li>
                         </ul>
                     </p>
                 </li>
-                <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto, como infraestrutura básica, restrições legais e ambientais, e aspectos fundiários. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
+                <li><strong>Informações Gerais:</strong> Nesta aba, você pode preencher manualmente informações contextuais importantes sobre o projeto. Estas informações serão incluídas no relatório final quando a opção "Informações Gerais do Projeto" for marcada na aba "Relatórios".</li>
                 <li><strong>Processar e Carregar:</strong> Após selecionar os arquivos GeoJSON, clique em "Processar e Carregar Dados". O aplicativo irá ler, processar e exibir suas camadas no mapa.</li>
                 <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estatístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
                 <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
                 <li><strong>Dados Lotes:</strong> A nova aba "Dados Lotes" lista os lotes em uma tabela detalhada com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
-                <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado.</li>
+                <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado (com dados IBGE/IA simulados).</li>
                 <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
             </ol>
-            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados. Para datasets muito grandes ou análises espaciais complexas em tempo real (como interseção de várias camadas grandes), um sistema com backend seria mais adequada.</p>
+            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados. Para datasets muito grandes ou análises espaciais complexas em tempo real (como interseção de várias camadas grandes) ou para integração real com IBGE/IA, um sistema com backend seria mais adequada.</p>
             <p>Esperamos que o GeoLaudo.AI seja uma ferramenta útil para você!</p>
         </section>
     </main>
@@ -405,11 +429,11 @@
     <!-- Inclui o JS do Leaflet -->
     <!-- ATENÇÃO: Atributo 'integrity' REMOVIDO para evitar bloqueios -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <!-- Inclui proj4js e proj4leaflet para futuras necessidades de reprojeção (não usado ativamente agora) -->
-    <!-- Se seus dados UTM não aparecerem, é provável que precise converter o GeoJSON para WGS84 no QGIS antes do upload. -->
+    <!-- Inclui proj4js para definição de sistemas de coordenadas -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
+    <!-- Inclui proj4leaflet para integração Leaflet com proj4js (não diretamente usado para reprojeção GeoJSON aqui, mas útil para context) -->
     <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
-    <!-- Inclui o Turf.js para operações geoespaciais client-side (se for usar extensivamente) -->
+    <!-- Inclui o Turf.js para operações geoespaciais client-side -->
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <!-- Inclui seu JS personalizado -->
     <script src="js/app.js"></script>
