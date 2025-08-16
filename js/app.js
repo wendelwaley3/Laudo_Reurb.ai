@@ -1,8 +1,8 @@
 // Variáveis Globais para armazenar os dados e camadas
-let map; 
-let allLotesGeoJSON = { type: 'FeatureCollection', features: [] };
-let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   
-let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; 
+let map; // Apenas declaração, a inicialização ocorre em initMap()
+let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena todos os lotes carregados
+let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   // Armazena todas as APPs carregadas
+let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena outras poligonais (infraestrutura, etc.)
 
 // VARIÁVEL PARA INFORMAÇÕES GERAIS (MANUAL)
 let generalProjectInfo = {}; 
@@ -25,18 +25,13 @@ const riscoStyles = {
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     // AQUI: Inicializamos o objeto 'map' com L.map()
-    // Definimos a visualização inicial e o zoom
-    map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
-    console.log('initMap: Objeto mapa criado.'); 
+    map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Coordenadas do centro do Brasil
 
-    // Basemap OpenStreetMap (AGORA DEVE CARREGAR CORRETAMENTE)
+    // Basemap OpenStreetMap (Padrão)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        minZoom: 0, // Garante que carrega em todos os zooms
-        maxZoom: 19 // Garante que carrega em todos os zooms
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     });
-    osmLayer.addTo(map); 
-    console.log('initMap: Basemap OpenStreetMap adicionado.'); 
+    osmLayer.addTo(map); // Adiciona o OSM como camada padrão
 
     // Basemap Esri World Imagery (Satélite) - similar ao Google Maps Satélite
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -46,10 +41,9 @@ function initMap() {
     // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
         "OpenStreetMap": osmLayer,
-        "Esri World Imagery (Satélite)": esriWorldImagery 
+        "Esri World Imagery (Satélite)": esriWorldImagery // Nome mais claro para o usuário
     };
-    L.control.layers(baseMaps).addTo(map); 
-    console.log('initMap: Controle de camadas base adicionado.'); 
+    L.control.layers(baseMaps).addTo(map); // AQUI: Adiciona o controle de camadas ao mapa JÁ INICIALIZADO
 
     // Adiciona listeners para os checkboxes da legenda personalizada
     document.getElementById('toggleLotes').addEventListener('change', (e) => toggleLayerVisibility(lotesLayer, e.target.checked));
@@ -118,23 +112,23 @@ function setupFileUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    // SELECIONA O BOTÃO VISÍVEL PELO ID: AGORA DEVE FUNCIONAR
+    // SELECIONA O BOTÃO VISÍVEL PELO ID: CRÍTICO PARA O UPLOAD FUNCIONAR
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
 
     let selectedFiles = []; 
 
     // Verifica se os elementos foram encontrados (para depuração)
-    if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput não encontrado!');
-    if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton não encontrado!');
+    if (!fileInput) console.error('setupFileUpload ERRO: #geojsonFileInput (input oculto) não encontrado!');
+    if (!selectFilesVisibleButton) console.error('setupFileUpload ERRO: #selectFilesVisibleButton (botão visível) não encontrado!');
 
-    // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL
+    // ADICIONA LISTENER DE CLIQUE AO BOTÃO VISÍVEL PARA DISPARAR O CLIQUE NO INPUT DE ARQUIVO OCULTO
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto.'); 
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
             fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
         });
     } else {
-        console.error('setupFileUpload: Botão visível ou input de arquivo não encontrados. O upload não funcionará.');
+        console.error('setupFileUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
     }
 
     // Lida com a seleção de arquivos via input (ocorrendo após o diálogo ser fechado)
@@ -221,73 +215,20 @@ function setupFileUpload() {
                      console.warn(`Arquivo ${file.name} não é um FeatureCollection, pode não ser processado corretamente.`);
                 }
 
-                // Lógica para determinar o tipo de camada e processar coordenadas UTM
-                let currentLayerFeatures = [];
-                let isUtm = false; // Flag para saber se precisamos reprojectar
-
-                // Tenta detectar se as coordenadas são UTM
-                // Uma heurística simples: Northing grande (7 milhões), Easting entre 100k e 900k
-                if (geojsonData.features.length > 0 && geojsonData.features[0].geometry && geojsonData.features[0].geometry.coordinates) {
-                    const firstCoords = geojsonData.features[0].geometry.coordinates;
-                    let sampleCoord;
-                    if (Array.isArray(firstCoords[0]) && Array.isArray(firstCoords[0][0])) { // Polygon/MultiPolygon
-                        sampleCoord = firstCoords[0][0][0];
-                    } else if (Array.isArray(firstCoords[0])) { // LineString/Point
-                         sampleCoord = firstCoords[0];
-                         if (!Array.isArray(sampleCoord[0])) sampleCoord = firstCoords; // If it's just a Point
-                    } else { // Single point coordinates (e.g. [E,N])
-                         sampleCoord = firstCoords;
-                    }
-                    
-                    if (sampleCoord && sampleCoord.length >= 2) {
-                        const easting = sampleCoord[0];
-                        const northing = sampleCoord[1];
-                        // Heurística para UTM: Easting entre ~100k e ~900k, Northing grande (acima de ~1 milhão para sul, ou ~10 mil para norte)
-                        // Ajustando para as suas coordenadas (341xxx, 794xxxx) que são tipicamente UTM Sul
-                        if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                            isUtm = true;
-                            console.log("Coordenadas detectadas como UTM. Preparando reprojeção.");
-                        }
-                    }
-                }
-
-                if (isUtm) {
-                    // DEFINE O CRS PARA SEUS DADOS UTM (EPSG:31983 para SIRGAS 2000 / UTM Zone 23S)
-                    // **** VOCÊ DEVE VERIFICAR E MUDAR ESTE EPSG SE SEUS DADOS FOREM DE OUTRA ZONA UTM ****
-                    // Ex: Para Zona 24S, use 'EPSG:31984'
-                    // Ex: Para Zona 22S, use 'EPSG:31982'
-                    const utmCrs = new L.Proj.CRS('EPSG:31983',
-                        '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs',
-                        {
-                            origin: [-4862502.81, 10000000], // Exemplo de origem para ajuste se necessário
-                            resolutions: [
-                                8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625
-                            ]
-                        }
-                    );
-                    
-                    // Reprojeta as feições UTM para Lat/Lon (WGS84) que o mapa padrão do Leaflet usa
-                    // L.Proj.geoJson precisa do crs da camada
-                    currentLayerFeatures = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
-                    console.log("Feições reprojetadas de UTM para WGS84 (Lat/Lon).");
-
-                } else {
-                    currentLayerFeatures = geojsonData.features; // Se não for UTM, usa como está (Lat/Lon)
-                    console.log("Feições carregadas como WGS84 (Lat/Lon).");
-                }
-
-
+                // Lógica para determinar o tipo de camada pelo nome do arquivo
+                // E CORREÇÃO DE NOMES DE PROPRIEDADES COM BASE NAS SUAS TABELAS
                 if (file.name.toLowerCase().includes('lotes')) {
-                    allLotesGeoJSON.features.push(...currentLayerFeatures);
-                    currentLayerFeatures.forEach(f => {
-                        if (f.properties && f.properties.nucleo) {
-                            nucleosSet.add(f.properties.nucleo);
+                    allLotesGeoJSON.features.push(...geojsonData.features);
+                    geojsonData.features.forEach(f => {
+                        // Usa a propriedade 'desc_nucleo' para o filtro de núcleos
+                        if (f.properties && f.properties.desc_nucleo) {
+                            nucleosSet.add(f.properties.desc_nucleo);
                         }
                     });
                 } else if (file.name.toLowerCase().includes('app')) {
-                    allAPPGeoJSON.features.push(...currentLayerFeatures);
-                } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura)
-                    allPoligonaisGeoJSON.features.push(...currentLayerFeatures);
+                    allAPPGeoJSON.features.push(...geojsonData.features);
+                } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura, tabela_geral)
+                    allPoligonaisGeoJSON.features.push(...geojsonData.features);
                 }
                 console.log(`Arquivo ${file.name} processado com sucesso.`); 
 
@@ -395,8 +336,9 @@ function renderLayersOnMap(featuresToDisplay = allLotesGeoJSON.features) {
 
 // Estilo dos lotes baseado no risco
 function styleLotes(feature) {
-    const risco = feature.properties.risco || 'N/A'; // Pega o risco ou 'N/A' se não definido
-    const style = riscoStyles[risco] || riscoStyles['N/A']; // Pega o estilo correspondente ou o padrão
+    // Usa a propriedade 'risco' para a coloração
+    const risco = feature.properties.risco || 'N/A'; 
+    const style = riscoStyles[risco] || riscoStyles['N/A']; 
 
     return {
         fillColor: style.fillColor,
@@ -417,15 +359,25 @@ function onEachFeatureLotes(feature, layer) {
             let value = feature.properties[key];
             if (value === null || value === undefined) value = 'N/A'; // Trata valores nulos/indefinidos
 
-            if (key.toLowerCase().includes('area') && typeof value === 'number') {
+            if (key.toLowerCase().includes('area_m2') && typeof value === 'number') { // Usa area_m2
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase().includes('custo') && typeof value === 'number') {
+            if (key.toLowerCase() === 'valor' && typeof value === 'number') { // Usa 'valor' para custo
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
-            if (key.toLowerCase() === 'app' && typeof value === 'boolean') {
-                value = value ? 'Sim' : 'Não';
+            // Propriedade 'dentro_app' para verificar se está em APP
+            if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
+                value = (value > 0) ? `Sim (${value}%)` : 'Não'; // Se >0%, está em APP
             }
+            // Propriedade 'desc_nucleo' para o núcleo
+            if (key.toLowerCase() === 'desc_nucleo') {
+                key = 'Núcleo'; // Renomeia para exibição
+            }
+            // Propriedade 'cod_lote' para o código do lote
+            if (key.toLowerCase() === 'cod_lote') {
+                key = 'Código Lote'; // Renomeia para exibição
+            }
+
 
             popupContent += `<strong>${key}:</strong> ${value}<br>`;
         }
@@ -444,26 +396,23 @@ function updateDashboard(features) {
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     features.forEach(feature => {
-        // Assume que 'risco' e 'app' são propriedades do GeoJSON dos lotes
-        const risco = feature.properties.risco || 'N/A';
-        if (riskCounts.hasOwnProperty(risco)) { // Verifica se a categoria de risco existe
+        // Usa a propriedade 'risco' para a contagem de risco
+        const risco = feature.properties.risco || 'N/A'; 
+        if (riskCounts.hasOwnProperty(risco)) { 
             riskCounts[risco]++;
         }
         
-        if (risco !== 'Baixo' && risco !== 'N/A') { // Conta lotes com risco diferente de "Baixo"
+        if (risco !== 'Baixo' && risco !== 'N/A') { 
             lotesRiscoCount++;
         }
         
-        // CORREÇÃO AQUI: Verifique o nome da propriedade 'app' no seu GeoJSON
-        // Use o nome exato da propriedade. Ex: se for 'em_app', mude abaixo.
-        // O valor deve ser true/false ou "sim"/"não"
-        if (feature.properties.app === true || String(feature.properties.app).toLowerCase() === 'sim') {
+        // Usa a propriedade 'dentro_app' para verificar APP
+        const dentroApp = feature.properties.dentro_app;
+        if (typeof dentroApp === 'number' && dentroApp > 0) { 
             lotesAppCount++;
         }
-        // CORREÇÃO AQUI: Verifique o nome da propriedade 'custo_intervencao' no seu GeoJSON
-        // Use o nome exato. Ex: se for 'custo', mude abaixo.
-        // O valor deve ser numérico
-        custoTotal += (feature.properties.custo_intervencao || 0);
+        // Usa a propriedade 'valor' para custo de intervenção
+        custoTotal += (feature.properties.valor || 0); 
     });
 
     document.getElementById('lotesRisco').innerText = lotesRiscoCount;
@@ -475,8 +424,8 @@ function updateDashboard(features) {
     document.getElementById('riskHighCount').innerText = riskCounts['Alto'] || 0;
     document.getElementById('riskVeryHighCount').innerText = riskCounts['Muito Alto'] || 0;
 
-    document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; // Exemplo simplificado
-    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; // Exemplo simplificado (todos em risco precisam de intervenção)
+    document.getElementById('areasIdentificadas').innerText = lotesRiscoCount; 
+    document.getElementById('areasIntervencao').innerText = lotesRiscoCount; 
 }
 
 // 6. Preenche o Filtro de Núcleos
@@ -515,7 +464,8 @@ document.getElementById('applyFiltersBtn').addEventListener('click', () => {
     let filteredFeatures = allLotesGeoJSON.features;
 
     if (selectedNucleus !== 'all') {
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.nucleo === selectedNucleus);
+        // Filtra pela propriedade 'desc_nucleo'
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === selectedNucleus);
     }
 
     // Re-renderiza a camada de lotes no mapa com os dados filtrados
@@ -542,18 +492,19 @@ function updateLotesTable(features) {
         const row = tableBody.insertRow();
         const props = feature.properties;
 
-        row.insertCell().textContent = props.codigo || 'N/A';
-        row.insertCell().textContent = props.nucleo || 'N/A';
+        // Usa as propriedades corretas das suas tabelas
+        row.insertCell().textContent = props.cod_lote || 'N/A';
+        row.insertCell().textContent = props.desc_nucleo || 'N/A';
         row.insertCell().textContent = props.tipo_uso || 'N/A';
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
         row.insertCell().textContent = props.risco || 'N/A';
-        // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
-        row.insertCell().textContent = (props.app === true || String(props.app).toLowerCase() === 'sim') ? 'Sim' : 'Não';
+        // Lógica para 'APP' baseada em 'dentro_app'
+        row.insertCell().textContent = (typeof props.dentro_app === 'number' && props.dentro_app > 0) ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
         const viewBtn = document.createElement('button');
         viewBtn.textContent = 'Ver no Mapa';
-        viewBtn.className = 'small-btn'; // Classe para estilizar o botão pequeno
+        viewBtn.className = 'small-btn'; 
         viewBtn.onclick = () => {
             // Navega para o dashboard primeiro
             document.querySelector('nav a[data-section="dashboard"]').click();
@@ -561,7 +512,7 @@ function updateLotesTable(features) {
             // Encontra a camada do lote específico e centraliza o mapa
             if (lotesLayer) {
                 lotesLayer.eachLayer(layer => {
-                    if (layer.feature && layer.feature.properties && layer.feature.properties.codigo === props.codigo) {
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.cod_lote === props.cod_lote) { // Usa cod_lote
                         map.setView(layer.getBounds().getCenter(), 18); // Centraliza e dá zoom
                         layer.openPopup(); // Abre o popup de detalhes
                     }
@@ -624,7 +575,7 @@ document.getElementById('exportTableBtn').addEventListener('click', () => {
     document.body.removeChild(link);
 });
 
-// FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais
+// FUNÇÃO: Coleta e Salva os dados do Formulário de Informações Gerais (manual)
 function setupGeneralInfoForm() {
     console.log('setupGeneralInfoForm: Configurando formulário de informações gerais.'); 
     const saveButton = document.getElementById('saveGeneralInfoBtn');
@@ -718,7 +669,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
     let filteredFeatures = allLotesGeoJSON.features;
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none') {
-        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.nucleo === nucleosAnalise);
+        filteredFeatures = allLotesGeoJSON.features.filter(f => f.properties.desc_nucleo === nucleosAnalise); // Filtra por 'desc_nucleo'
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
     } else {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
@@ -729,7 +680,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
         reportText += `Total de Lotes Analisados: ${filteredFeatures.length}\n`;
         
-        const totalArea = filteredFeatures.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0);
+        const totalArea = filteredFeatures.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0); // Usa 'area_m2'
         reportText += `Área Total dos Lotes: ${totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²\n\n`;
 
         const uniqueTiposUso = new Set(filteredFeatures.map(f => f.properties.tipo_uso).filter(Boolean));
@@ -741,7 +692,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         filteredFeatures.forEach(f => {
-            const risco = f.properties.risco || 'N/A';
+            const risco = f.properties.risco || 'N/A'; // Usa 'risco'
             if (riskCounts.hasOwnProperty(risco)) riskCounts[risco]++;
         });
         const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
@@ -763,7 +714,8 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
 
     if (incAreasPublicas) {
-        const lotesEmAPP = filteredFeatures.filter(f => f.properties.app === true || String(f.properties.app).toLowerCase() === 'sim').length;
+        // Lógica para APP baseada em 'dentro_app'
+        const lotesEmAPP = filteredFeatures.filter(f => typeof f.properties.dentro_app === 'number' && f.properties.dentro_app > 0).length;
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
         reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
         if (lotesEmAPP > 0) {
@@ -824,7 +776,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
         reportText += `  - Medidas Compensatórias: ${info.medidasCompensatorias || 'Não informado'}.\n\n`;
 
-        reportText += `Esta seção reflete informações gerais sobre o área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
+        reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
     } else if (incInformacoesGerais) {
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
         reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
@@ -838,7 +790,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     }
     
     // Custo de Intervenção (sempre incluído no final do relatório)
-    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.custo_intervencao || 0), 0);
+    const custoTotalFiltrado = filteredFeatures.reduce((acc, f) => acc + (f.properties.valor || 0), 0); // Usa 'valor'
     reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
     reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
     reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
