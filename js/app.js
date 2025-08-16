@@ -21,49 +21,30 @@ const riscoStyles = {
     'N/A': { fillColor: '#3498db', color: 'white' }           // Azul padrão para risco não definido
 };
 
-// ========================================================================================
-// IMPORTANTE: DEFINIÇÃO DO SISTEMA DE COORDENADAS UTM PARA REPROJEÇÃO
-// ========================================================================================
-// Baseado nas suas coordenadas (E/X: 341012,41 e N/Y: 7943447,24), assumimos SIRGAS 2000 / UTM Zone 23S.
-// SE SEUS DADOS FOREM DE OUTRA ZONA UTM OU OUTRO DATUM, VOCÊ PRECISA MUDAR A DEFINIÇÃO ABAIXO.
-// Você pode encontrar as definições PROJ4 em https://epsg.io/ (busque pelo seu EPSG, ex: 31983)
-if (typeof proj4 !== 'undefined') {
-    proj4.defs('EPSG:31983', '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
-} else {
-    console.error("Proj4js não carregado. A reprojeção UTM não funcionará.");
-}
-// ========================================================================================
-
-
 // 1. Inicializa o Mapa
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
+    // AQUI: Inicializamos o objeto 'map' com L.map()
+    // Definimos a visualização inicial e o zoom
     map = L.map('mapid').setView([-15.7801, -47.9292], 5); 
     console.log('initMap: Objeto mapa criado.'); 
 
-    // Basemap Esri World Street Map (Mais robusto para ser o padrão e carregar sempre)
-    const esriStreetMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
-        minZoom: 0,
-        maxZoom: 19
-    });
-    esriStreetMap.addTo(map); // Define como o mapa base padrão
-
-    // Basemap OpenStreetMap (Adicionado como opção)
+    // Basemap OpenStreetMap (AGORA DEVE CARREGAR CORRETAMENTE)
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        minZoom: 0, 
-        maxZoom: 19 
+        minZoom: 0, // Garante que carrega em todos os zooms
+        maxZoom: 19 // Garante que carrega em todos os zooms
     });
+    osmLayer.addTo(map); 
+    console.log('initMap: Basemap OpenStreetMap adicionado.'); 
 
-    // Basemap Esri World Imagery (Satélite)
+    // Basemap Esri World Imagery (Satélite) - similar ao Google Maps Satélite
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
     // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
-        "Esri World Street Map": esriStreetMap, // Agora é o padrão
         "OpenStreetMap": osmLayer,
         "Esri World Imagery (Satélite)": esriWorldImagery 
     };
@@ -75,8 +56,9 @@ function initMap() {
     document.getElementById('togglePoligonais').addEventListener('change', (e) => toggleLayerVisibility(poligonaisLayer, e.target.checked));
     document.getElementById('toggleAPP').addEventListener('change', (e) => toggleLayerVisibility(appLayer, e.target.checked));
     
-    // map.invalidateSize() é chamado em DOMContentLoaded e na mudança de abas
-    console.log('initMap: Mapa inicializado com sucesso.'); 
+    // IMPORTANTE: map.invalidateSize() deve ser chamado depois que o mapa está visível no DOM
+    map.invalidateSize(); 
+    console.log('initMap: invalidateSize() chamado.'); 
 }
 
 // Função para ligar/desligar a visibilidade da camada no mapa
@@ -136,7 +118,7 @@ function setupFileUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    // SELECIONA O BOTÃO VISÍVEL PELO ID
+    // SELECIONA O BOTÃO VISÍVEL PELO ID: AGORA DEVE FUNCIONAR
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
 
     let selectedFiles = []; 
@@ -239,63 +221,73 @@ function setupFileUpload() {
                      console.warn(`Arquivo ${file.name} não é um FeatureCollection, pode não ser processado corretamente.`);
                 }
 
-                // Lógica para determinar se o GeoJSON precisa de reprojeção (UTM -> Lat/Lon)
-                let featuresToLoad = [];
+                // Lógica para determinar o tipo de camada e processar coordenadas UTM
+                let currentLayerFeatures = [];
+                let isUtm = false; // Flag para saber se precisamos reprojectar
 
-                // Heurística para detectar UTM: verifica se a primeira coordenada tem valores grandes de Northing e Easting
-                if (geojsonData.features.length > 0 && typeof proj4 !== 'undefined' && typeof L.Proj !== 'undefined') {
-                    const sampleFeature = geojsonData.features[0];
-                    if (sampleFeature.geometry && sampleFeature.geometry.coordinates) {
-                        let sampleCoord;
-                        // Extrai uma coordenada válida para verificação, lidando com diferentes tipos de geometria
-                        if (sampleFeature.geometry.type === 'Point') {
-                            sampleCoord = sampleFeature.geometry.coordinates;
-                        } else if (sampleFeature.geometry.type === 'LineString' || sampleFeature.geometry.type === 'MultiPoint') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0];
-                        } else if (sampleFeature.geometry.type === 'Polygon' || sampleFeature.geometry.type === 'MultiLineString') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0][0];
-                        } else if (sampleFeature.geometry.type === 'MultiPolygon') {
-                            sampleCoord = sampleFeature.geometry.coordinates[0][0][0];
-                        }
-                        
-                        if (sampleCoord && sampleCoord.length >= 2) {
-                            const easting = sampleCoord[0]; // X
-                            const northing = sampleCoord[1]; // Y
-
-                            // Heurística para UTM no Brasil (especialmente Zonas 22S, 23S, 24S)
-                            // Easting entre 100.000 e 900.000 (False Easting para não ter negativos)
-                            // Northing grande (7 milhões a 10 milhões para Hemisfério Sul)
-                            if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
-                                console.log("Coordenadas detectadas como UTM. Reprojetando para WGS84...");
-                                // Define o CRS para o Leaflet.Proj com base na definição do proj4.defs()
-                                const utmCrs = new L.Proj.CRS('EPSG:31983'); // Usa a definição já criada no proj4.defs
-                                
-                                // O L.Proj.geoJson aceita um GeoJSON e um objeto de opções, onde crs é o CRS de ENTRADA do GeoJSON
-                                featuresToLoad = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
-                            }
+                // Tenta detectar se as coordenadas são UTM
+                // Uma heurística simples: Northing grande (7 milhões), Easting entre 100k e 900k
+                if (geojsonData.features.length > 0 && geojsonData.features[0].geometry && geojsonData.features[0].geometry.coordinates) {
+                    const firstCoords = geojsonData.features[0].geometry.coordinates;
+                    let sampleCoord;
+                    if (Array.isArray(firstCoords[0]) && Array.isArray(firstCoords[0][0])) { // Polygon/MultiPolygon
+                        sampleCoord = firstCoords[0][0][0];
+                    } else if (Array.isArray(firstCoords[0])) { // LineString/Point
+                         sampleCoord = firstCoords[0];
+                         if (!Array.isArray(sampleCoord[0])) sampleCoord = firstCoords; // If it's just a Point
+                    } else { // Single point coordinates (e.g. [E,N])
+                         sampleCoord = firstCoords;
+                    }
+                    
+                    if (sampleCoord && sampleCoord.length >= 2) {
+                        const easting = sampleCoord[0];
+                        const northing = sampleCoord[1];
+                        // Heurística para UTM: Easting entre ~100k e ~900k, Northing grande (acima de ~1 milhão para sul, ou ~10 mil para norte)
+                        // Ajustando para as suas coordenadas (341xxx, 794xxxx) que são tipicamente UTM Sul
+                        if (easting > 100000 && easting < 900000 && northing > 1000000 && northing < 10000000) {
+                            isUtm = true;
+                            console.log("Coordenadas detectadas como UTM. Preparando reprojeção.");
                         }
                     }
                 }
-                
-                // Se não detectou UTM ou proj4/proj4leaflet não estão carregados, carrega as feições como estão (assumindo WGS84)
-                if (featuresToLoad.length === 0 && geojsonData.features.length > 0) {
-                    featuresToLoad = geojsonData.features;
-                    console.log("Coordenadas carregadas como WGS84 ou reprojeção não aplicável.");
+
+                if (isUtm) {
+                    // DEFINE O CRS PARA SEUS DADOS UTM (EPSG:31983 para SIRGAS 2000 / UTM Zone 23S)
+                    // **** VOCÊ DEVE VERIFICAR E MUDAR ESTE EPSG SE SEUS DADOS FOREM DE OUTRA ZONA UTM ****
+                    // Ex: Para Zona 24S, use 'EPSG:31984'
+                    // Ex: Para Zona 22S, use 'EPSG:31982'
+                    const utmCrs = new L.Proj.CRS('EPSG:31983',
+                        '+proj=utm +zone=23 +south +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs',
+                        {
+                            origin: [-4862502.81, 10000000], // Exemplo de origem para ajuste se necessário
+                            resolutions: [
+                                8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625
+                            ]
+                        }
+                    );
+                    
+                    // Reprojeta as feições UTM para Lat/Lon (WGS84) que o mapa padrão do Leaflet usa
+                    // L.Proj.geoJson precisa do crs da camada
+                    currentLayerFeatures = L.Proj.geoJson(geojsonData, { crs: utmCrs }).toGeoJSON().features;
+                    console.log("Feições reprojetadas de UTM para WGS84 (Lat/Lon).");
+
+                } else {
+                    currentLayerFeatures = geojsonData.features; // Se não for UTM, usa como está (Lat/Lon)
+                    console.log("Feições carregadas como WGS84 (Lat/Lon).");
                 }
 
 
-                // Adiciona as feições processadas (originais ou reprojetadas) às camadas globais
                 if (file.name.toLowerCase().includes('lotes')) {
-                    allLotesGeoJSON.features.push(...featuresToLoad);
-                    featuresToLoad.forEach(f => { // Usa featuresToLoad para popular núcleos
+                    allLotesGeoJSON.features.push(...currentLayerFeatures);
+                    currentLayerFeatures.forEach(f => {
                         if (f.properties && f.properties.nucleo) {
                             nucleosSet.add(f.properties.nucleo);
                         }
                     });
                 } else if (file.name.toLowerCase().includes('app')) {
-                    allAPPGeoJSON.features.push(...featuresToLoad);
+                    allAPPGeoJSON.features.push(...currentLayerFeatures);
                 } else { // Presume-se que o restante são poligonais diversas (ex: infraestrutura)
-                    allPoligonaisGeoJSON.features.push(...featuresToLoad);
+                    allPoligonaisGeoJSON.features.push(...currentLayerFeatures);
                 }
                 console.log(`Arquivo ${file.name} processado com sucesso.`); 
 
@@ -428,14 +420,10 @@ function onEachFeatureLotes(feature, layer) {
             if (key.toLowerCase().includes('area') && typeof value === 'number') {
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            // CORREÇÃO AQUI: Verifique o nome da propriedade de custo no seu GeoJSON
-            // Ex: se for 'valor_total_custo', mude aqui 'custo_intervencao' para 'valor_total_custo'
-            if (key.toLowerCase().includes('custo') && typeof value === 'number') { // Mantém genérico para 'custo'
+            if (key.toLowerCase().includes('custo') && typeof value === 'number') {
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
-            // CORREÇÃO AQUI: Verifique o nome da propriedade de APP no seu GeoJSON
-            // Ex: se for 'dentro_app', mude aqui 'app' para 'dentro_app'
-            if (key.toLowerCase() === 'app' && typeof value === 'boolean') { // Mantém genérico para 'app'
+            if (key.toLowerCase() === 'app' && typeof value === 'boolean') {
                 value = value ? 'Sim' : 'Não';
             }
 
@@ -560,7 +548,6 @@ function updateLotesTable(features) {
         row.insertCell().textContent = (props.area_m2 && typeof props.area_m2 === 'number') ? props.area_m2.toLocaleString('pt-BR') : 'N/A';
         row.insertCell().textContent = props.risco || 'N/A';
         // CORREÇÃO AQUI: Garante que a coluna 'APP' exiba "Sim" ou "Não"
-        // Use o nome exato da propriedade 'app' do seu GeoJSON
         row.insertCell().textContent = (props.app === true || String(props.app).toLowerCase() === 'sim') ? 'Sim' : 'Não';
         
         const actionsCell = row.insertCell();
@@ -837,7 +824,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
         reportText += `  - Medidas Compensatórias: ${info.medidasCompensatorias || 'Não informado'}.\n\n`;
 
-        reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
+        reportText += `Esta seção reflete informações gerais sobre o área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
     } else if (incInformacoesGerais) {
         reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
         reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
