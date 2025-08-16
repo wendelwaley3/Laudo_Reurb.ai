@@ -457,11 +457,11 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
     if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
+    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f1c40f'; // Amarelo
+    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e67e22'; // Laranja
     else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
     else color = '#3498db'; 
 
@@ -487,7 +487,7 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
+            if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo de intervenção') && typeof value === 'number') { // Inclui 'custo de intervenção'
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
@@ -508,6 +508,11 @@ function onEachLoteFeature(feature, layer) {
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
                 case 'status_risco': displayKey = 'Status Risco'; break; 
+                case 'cod_area': displayKey = 'Cód. Área'; break;
+                case 'grau': displayKey = 'Grau'; break;
+                case 'qtde_lote': displayKey = 'Qtde. Lote(s)'; break;
+                case 'intervencao': displayKey = 'Intervenção'; break;
+                case 'lotes_atingidos': displayKey = 'Lotes Atingidos'; break;
             }
 
             popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
@@ -650,7 +655,7 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
+        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase(); 
         
         // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
         if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
