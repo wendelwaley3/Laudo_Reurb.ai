@@ -892,4 +892,125 @@ async function gerarRelatorioIA() {
         reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
         reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
         if (lotesEmAPP > 0) {
-            reportText += `Observação: A presença
+            reportText += `Observação: A presença de lotes em Áreas de Preservação Permanente exige a aplicação de medidas específicas de regularização ambiental, como a recuperação da área degradada ou a compensação ambiental, conforme o Código Florestal e demais normativas ambientais aplicáveis à REURB.\n\n`;
+        } else {
+            reportText += `Observação: Não foram identificados lotes em Áreas de Preservação Permanente no conjunto de dados analisado, o que simplifica o licenciamento ambiental da regularização.\n\n`;
+        }
+    }
+
+    if (incInformacoesGerais && Object.keys(state.generalProjectInfo).length > 0) {
+        const info = state.generalProjectInfo; 
+
+        reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
+        
+        reportText += `**Infraestrutura Básica:**\n`;
+        reportText += `  - Unidades de Conservação Próximas: ${info.ucConservacao || 'Não informado'}.\n`;
+        reportText += `  - Proteção de Mananciais na Área: ${info.protecaoMananciais || 'Não informado'}.\n`;
+        reportText += `  - Abastecimento de Água: ${info.tipoAbastecimento || 'Não informado'}${info.responsavelAbastecimento ? ' (Responsável: ' + info.responsavelAbastecimento + ')' : ''}.\n`;
+        reportText += `  - Coleta de Esgoto: ${info.tipoColetaEsgoto || 'Não informado'}${info.responsavelColetaEsgoto ? ' (Responsável: ' + info.responsavelColetaEsgoto + ')' : ''}.\n`;
+        reportText += `  - Sistema de Drenagem: ${info.sistemaDrenagem || 'Não informado'}.\n`;
+        reportText += `  - Lotes com Drenagem Inadequada: ${info.drenagemInadequada || 'Não informado'}.\n`;
+        reportText += `  - Logradouros: ${info.logradourosIdentificados || 'Não informado'}.\n\n`;
+
+        reportText += `**Restrições e Conflitos:**\n`;
+        if (info.linhaTransmissao === 'Sim' || info.minerodutoGasoduto === 'Sim' || info.linhaFerrea === 'Sim' || info.aeroporto === 'Sim' || info.limitacoesOutras === 'Sim') {
+            reportText += `  - Foram identificadas as seguintes restrições/infraestruturas de grande porte:\n`;
+            if (info.linhaTransmissao === 'Sim') reportText += `    - Linha de Transmissão de Energia.\n`;
+            if (info.minerodutoGasoduto === 'Sim') reportText += `    - Mineroduto / Gasoduto.\n`;
+            if (info.linhaFerrea === 'Sim') reportText += `    - Linha Férrea.\n`;
+            if (info.aeroporto === 'Sim') reportText += `    - Proximidade de Aeroporto.\n`;
+            if (info.limitacoesOutras === 'Sim') reportText += `    - Outras limitações de natureza diversa.\n`;
+        } else {
+            reportText += `  - Não foram identificadas restrições significativas de infraestruturas de grande porte ou outras limitações específicas.\n`;
+        }
+        reportText += `  - Processo no Ministério Público: ${info.processoMP || 'Não informado'}.\n`;
+        reportText += `  - Processos Judiciais Existentes: ${info.processosJudiciais || 'Não informado'}.\n`;
+        reportText += `  - Comarcas do CRI: ${info.comarcasCRI || 'Não informado/Não aplicável'}.\n\n`;
+
+        reportText += `**Aspectos Legais e Fundiários:**\n`;
+        reportText += `  - Titularidade da Área: ${info.titularidadeArea || 'Não informado'}.\n`;
+        reportText += `  - Programa Terra Legal: ${info.terraLegal || 'Não informado'}.\n`;
+        reportText += `  - Instrumento Jurídico Principal: ${info.instrumentoJuridico || 'Não informado'}.\n`;
+        reportText += `  - Legislação Municipal REURB: ${info.legislacaoReurb || 'Não informada'}.\n`;
+        reportText += `  - Legislação Municipal Ambiental: ${info.legislacaoAmbiental || 'Não informada'}.\n`;
+        reportText += `  - Plano Diretor Municipal: ${info.planoDiretor || 'Não informado'}.\n`;
+        reportText += `  - Lei de Uso e Ocupação do Solo/Zoneamento: ${info.zoneamento || 'Não informado'}.\n`;
+        reportText += `  - Município de Origem do Núcleo: ${info.municipioOriginal || 'Não informado/Atual'}.\n`;
+        reportText += `  - Matrículas de Origem/Afetadas: ${info.matriculasOrigem || 'Não informadas.'}\n`;
+        reportText += `  - Matrículas Identificadas: ${info.matriculasIdentificadas || 'Não informadas.'}\n\n`;
+
+        reportText += `**Ações e Medidas Propostas:**\n`;
+        reportText += `  - Adequação para Correção de Desconformidades: ${info.adequacaoDesconformidades || 'Não informado'}.\n`;
+        reportText += `  - Obras de Infraestrutura Essencial: ${info.obrasInfraestrutura || 'Não informado'}.\n`;
+        reportText += `  - Medidas Compensatórias: ${info.medidasCompensatorias || 'Não informado'}.\n\n`;
+
+        reportText += `Esta seção reflete informações gerais sobre a área do projeto, essenciais para uma análise contextualizada e para a tomada de decisões no processo de REURB.\n\n`;
+    } else if (incInformacoesGerais) {
+        reportText += `--- 4. Informações de Contexto Geral e Infraestrutura do Projeto ---\n`;
+        reportText += `Nenhuma informação geral foi preenchida ou salva na aba 'Informações Gerais'. Por favor, preencha os dados e clique em 'Salvar Informações Gerais' antes de gerar o relatório com esta seção.\n\n`;
+    }
+
+    if (incInfraestrutura && state.layers.poligonais.getLayers().length > 0) { 
+        reportText += `--- 5. Análise de Infraestrutura e Equipamentos Urbanos (Camadas Geoespaciais) ---\n`;
+        reportText += `Foram detectadas ${state.layers.poligonais.getLayers().length} poligonais de infraestrutura ou outras áreas de interesse (como vias, áreas verdes, equipamentos comunitários) nas camadas carregadas.\n`;
+        reportText += `A presença e adequação da infraestrutura existente é um fator chave para a viabilidade e qualidade da regularização. Recomenda-se verificação detalhada da situação da infraestrutura básica (água, esgoto, energia, drenagem, acesso) em relação aos lotes.\n\n`;
+    }
+    
+    const custoTotalFiltrado = featuresToAnalyze.reduce((acc, f) => acc + (f.properties.valor || 0), 0); 
+    reportText += `--- 6. Custo de Intervenção Estimado ---\n`;
+    reportText += `Custo Total Estimado para Intervenção nos Lotes Analisados: R$ ${custoTotalFiltrado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+    reportText += `Este valor é uma estimativa e deve ser refinado com levantamentos de campo e orçamentos detalhados.\n\n`;
+
+
+    reportText += `--- Fim do Relatório ---\n`;
+    reportText += `Este relatório foi gerado automaticamente pelo GeoLaudo.AI. Para análises mais aprofundadas e validação legal, consulte um especialista qualificado e os órgãos competentes.`;
+
+    state.lastReportText = reportText; 
+    generatedReportContent.textContent = reportText; 
+    generatedReportContent.scrollTop = 0; 
+}
+
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
+
+    // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+    });
+    
+    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+    });
+
+
+    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
