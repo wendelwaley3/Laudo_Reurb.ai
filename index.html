@@ -97,32 +97,17 @@
                 <li><span id="areasIntervencao">0</span> áreas demandam intervenção estrutural</li>
             </ul>
 
+            <!-- NOVA SEÇÃO: Análise de Uso do Solo -->
+            <h2>Análise de Uso do Solo</h2>
+            <div id="usoSoloContainer" class="risk-summary">
+                <p>Nenhum dado de uso do solo disponível.</p>
+            </div>
+
+
             <h2>Análise Comparativa por Núcleo</h2>
             <div id="nucleusComparisonChart" class="chart-container">
                 <p>Nenhum dado disponível. Faça o upload das camadas para visualizar o gráfico.</p>
             </div>
-        </section>
-
-        <!-- Upload Section -->
-        <section id="upload" class="container">
-            <h2>Upload de Camadas GeoJSON</h2>
-            <div class="upload-area">
-                <!-- ESTRUTURA PARA UPLOAD CORRIGIDA: LABEL ENVOLVENDO TUDO -->
-                <label class="drag-drop-area">
-                    <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
-                    <p>ou clique para selecionar</p>
-                    <button type="button">Selecionar Arquivos</button>
-                    <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
-                </label>
-            </div>
-            <div class="uploaded-files-preview">
-                <h3>Arquivos Selecionados:</h3>
-                <ul id="fileList">
-                    <li>Nenhum arquivo selecionado.</li>
-                </ul>
-            </div>
-            <button id="processAndLoadBtn">Processar e Carregar Dados</button>
-            <p id="uploadStatus" class="status-message"></p>
         </section>
 
         <!-- (O restante do HTML das outras abas continua igual) -->
@@ -139,7 +124,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
     <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
     <!-- Inclui o Turf.js para operações geoespaciais client-side -->
-    <script src="https://unpkg.com/turf@6.5.0/turf.min.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <!-- Inclui seu JS personalizado -->
     <script src="js/app.js"></script>
 </body>
