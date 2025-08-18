@@ -1,3 +1,4 @@
+```javascript
 // ===================== Estado Global do Aplicativo =====================
 // Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
@@ -40,9 +41,9 @@ function downloadText(filename, text) {
 /** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
 function ensurePolygonClosed(coords) {
     if (!coords || coords.length === 0) return coords;
-    const first = coords[0];
+    const first = coords;
     const last = coords[coords.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) {
+    if (first !== last || first !== last) {
         coords.push(first);
     }
     return coords;
@@ -54,7 +55,7 @@ function ensurePolygonClosed(coords) {
 function utmToLngLat(x, y, zone, south) {
     const def = `+proj=utm +zone=${Number(zone)} ${south ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
     const p = proj4(def, proj4.WGS84, [x, y]);
-    return [p[0], p[1]]; // [longitude, latitude]
+    return [p, p]; // [longitude, latitude]
 }
 
 /**
@@ -67,16 +68,16 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
         if (!coords || coords.length === 0) return coords;
 
         if (geomType === 'Point') {
-            return utmToLngLat(coords[0], coords[1], zone, south);
+            return utmToLngLat(coords, coords, zone, south);
         } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
-            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
+            return coords.map(coord => utmToLngLat(coord, coord, zone, south));
         } else if (geomType === 'Polygon') {
-            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
+            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord, coord, zone, south))));
         } else if (geomType === 'MultiLineString') {
-            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
+            return coords.map(line => line.map(coord => utmToLngLat(coord, coord, zone, south)));
         } else if (geomType === 'MultiPolygon') {
             return coords.map(polygon => 
-                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
+                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord, coord, zone, south))))
             );
         }
         return coords; 
