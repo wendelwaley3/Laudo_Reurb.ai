@@ -35,6 +35,7 @@ function downloadText(filename, text) {
     URL.revokeObjectURL(url); // Libera o objeto URL
 }
 
+
 /** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
 function ensurePolygonClosed(coords) {
     if (!coords || coords.length === 0) return coords;
@@ -55,12 +56,15 @@ function utmToLngLat(x, y, zone, south) {
     return [p[0], p[1]]; // [longitude, latitude]
 }
 
-/** Converte um GeoJSON inteiro de UTM para WGS84. */
+/**
+ * Converte um GeoJSON inteiro de UTM para WGS84.
+ */
 function reprojectGeoJSONFromUTM(geojson, zone, south) {
     const converted = JSON.parse(JSON.stringify(geojson)); 
 
     function convertGeometryCoords(coords, geomType) {
         if (!coords || coords.length === 0) return coords;
+
         if (geomType === 'Point') {
             return utmToLngLat(coords[0], coords[1], zone, south);
         } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
@@ -179,7 +183,6 @@ function initMap() {
     state.layers.app = L.featureGroup().addTo(state.map); 
     state.layers.poligonais = L.featureGroup().addTo(state.map); 
 
-    // Remove as camadas APP e Poligonais do mapa por padrão, para que o usuário as ative pela legenda
     state.map.removeLayer(state.layers.app);
     state.map.removeLayer(state.layers.poligonais);
 
@@ -243,6 +246,7 @@ function initUpload() {
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
     });
 
+    // Adiciona listener de clique ao botão visível para disparar o clique no input de arquivo oculto
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado.'); 
@@ -252,6 +256,7 @@ function initUpload() {
         console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
     }
 
+    // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
         console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
         const selectedFilesArray = Array.from(e.target.files);
@@ -267,6 +272,7 @@ function initUpload() {
         }
     });
 
+    // Listener para arrastar e soltar (na área de drag-drop)
     dragDropArea.addEventListener('dragover', (e) => {
         e.preventDefault(); 
         dragDropArea.classList.add('dragging');
@@ -282,6 +288,7 @@ function initUpload() {
         fileInput.dispatchEvent(new Event('change')); 
     });
 
+    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
     function createFileList(files) {
         const dataTransfer = new DataTransfer();
         files.forEach(file => dataTransfer.items.add(file));
@@ -289,6 +296,7 @@ function initUpload() {
     }
 
 
+    // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
@@ -392,15 +400,13 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.grau || feature.properties.risco || feature.properties.status_risco || 'N/A'); // Prioriza 'grau'
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-    switch (risco) {
-        case '1': color = '#2ecc71'; break; // Baixo - Verde
-        case '2': color = '#f1c40f'; break; // Médio - Amarelo
-        case '3': color = '#e67e22'; break; // Alto - Laranja
-        case '4': color = '#c0392b'; break; // Muito Alto - Vermelho
-        default: color = '#3498db'; // Padrão - Azul
-    }
+    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
+    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f1c40f'; // Amarelo
+    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e67e22'; // Laranja
+    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
+    else color = '#3498db'; 
 
     return {
         fillColor: color,
@@ -592,18 +598,16 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.grau || p.risco || p.status_risco || 'N/A');
+        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase(); 
         
         // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        switch(risco) {
-            case '1': riskCounts['Baixo']++; break;
-            case '2': riskCounts['Médio']++; break;
-            case '3': riskCounts['Alto']++; break;
-            case '4': riskCounts['Muito Alto']++; break;
-            default: console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
+        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
 
-        if (risco === '3' || risco === '4') {
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
             lotesRiscoAltoMuitoAlto++;
         }
         
@@ -658,7 +662,7 @@ function fillLotesTable() {
         const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
         const tipoUso = p.tipo_uso || 'N/A';
         const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
-        const statusRisco = p.grau || p.risco || p.status_risco || 'N/A'; 
+        const statusRisco = p.risco || p.status_risco || 'N/A'; 
         const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; 
         
         const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
@@ -836,6 +840,7 @@ async function gerarRelatorioIA() {
         }
     }
 
+    // Busca dados IBGE simulados
     const dadosIbge = getSimulatedMunicipioData(municipioDoNucleo);
     if (dadosIbge && dadosIbge.municipio && dadosIbge.municipio !== "Não informado") {
         reportText += `--- Informações do Município (${dadosIbge.municipio}) ---\n`;
@@ -863,7 +868,7 @@ async function gerarRelatorioIA() {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         featuresToAnalyze.forEach(f => {
-            const risco = String(f.properties.grau || f.properties.risco || f.properties.status_risco || 'N/A').toLowerCase();
+            const risco = String(f.properties.risco || f.properties.status_risco || 'N/A').toLowerCase();
             if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
             else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
             else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
