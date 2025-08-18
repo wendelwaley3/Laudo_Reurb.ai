@@ -1,4 +1,3 @@
-```javascript
 // ===================== Estado Global do Aplicativo =====================
 // Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
@@ -41,9 +40,9 @@ function downloadText(filename, text) {
 /** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
 function ensurePolygonClosed(coords) {
     if (!coords || coords.length === 0) return coords;
-    const first = coords[0];
+    const first = coords;
     const last = coords[coords.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) {
+    if (first !== last || first !== last) {
         coords.push(first);
     }
     return coords;
@@ -55,7 +54,7 @@ function ensurePolygonClosed(coords) {
 function utmToLngLat(x, y, zone, south) {
     const def = `+proj=utm +zone=${Number(zone)} ${south ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
     const p = proj4(def, proj4.WGS84, [x, y]);
-    return [p[0], p[1]]; // [longitude, latitude]
+    return [p, p]; // [longitude, latitude]
 }
 
 /**
@@ -68,16 +67,16 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
         if (!coords || coords.length === 0) return coords;
 
         if (geomType === 'Point') {
-            return utmToLngLat(coords[0], coords[1], zone, south);
+            return utmToLngLat(coords, coords, zone, south);
         } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
-            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
+            return coords.map(coord => utmToLngLat(coord, coord, zone, south));
         } else if (geomType === 'Polygon') {
-            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
+            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord, coord, zone, south))));
         } else if (geomType === 'MultiLineString') {
-            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
+            return coords.map(line => line.map(coord => utmToLngLat(coord, coord, zone, south)));
         } else if (geomType === 'MultiPolygon') {
             return coords.map(polygon => 
-                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
+                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord, coord, zone, south))))
             );
         }
         return coords; 
@@ -230,9 +229,7 @@ function initUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-
-    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
+    const selectFilesVisibleButton = document.querySelector('.select-files-button'); // Usando classe em vez de ID
 
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
@@ -250,16 +247,6 @@ function initUpload() {
     utmHemisphereSelect.addEventListener('change', () => { 
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
     });
-
-    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado.'); 
-            fileInput.click();
-        });
-    } else {
-        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
-    }
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
@@ -381,7 +368,7 @@ function initUpload() {
         const allLayersGroup = L.featureGroup([state.layers.lotes, state.layers.app, state.layers.poligonais]);
         if (allLayersGroup.getLayers().length > 0) {
             try { 
-                state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] }); 
+                state.map.fitBounds(allLayersGroup.getBounds(), { padding: }); 
                 console.log('Mapa ajustado para os bounds dos dados carregados.');
             } catch (e) {
                 console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas dos seus GeoJSONs.", e);
@@ -583,7 +570,7 @@ function zoomToFilter() {
         return;
     }
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
-    try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
+    try { state.map.fitBounds(layer.getBounds(), { padding: }); } catch (e) {
         console.warn("Não foi possível ajustar o mapa ao filtro. Verifique as coordenadas dos lotes filtrados.", e);
     }
 }
@@ -694,7 +681,7 @@ function fillLotesTable() {
                 document.querySelector('nav a[data-section="dashboard"]').click();
                 const tempLayer = L.geoJSON(loteToZoom); 
                 try { 
-                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                    state.map.fitBounds(tempLayer.getBounds(), { padding: }); 
                 } catch (e) {
                     console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
                 }
@@ -726,8 +713,8 @@ function fillLotesTable() {
             if (tr.style.display === 'none') return; 
             const tds = tr.querySelectorAll('td');
             if (tds.length >= 6) rows.push([
-                tds[0].textContent, tds[1].textContent, tds[2].textContent,
-                tds[3].textContent, tds[4].textContent, tds[5].textContent
+                tds.textContent, tds.textContent, tds.textContent,
+                tds.textContent, tds.textContent, tds.textContent
             ]);
         });
         const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
@@ -837,11 +824,11 @@ async function gerarRelatorioIA() {
     let municipioDoNucleo = "Não informado"; 
     if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none' && featuresToAnalyze.length > 0) {
         reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
-        municipioDoNucleo = featuresToAnalyze[0].properties?.nm_mun || featuresToAnalyze[0].properties?.municipio || "Não informado";
+        municipioDoNucleo = featuresToAnalyze.properties?.nm_mun || featuresToAnalyze.properties?.municipio || "Não informado";
     } else {
         reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
         if (state.allLotes.length > 0) {
-             municipioDoNucleo = state.allLotes[0].properties?.nm_mun || state.allLotes[0].properties?.municipio || "Não informado";
+             municipioDoNucleo = state.allLotes.properties?.nm_mun || state.allLotes.properties?.municipio || "Não informado";
         }
     }
 
