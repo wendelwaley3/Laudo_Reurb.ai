@@ -1,4 +1,6 @@
+```javascript
 // ===================== Estado Global do Aplicativo =====================
+// Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
     map: null,
     layers: { // FeatureGroups para gerenciar as camadas do Leaflet
@@ -171,6 +173,7 @@ function initMap() {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
+    // Controle de camadas base para o usuário escolher o basemap
     const baseMaps = {
         "OpenStreetMap": osmLayer,
         "Esri World Imagery (Satélite)": esriWorldImagery 
@@ -227,7 +230,9 @@ function initUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
+
+    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
@@ -246,7 +251,7 @@ function initUpload() {
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
     });
 
-    // Adiciona listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado.'); 
