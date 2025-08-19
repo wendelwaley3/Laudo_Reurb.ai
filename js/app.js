@@ -1,4 +1,3 @@
-```javascript
 // ===================== Estado Global do Aplicativo =====================
 // Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
