@@ -1054,6 +1054,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         downloadText('relatorio_geolaudo.txt', state.lastReportText);
     });
+    
+    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+    });
+
 
     // Estado inicial: Dashboard ativo e preenchido (vazio no início)
     document.getElementById('dashboard').classList.add('active');
