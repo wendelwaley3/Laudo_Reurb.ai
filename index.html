@@ -1,3 +1,26 @@
+<!-- Upload Section -->
+        <section id="upload" class="container">
+            <h2>Upload de Camadas GeoJSON</h2>
+            <div class="upload-area">
+                <!-- ESTRUTURA PARA UPLOAD -->
+                <label for="geojsonFileInput" class="drag-drop-area">
+                    <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
+                    <p>ou clique para selecionar</p>
+                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button> 
+                </label>
+                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
+            </div>
+            <div class="uploaded-files-preview">
+                <h3>Arquivos Selecionados:</h3>
+                <ul id="fileList">
+                    <li>Nenhum arquivo selecionado.</li>
+                </ul>
+            </div>
+            <button id="processAndLoadBtn">Processar e Carregar Dados</button>
+            <p id="uploadStatus" class="status-message"></p>
+        </section>
+
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -105,7 +128,7 @@
             </div>
         </section>
 
-        <!-- Upload Section -->
+                <!-- Upload Section -->
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
@@ -125,25 +148,6 @@
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
-            <!-- CONTROLE DE REPROJEÇÃO UTM (NOVO) -->
-            <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
-                <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
-                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
-                    <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:flex; gap:10px; align-items:center; display:none;"> <!-- Display none por padrão -->
-                        <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
-                        <label>Hemisfério: 
-                            <select id="utmHemisphereSelect">
-                                <option value="S">Sul</option>
-                                <option value="N">Norte</option>
-                            </select>
-                        </label>
-                    </div>
-                </div>
-                <p style="font-size:0.85em; color:#666; margin-top:10px;">
-                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção de reprojeção UTM apenas se não puder converter previamente.
-                </p>
-            </div>
         </section>
 
         <!-- SEÇÃO: Informações Gerais (Preenchimento Manual) -->
