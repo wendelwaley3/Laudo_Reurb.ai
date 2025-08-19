@@ -253,9 +253,6 @@ function initUpload() {
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
 
-    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
-
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
@@ -277,16 +274,6 @@ function initUpload() {
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
         console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
     });
-
-    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
-            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
-        });
-    } else {
-        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
-    }
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
@@ -316,15 +303,14 @@ function initUpload() {
         e.preventDefault();
         dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.geojson') || file.name.endsWith('.json'));
-        fileInput.files = createFileList(droppedFiles); // Usa a função auxiliar
+        fileInput.files = new FileListItems(droppedFiles); // Simula a FileList
         fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
-
-    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
-    function createFileList(files) {
-        const dataTransfer = new DataTransfer();
-        files.forEach(file => dataTransfer.items.add(file));
-        return dataTransfer.files;
+    // Classe auxiliar para simular FileList (para drag and drop)
+    function FileListItems(files) {
+        const b = new ClipboardEvent("").clipboardData || new DataTransfer();
+        for (let i = 0, len = files.length; i < len; i++) b.items.add(files[i]);
+        return b.files;
     }
 
 
@@ -374,6 +360,7 @@ function initUpload() {
                         console.error(`Falha na reprojeção de ${file.name}:`, e);
                         uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`;
                         uploadStatus.className = 'status-message error';
+                        // Interrompe o processo se uma reprojeção falhar criticamente
                         return; 
                     }
                 }
@@ -389,11 +376,11 @@ function initUpload() {
 
                 // Lógica para categorizar camadas por nome do arquivo
                 const fileNameLower = file.name.toLowerCase();
-                if (fileNameLower.includes('lote')) { 
+                if (fileNameLower.includes('lote')) { // Assumes 'lotes laudo.geojson', 'lotes area de risco.geojson'
                     newLotesFeatures.push(...geojsonData.features);
-                } else if (fileNameLower.includes('app')) { 
+                } else if (fileNameLower.includes('app')) { // Assumes 'lotesapp_laudo.geojson'
                     newAPPFeatures.push(...geojsonData.features);
-                } else { 
+                } else { // Assumes 'tabela_geral.geojson' e outras poligonais
                     newPoligonaisFeatures.push(...geojsonData.features);
                 }
                 console.log(`Arquivo ${file.name} categorizado.`); 
@@ -402,6 +389,7 @@ function initUpload() {
                 console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
+                // Limpa todos os dados carregados se um único arquivo falhar
                 state.layers.lotes.clearLayers();
                 state.layers.app.clearLayers();
                 state.layers.poligonais.clearLayers();
@@ -411,6 +399,11 @@ function initUpload() {
             }
         }
 
+        // Adiciona as feições coletadas aos FeatureGroups do Leaflet para exibição no mapa
+        // É importante que os FeatureGroups já estejam adicionados ao mapa (feito em initMap)
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
+        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
@@ -418,10 +411,7 @@ function initUpload() {
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
+        // Adiciona a camada de lotes ao FeatureGroup (ela será exibida/filtrada depois)
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
@@ -441,7 +431,7 @@ function initUpload() {
         // Atualiza UI
         populateNucleusFilter();
         refreshDashboard();
-        fillLotesTable(); 
+        fillLotesTable();
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
@@ -453,16 +443,11 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
-    let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f1c40f'; // Amarelo
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e67e22'; // Laranja
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
-    else color = '#3498db'; 
+    const risco = feature.properties.risco || 'N/A'; // Usa a propriedade 'risco'
+    const style = riscoStyles[risco] || riscoStyles['N/A']; 
 
     return {
-        fillColor: color,
+        fillColor: style.fillColor,
         weight: 1,
         opacity: 1,
         color: 'white', 
@@ -483,7 +468,7 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo de intervenção') && typeof value === 'number') { // Inclui 'custo de intervenção'
+            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
                 value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
@@ -500,15 +485,10 @@ function onEachLoteFeature(feature, layer) {
                 case 'dentro_app': displayKey = 'Em APP'; break;
                 case 'valor': displayKey = 'Custo de Intervenção'; break;
                 case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
-                case 'nm_mun': displayKey = 'Município'; break; 
+                case 'nm_mun': displayKey = 'Município'; break; // Nome do município do lote
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
-                case 'status_risco': displayKey = 'Status Risco'; break; 
-                case 'cod_area': displayKey = 'Cód. Área'; break;
-                case 'grau': displayKey = 'Grau'; break;
-                case 'qtde_lote': displayKey = 'Qtde. Lote(s)'; break;
-                case 'intervencao': displayKey = 'Intervenção'; break;
-                case 'lotes_atingidos': displayKey = 'Lotes Atingidos'; break;
+                // Adicione mais mapeamentos se precisar renomear outras propriedades para o popup
             }
 
             popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
@@ -552,17 +532,19 @@ function stylePoligonal(feature) {
 async function onEachPoligonalFeature(feature, layer) {
     if (feature.properties) {
         const props = feature.properties;
-        const municipioNome = props.municipio || props.nm_mun || 'Não informado'; 
+        const municipioNome = props.municipio || props.nm_mun || 'Não informado'; // Prioriza 'municipio' da poligonal
 
         let popupContent = `<h3>Informações da Poligonal: ${municipioNome}</h3>`;
         popupContent += `<strong>Município:</strong> ${municipioNome}<br>`;
         if (props.area_m2) popupContent += `<strong>Área (m²):</strong> ${props.area_m2.toLocaleString('pt-BR')} m²<br>`;
+        // Adiciona outras propriedades, evitando duplicar as já tratadas
         for (let key in props) {
             if (!['municipio', 'nm_mun', 'area_m2'].includes(key.toLowerCase())) {
                 popupContent += `<strong>${key}:</strong> ${props[key]}<br>`;
             }
         }
         
+        // Botão para buscar informações do município
         popupContent += `<button onclick="buscarInfoCidade('${municipioNome}')" style="margin-top:8px;">Ver informações do município</button>`;
         
         layer.bindPopup(popupContent);
@@ -570,9 +552,10 @@ async function onEachPoligonalFeature(feature, layer) {
 }
 
 // ===================== Função simulada para buscar dados extras de cidade =====================
+// Esta função é chamada ao clicar no botão no popup de poligonais.
 async function buscarInfoCidade(nomeCidade) {
     alert(`Buscando dados simulados para ${nomeCidade}...`);
-    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
+    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); // Usa a função simulada IBGE
     
     let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
     info += `- Região: ${dadosSimulados.regiao}\n`;
@@ -580,6 +563,7 @@ async function buscarInfoCidade(nomeCidade) {
     info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
     info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
 
+    // Exibe as informações em um alerta ou em um modal mais sofisticado
     alert(info);
     console.log("Dados do município simulados:", dadosSimulados);
 }
@@ -591,13 +575,16 @@ function populateNucleusFilter() {
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
+    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
-    if (state.nucleusSet.size > 0) {
+    if (state.nucleusSet.size === 0) {
+        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
+    } else {
         const sortedNucleos = Array.from(state.nucleusSet).sort();
         sortedNucleos.forEach(nucleo => {
-            if (nucleo && nucleo.trim() !== '') { 
+            if (nucleo && nucleo.trim() !== '') { // Garante que o núcleo não seja vazio/nulo
                 const option1 = document.createElement('option');
                 option1.value = nucleo;
                 option1.textContent = nucleo;
@@ -609,8 +596,6 @@ function populateNucleusFilter() {
                 reportNucleosSelect.appendChild(option2);
             }
         });
-    } else {
-        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
     }
 }
 
@@ -627,7 +612,7 @@ function filteredLotes() {
 function zoomToFilter() {
     const feats = filteredLotes();
     if (feats.length === 0) {
-        state.map.setView([-15.7801, -47.9292], 5); 
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
         return;
     }
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
@@ -642,41 +627,31 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0; 
+    let lotesRiscoCount = 0; // Alto + Muito Alto
     let lotesAppCount = 0;
     let custoTotal = 0;
-    let custoMin = Infinity;
-    let custoMax = -Infinity;
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase(); 
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
         if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
         else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
         else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
         else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-            lotesRiscoAltoMuitoAlto++;
-        }
-        
         const dentroApp = Number(p.dentro_app || p.app || 0); 
         if (dentroApp > 0) lotesAppCount++;
 
         const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
-        if (!isNaN(valorCusto) && valorCusto > 0) { 
-            custoTotal += valorCusto;
-            if (valorCusto < custoMin) custoMin = valorCusto;
-            if (valorCusto > custoMax) custoMax = valorCusto;
-        }
+        custoTotal += isNaN(valorCusto) ? 0 : valorCusto;
     });
 
+    lotesRiscoCount = riskCounts['Alto'] + riskCounts['Muito Alto']; 
+
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('lotesRisco').textContent = lotesRiscoCount;
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
@@ -685,11 +660,8 @@ function refreshDashboard() {
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
-
-    document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
-    document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoCount; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoCount; 
 }
 
 // ===================== Tabela de Lotes =====================
@@ -697,7 +669,7 @@ function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
     const tbody = document.querySelector('#lotesDataTable tbody');
     const feats = filteredLotes(); 
-    tbody.innerHTML = ''; 
+    tbody.innerHTML = '';
 
     if (feats.length === 0) {
         const tr = document.createElement('tr');
@@ -711,13 +683,13 @@ function fillLotesTable() {
         const p = f.properties || {};
         const tr = document.createElement('tr');
 
-        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`; 
+        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`;
         const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
         const tipoUso = p.tipo_uso || 'N/A';
         const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
-        const statusRisco = p.risco || p.status_risco || 'N/A'; 
-        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; 
-        
+        const statusRisco = p.risco || 'N/A';
+        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não';
+
         const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
         tr.innerHTML = `
             <td>${codLote}</td>
@@ -732,27 +704,25 @@ function fillLotesTable() {
     });
     tbody.appendChild(fragment);
 
-    // **CORREÇÃO AQUI**: Adiciona listeners para os botões "Ver no Mapa"
+    // Adiciona listeners para os botões "Ver no Mapa"
     tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const codLoteToZoom = btn.getAttribute('data-codlote');
-            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote == codLoteToZoom)); // '==' para comparar string com número se necessário
+            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) === codLoteToZoom);
             
             if (loteToZoom) {
                 document.querySelector('nav a[data-section="dashboard"]').click();
                 const tempLayer = L.geoJSON(loteToZoom); 
-                try { 
-                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
-                } catch (e) {
-                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
+                try { state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); } catch (e) {
+                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas.", e);
                 }
                 state.layers.lotes.eachLayer(layer => {
-                    if (layer.feature?.properties?.cod_lote == codLoteToZoom && layer.openPopup) { // '==' para comparar string com número
+                    if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) === codLoteToZoom && layer.openPopup) {
                         layer.openPopup();
                     }
                 });
             } else {
-                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
+                console.warn(`Lote com código ${codLoteToZoom} não encontrado para zoom.`);
             }
         });
     });
@@ -921,11 +891,8 @@ async function gerarRelatorioIA() {
     if (incAnaliseRiscos) {
         const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
         featuresToAnalyze.forEach(f => {
-            const risco = String(f.properties.risco || f.properties.status_risco || 'N/A').toLowerCase();
-            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+            const risco = f.properties.risco || 'N/A'; 
+            if (riskCounts.hasOwnProperty(risco)) riskCounts[risco]++;
         });
         const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
         const percRiscoElevado = (lotesComRiscoElevado / featuresToAnalyze.length * 100 || 0).toFixed(2);
