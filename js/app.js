@@ -1,4 +1,3 @@
-
 // ===================== Estado Global do Aplicativo =====================
 // Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
@@ -32,6 +31,8 @@ function downloadText(filename, text) {
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url); // Libera o objeto URL
 }
 
@@ -254,6 +255,9 @@ function initUpload() {
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
 
+    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
+
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
@@ -275,6 +279,16 @@ function initUpload() {
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
         console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
     });
+
+    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
+            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+        });
+    } else {
+        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
+    }
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
@@ -304,14 +318,15 @@ function initUpload() {
         e.preventDefault();
         dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.geojson') || file.name.endsWith('.json'));
-        fileInput.files = new FileListItems(droppedFiles); // Simula a FileList
+        fileInput.files = createFileList(droppedFiles); // Usa a função auxiliar
         fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
-    // Classe auxiliar para simular FileList (para drag and drop)
-    function FileListItems(files) {
-        const b = new ClipboardEvent("").clipboardData || new DataTransfer();
-        for (let i = 0, len = files.length; i < len; i++) b.items.add(files[i]);
-        return b.files;
+
+    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
+    function createFileList(files) {
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        return dataTransfer.files;
     }
 
 
@@ -361,7 +376,6 @@ function initUpload() {
                         console.error(`Falha na reprojeção de ${file.name}:`, e);
                         uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`;
                         uploadStatus.className = 'status-message error';
-                        // Interrompe o processo se uma reprojeção falhar criticamente
                         return; 
                     }
                 }
@@ -377,11 +391,11 @@ function initUpload() {
 
                 // Lógica para categorizar camadas por nome do arquivo
                 const fileNameLower = file.name.toLowerCase();
-                if (fileNameLower.includes('lote')) { // Assumes 'lotes laudo.geojson', 'lotes area de risco.geojson'
+                if (fileNameLower.includes('lote')) { 
                     newLotesFeatures.push(...geojsonData.features);
-                } else if (fileNameLower.includes('app')) { // Assumes 'lotesapp_laudo.geojson'
+                } else if (fileNameLower.includes('app')) { 
                     newAPPFeatures.push(...geojsonData.features);
-                } else { // Assumes 'tabela_geral.geojson' e outras poligonais
+                } else { 
                     newPoligonaisFeatures.push(...geojsonData.features);
                 }
                 console.log(`Arquivo ${file.name} categorizado.`); 
@@ -390,7 +404,6 @@ function initUpload() {
                 console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
-                // Limpa todos os dados carregados se um único arquivo falhar
                 state.layers.lotes.clearLayers();
                 state.layers.app.clearLayers();
                 state.layers.poligonais.clearLayers();
@@ -400,19 +413,17 @@ function initUpload() {
             }
         }
 
-        // Adiciona as feições coletadas aos FeatureGroups do Leaflet para exibição no mapa
-        // É importante que os FeatureGroups já estejam adicionados ao mapa (feito em initMap)
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
-        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
-            if (f.properties && f.properties.desc_nucleo) { // Usa desc_nucleo
+            if (f.properties && f.properties.desc_nucleo) { 
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
-        // Adiciona a camada de lotes ao FeatureGroup (ela será exibida/filtrada depois)
+        
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
@@ -432,7 +443,7 @@ function initUpload() {
         // Atualiza UI
         populateNucleusFilter();
         refreshDashboard();
-        fillLotesTable(); // Preenche a tabela de lotes na nova aba
+        fillLotesTable(); 
 
         uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
@@ -491,7 +502,7 @@ function onEachLoteFeature(feature, layer) {
                 case 'dentro_app': displayKey = 'Em APP'; break;
                 case 'valor': displayKey = 'Custo de Intervenção'; break;
                 case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
-                case 'nm_mun': displayKey = 'Município'; break; // Nome do município do lote
+                case 'nm_mun': displayKey = 'Município'; break; 
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
                 case 'status_risco': displayKey = 'Status Risco'; break; 
