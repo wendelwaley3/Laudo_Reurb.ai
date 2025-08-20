@@ -227,10 +227,10 @@ function initUpload() {
 function styleLote(feature) {
     const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f1c40f'; // Amarelo
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e67e22'; // Laranja
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
+    if (risco === '1' || risco.includes('baixo')) color = '#2ecc71';      
+    else if (risco === '2' || risco.includes('médio')) color = '#f1c40f'; // Amarelo
+    else if (risco === '3' || risco.includes('alto')) color = '#e67e22'; // Laranja
+    else if (risco === '4' || risco.includes('muito alto')) color = '#c0392b'; 
     else color = '#3498db'; 
 
     return {
