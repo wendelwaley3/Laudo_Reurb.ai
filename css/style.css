@@ -41,7 +41,7 @@ nav a {
     margin-left: 25px;
     padding: 8px 15px;
     border-radius: 6px;
-    transition: background-color 0.3s ease, transform 0.2s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease; /* Adicionada transição para box-shadow */
     font-weight: 500;
     white-space: nowrap; /* Evita quebras de linha nos links */
 }
@@ -49,6 +49,7 @@ nav a {
 nav a:hover, nav a.active {
     background-color: #34495e; /* Azul médio */
     transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* SOMBREAMENTO ADICIONADO */
 }
 
 /* Botões */
