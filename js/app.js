@@ -590,7 +590,14 @@ function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
+
+    // Verifica se os elementos existem antes de tentar usá-los
+    if (!filterSelect || !reportNucleosSelect) {
+        console.error("Um ou mais elementos de filtro ('nucleusFilter' ou 'nucleosAnalise') não foram encontrados no HTML.");
+        return; // Sai da função para evitar mais erros
+    }
     
+    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
@@ -613,24 +620,6 @@ function populateNucleusFilter() {
         reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
     }
 }
-
-function filteredLotes() {
-    if (state.currentNucleusFilter === 'all') return state.allLotes;
-    return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
-}
-
-function zoomToFilter() {
-    const feats = filteredLotes();
-    if (feats.length === 0) {
-        state.map.setView([-15.7801, -47.9292], 5); 
-        return;
-    }
-    const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
-    try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
-        console.warn("Não foi possível ajustar o mapa ao filtro.", e);
-    }
-}
-
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
