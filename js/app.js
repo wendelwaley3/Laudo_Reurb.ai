@@ -60,6 +60,15 @@ function ensurePolygonClosed(coords) {
 // ===================== Reprojeção UTM → WGS84 (client-side com proj4js) =====================
 // Esta seção permite que o app tente reprojetar GeoJSONs em UTM, se necessário.
 
+/** Converte um ponto UTM (x,y) para Lat/Lng (WGS84). */
+function utmToLngLat(x, y, zone, south) {
+    // Definição dinâmica da projeção UTM (ex: SIRGAS 2000 / UTM zone 23S)
+    const def = `+proj=utm +zone=${Number(zone)} ${south ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
+    // Retorna [longitude, latitude]
+    const p = proj4(def, proj4.WGS84, [x, y]);
+    return [p[0], p[1]]; 
+}
+
 /**
  * Converte um GeoJSON inteiro de UTM para WGS84.
  * Percorre as geometrias e aplica a conversão de coordenadas.
@@ -73,33 +82,37 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
     const converted = JSON.parse(JSON.stringify(geojson)); 
 
     function convertGeometryCoords(coords, geomType) {
-        if (!coords || !Array.isArray(coords) || coords.length === 0) return coords;
+        if (!coords || coords.length === 0) return coords;
 
-        // Verifica se o array contém números ou outros arrays para descer na recursão
-        if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
-            // Chegamos ao nível de um ponto [x, y]
+        if (geomType === 'Point') {
             return utmToLngLat(coords[0], coords[1], zone, south);
+        } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
+            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
+        } else if (geomType === 'Polygon') {
+            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
+        } else if (geomType === 'MultiLineString') {
+            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
+        } else if (geomType === 'MultiPolygon') {
+            return coords.map(polygon => 
+                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
+            );
         }
-        
-        // Se não é um ponto, é um array de pontos ou um array de arrays de pontos.
-        // Chamamos a função recursivamente para cada elemento.
-        return coords.map(c => convertGeometryCoords(c, geomType));
+        return coords; // Retorna as coordenadas originais para tipos não mapeados
     }
 
     if (converted.type === 'FeatureCollection') {
-        converted.features.forEach(feature => {
-            if (feature.geometry && feature.geometry.coordinates) {
+        converted.features = converted.features.map(feature => {
+            if (feature.geometry) {
                 feature.geometry.coordinates = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
             }
+            return feature;
         });
     } else if (converted.type === 'Feature') {
-        if (converted.geometry && converted.geometry.coordinates) {
+        if (converted.geometry) {
             converted.geometry.coordinates = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
         }
     } else { // Assume que é um objeto de geometria
-        if (converted.coordinates) {
-            converted.coordinates = convertGeometryCoords(converted.coordinates, converted.type);
-        }
+        converted.coordinates = convertGeometryCoords(converted.coordinates, converted.type);
     }
 
     return converted;
