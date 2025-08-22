@@ -739,4 +739,3 @@ function fillLotesTable() {
 
 // ===================== Inicialização Principal =====================
 // A função `DOMContentLoaded` que chama todas as funções `init*` permanece a mesma.
-
