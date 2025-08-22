@@ -37,14 +37,6 @@
                     <option value="all">Todos os Núcleos</option>
                     <!-- Opções de núcleo serão adicionadas via JS -->
                 </select>
-                <!-- NOVO FILTRO DE RISCO -->
-                <select id="riskFilter">
-                    <option value="all">Todos os Riscos</option>
-                    <option value="1">Baixo Risco (1)</option>
-                    <option value="2">Médio Risco (2)</option>
-                    <option value="3">Alto Risco (3)</option>
-                    <option value="4">Muito Alto Risco (4)</option>
-                </select>
                 <button id="applyFiltersBtn">Aplicar Filtros</button>
             </div>
 
@@ -81,12 +73,13 @@
                 <div class="legend-item"><input type="checkbox" id="toggleAPP"><label for="toggleAPP">APP</label> <span class="legend-color app"></span></div>
 
                 <h4>Áreas de Risco:</h4>
-                <ul>
-                    <li class="risk-low">Baixo Risco (1)</li>
-                    <li class="risk-medium">Médio Risco (2)</li>
-                    <li class="risk-high">Alto Risco (3)</li>
-                    <li class="risk-very-high">Muito Alto Risco (4)</li>
-                </ul>
+                <!-- NOVO: Filtros de Risco com Checkboxes -->
+                <div class="legend-risk-filters">
+                    <div class="legend-item"><input type="checkbox" id="toggleRisk1" checked><label for="toggleRisk1" class="risk-low">Baixo Risco (1)</label></div>
+                    <div class="legend-item"><input type="checkbox" id="toggleRisk2" checked><label for="toggleRisk2" class="risk-medium">Médio Risco (2)</label></div>
+                    <div class="legend-item"><input type="checkbox" id="toggleRisk3" checked><label for="toggleRisk3" class="risk-high">Alto Risco (3)</label></div>
+                    <div class="legend-item"><input type="checkbox" id="toggleRisk4" checked><label for="toggleRisk4" class="risk-very-high">Muito Alto Risco (4)</label></div>
+                </div>
                 <p class="click-info">Clique nos elementos do mapa para ver detalhes</p>
             </div>
 
@@ -122,6 +115,11 @@
         </section>
 
         <!-- Upload Section -->
+        <section id="upload" class="container">
+            <h2>Upload de Camadas GeoJSON</h2>
+            <div class="upload-area">
+                <!-- ESTRUTURA PARA UPLOAD -->
+                       <!-- Upload Section -->
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
