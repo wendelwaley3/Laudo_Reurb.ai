@@ -636,7 +636,6 @@ function zoomToFilter() {
 }
 
 // ===================== Dashboard =====================
-// ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
     const feats = filteredLotes();
@@ -1091,3 +1090,30 @@ document.addEventListener('DOMContentLoaded', () => {
     populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
+// ===================== Detecção de Município por Coordenadas =====================
+/**
+ * Usa a API do Nominatim (OpenStreetMap) para descobrir o município a partir de coordenadas.
+ * @param {L.LatLng} latlng - As coordenadas (latitude, longitude) do ponto central.
+ * @returns {Promise<string>} O nome do município ou "Não Identificado".
+ */
+async function getMunicipioFromCoordinates(latlng) {
+    const { lat, lng } = latlng;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    console.log("Buscando município na URL:", url);
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Erro na API do Nominatim: ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log("Resposta da API Nominatim:", data);
+        
+        // A API retorna o nome da cidade em 'city', 'town', 'village', etc.
+        const municipio = data.address?.city || data.address?.town || data.address?.village || "Não Identificado";
+        return municipio;
+    } catch (error) {
+        console.error("Erro ao buscar município:", error);
+        return "Não Identificado";
+    }
+}
