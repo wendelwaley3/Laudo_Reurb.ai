@@ -471,14 +471,29 @@ function initUpload() {
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
+// Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
+    // Busca por 'grau', 'risco' ou 'status_risco' e converte para número
+    const grau = parseInt(feature.properties.grau || feature.properties.risco || feature.properties.status_risco, 10);
     let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
-    else color = '#3498db'; 
+
+    switch (grau) {
+        case 1:
+            color = '#2ecc71'; // Verde (Baixo Risco)
+            break;
+        case 2:
+            color = '#f1c40f'; // Amarelo (Médio Risco)
+            break;
+        case 3:
+            color = '#e67e22'; // Laranja (Alto Risco)
+            break;
+        case 4:
+            color = '#c0392b'; // Vermelho (Muito Alto Risco)
+            break;
+        default:
+            color = '#3498db'; // Azul padrão (Sem Risco / N/A)
+            break;
+    }
 
     return {
         fillColor: color,
