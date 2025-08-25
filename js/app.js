@@ -636,12 +636,13 @@ function zoomToFilter() {
 }
 
 // ===================== Dashboard =====================
+// ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0; 
+    let lotesRiscoAltoMuitoAlto = 0;
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -650,47 +651,66 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
-        
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+        // Pega o valor de risco de múltiplas colunas possíveis e converte para minúsculas
+        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+        // **NOVA LÓGICA DE CONTAGEM DE RISCO**
+        // Primeiro, verifica se o risco é "geologico" ou "hidrologico" e os trata como risco ALTO por padrão
+        if (risco === 'geologico' || risco === 'hidrologico') {
+            riskCounts['Alto']++; // Classifica como Risco Alto
+        } 
+        // Se não for, verifica os outros valores
+        else if (risco === '1' || risco.includes('baixo')) {
+            riskCounts['Baixo']++;
+        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
+            riskCounts['Médio']++;
+        } else if (risco === '3' || risco.includes('alto')) {
+            riskCounts['Alto']++;
+        } else if (risco === '4' || risco.includes('muito alto')) {
+            riskCounts['Muito Alto']++;
+        } else if (risco !== 'n/a' && risco !== 'null') {
+            // Apenas mostra o aviso se o risco não for N/A ou null
+            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        }
+        
+        // Contagem para o card "Lotes em Risco" (Alto + Muito Alto)
+        // Inclui "geologico" e "hidrologico" como risco
+        if (risco === '3' || risco === '4' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
             lotesRiscoAltoMuitoAlto++;
         }
         
-        const dentroApp = Number(p.dentro_app || p.app || 0); 
-        if (dentroApp > 0) lotesAppCount++;
+        // Contagem de Lotes em APP
+        const dentroApp = Number(p.dentro_app || p.app || 0);
+        if (dentroApp > 0) {
+            lotesAppCount++;
+        }
 
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
-        if (!isNaN(valorCusto) && valorCusto > 0) { 
+        // Cálculo do Custo de Intervenção
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
+        if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
+    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
-
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
