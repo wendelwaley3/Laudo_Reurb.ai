@@ -330,8 +330,9 @@ function initUpload() {
         files.forEach(file => dataTransfer.items.add(file));
         return dataTransfer.files;
     }
-    
-      // Listener para o botão "Processar e Carregar Dados"
+
+
+    // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
@@ -413,28 +414,7 @@ function initUpload() {
                 return; 
             }
         }
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        
-        // **NOVA LÓGICA DE DETECÇÃO DE MUNICÍPIO**
-        // A função onEachPoligonalFeature agora será assíncrona
-        await Promise.all(newPoligonaisFeatures.map(async feature => {
-            const tempLayer = L.geoJSON(feature);
-            const center = tempLayer.getBounds().getCenter();
-            const municipio = await getMunicipioFromCoordinates(center);
 
-            // Adiciona o nome do município detectado como uma nova propriedade
-            feature.properties.municipio_detectado = municipio;
-
-            // Se a propriedade 'municipio' original não existir, preenche com o detectado
-            if (!feature.properties.municipio) {
-                feature.properties.municipio = municipio;
-            }
-        }));
-        
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
-        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
@@ -442,6 +422,10 @@ function initUpload() {
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
+        
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
@@ -467,33 +451,19 @@ function initUpload() {
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
+}
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
-// Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para número
-    const grau = parseInt(feature.properties.grau || feature.properties.risco || feature.properties.status_risco, 10);
+    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
     let color;
-
-    switch (grau) {
-        case 1:
-            color = '#2ecc71'; // Verde (Baixo Risco)
-            break;
-        case 2:
-            color = '#f1c40f'; // Amarelo (Médio Risco)
-            break;
-        case 3:
-            color = '#e67e22'; // Laranja (Alto Risco)
-            break;
-        case 4:
-            color = '#c0392b'; // Vermelho (Muito Alto Risco)
-            break;
-        default:
-            color = '#3498db'; // Azul padrão (Sem Risco / N/A)
-            break;
-    }
+    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
+    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
+    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
+    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
+    else color = '#3498db'; 
 
     return {
         fillColor: color,
@@ -671,7 +641,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0;
+    let lotesRiscoAltoMuitoAlto = 0; 
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -680,66 +650,47 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Pega o valor de risco de múltiplas colunas possíveis e converte para minúsculas
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
-
-        // **NOVA LÓGICA DE CONTAGEM DE RISCO**
-        // Primeiro, verifica se o risco é "geologico" ou "hidrologico" e os trata como risco ALTO por padrão
-        if (risco === 'geologico' || risco === 'hidrologico') {
-            riskCounts['Alto']++; // Classifica como Risco Alto
-        } 
-        // Se não for, verifica os outros valores
-        else if (risco === '1' || risco.includes('baixo')) {
-            riskCounts['Baixo']++;
-        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
-            riskCounts['Médio']++;
-        } else if (risco === '3' || risco.includes('alto')) {
-            riskCounts['Alto']++;
-        } else if (risco === '4' || risco.includes('muito alto')) {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco !== 'null') {
-            // Apenas mostra o aviso se o risco não for N/A ou null
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
-        // Contagem para o card "Lotes em Risco" (Alto + Muito Alto)
-        // Inclui "geologico" e "hidrologico" como risco
-        if (risco === '3' || risco === '4' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
+        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
             lotesRiscoAltoMuitoAlto++;
         }
         
-        // Contagem de Lotes em APP
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
+        const dentroApp = Number(p.dentro_app || p.app || 0); 
+        if (dentroApp > 0) lotesAppCount++;
 
-        // Cálculo do Custo de Intervenção
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
-        if (!isNaN(valorCusto) && valorCusto > 0) {
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
+        if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
+
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
@@ -1120,30 +1071,3 @@ document.addEventListener('DOMContentLoaded', () => {
     populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
-// ===================== Detecção de Município por Coordenadas =====================
-/**
- * Usa a API do Nominatim (OpenStreetMap) para descobrir o município a partir de coordenadas.
- * @param {L.LatLng} latlng - As coordenadas (latitude, longitude) do ponto central.
- * @returns {Promise<string>} O nome do município ou "Não Identificado".
- */
-async function getMunicipioFromCoordinates(latlng) {
-    const { lat, lng } = latlng;
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-    console.log("Buscando município na URL:", url);
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Erro na API do Nominatim: ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log("Resposta da API Nominatim:", data);
-        
-        // A API retorna o nome da cidade em 'city', 'town', 'village', etc.
-        const municipio = data.address?.city || data.address?.town || data.address?.village || "Não Identificado";
-        return municipio;
-    } catch (error) {
-        console.error("Erro ao buscar município:", error);
-        return "Não Identificado";
-    }
-}
