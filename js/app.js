@@ -330,9 +330,8 @@ function initUpload() {
         files.forEach(file => dataTransfer.items.add(file));
         return dataTransfer.files;
     }
-
-
-    // Listener para o botão "Processar e Carregar Dados"
+    
+      // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
@@ -414,7 +413,28 @@ function initUpload() {
                 return; 
             }
         }
+        
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        
+        // **NOVA LÓGICA DE DETECÇÃO DE MUNICÍPIO**
+        // A função onEachPoligonalFeature agora será assíncrona
+        await Promise.all(newPoligonaisFeatures.map(async feature => {
+            const tempLayer = L.geoJSON(feature);
+            const center = tempLayer.getBounds().getCenter();
+            const municipio = await getMunicipioFromCoordinates(center);
 
+            // Adiciona o nome do município detectado como uma nova propriedade
+            feature.properties.municipio_detectado = municipio;
+
+            // Se a propriedade 'municipio' original não existir, preenche com o detectado
+            if (!feature.properties.municipio) {
+                feature.properties.municipio = municipio;
+            }
+        }));
+        
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
+        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
@@ -422,10 +442,6 @@ function initUpload() {
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
@@ -451,36 +467,31 @@ function initUpload() {
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
-}
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
+// Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
+    // Busca por 'grau', 'risco' ou 'status_risco' e converte para número
+    const grau = parseInt(feature.properties.grau || feature.properties.risco || feature.properties.status_risco, 10);
     let color;
 
-    // Mapeamento de risco para cores
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#2ecc71'; // Verde
+    switch (grau) {
+        case 1:
+            color = '#2ecc71'; // Verde (Baixo Risco)
             break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#f1c40f'; // Amarelo
+        case 2:
+            color = '#f1c40f'; // Amarelo (Médio Risco)
             break;
-        case '3':
-        case 'alto':
-            color = '#e67e22'; // Laranja
+        case 3:
+            color = '#e67e22'; // Laranja (Alto Risco)
             break;
-        case '4':
-        case 'muito alto':
-            color = '#c0392b'; // Vermelho
+        case 4:
+            color = '#c0392b'; // Vermelho (Muito Alto Risco)
             break;
         default:
-            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
+            color = '#3498db'; // Azul padrão (Sem Risco / N/A)
             break;
     }
 
@@ -538,13 +549,12 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        fillColor: '#006400', // Verde escuro
-        weight: 2,           // Espessura da borda
-        opacity: 1,          // Opacidade da borda
-        color: '#006400',    // Cor da borda (verde escuro)
-        dashArray: '5, 5',   // Borda tracejada (5 pixels desenhados, 5 pixels vazios)
-        fillOpacity: 0.3     // Transparência do preenchimento (0.3 = 70% transparente)
+        color: '#e74c3c', // Vermelho para APP
+        weight: 2,
+        opacity: 0.7,
+        fillOpacity: 0.2
     };
+}
 
 // Popup da camada APP
 function onEachAppFeature(feature, layer) {
@@ -670,28 +680,32 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Converte o valor de 'grau', 'risco', ou 'status_risco' para um número inteiro
-        const grau = parseInt(p.grau || p.risco || p.status_risco, 10);
+        // Pega o valor de risco de múltiplas colunas possíveis e converte para minúsculas
+        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        // **NOVA LÓGICA DE CONTAGEM DE RISCO BASEADA EM NÚMEROS**
-        switch (grau) {
-            case 1:
-                riskCounts['Baixo']++;
-                break;
-            case 2:
-                riskCounts['Médio']++;
-                break;
-            case 3:
-                riskCounts['Alto']++;
-                lotesRiscoAltoMuitoAlto++;
-                break;
-            case 4:
-                riskCounts['Muito Alto']++;
-                lotesRiscoAltoMuitoAlto++;
-                break;
-            default:
-                // Se não for um número de 1 a 4, não faz nada com a contagem de risco
-                break;
+        // **NOVA LÓGICA DE CONTAGEM DE RISCO**
+        // Primeiro, verifica se o risco é "geologico" ou "hidrologico" e os trata como risco ALTO por padrão
+        if (risco === 'geologico' || risco === 'hidrologico') {
+            riskCounts['Alto']++; // Classifica como Risco Alto
+        } 
+        // Se não for, verifica os outros valores
+        else if (risco === '1' || risco.includes('baixo')) {
+            riskCounts['Baixo']++;
+        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
+            riskCounts['Médio']++;
+        } else if (risco === '3' || risco.includes('alto')) {
+            riskCounts['Alto']++;
+        } else if (risco === '4' || risco.includes('muito alto')) {
+            riskCounts['Muito Alto']++;
+        } else if (risco !== 'n/a' && risco !== 'null') {
+            // Apenas mostra o aviso se o risco não for N/A ou null
+            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        }
+        
+        // Contagem para o card "Lotes em Risco" (Alto + Muito Alto)
+        // Inclui "geologico" e "hidrologico" como risco
+        if (risco === '3' || risco === '4' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
+            lotesRiscoAltoMuitoAlto++;
         }
         
         // Contagem de Lotes em APP
@@ -726,7 +740,6 @@ function refreshDashboard() {
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
-
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
@@ -1107,3 +1120,30 @@ document.addEventListener('DOMContentLoaded', () => {
     populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
+// ===================== Detecção de Município por Coordenadas =====================
+/**
+ * Usa a API do Nominatim (OpenStreetMap) para descobrir o município a partir de coordenadas.
+ * @param {L.LatLng} latlng - As coordenadas (latitude, longitude) do ponto central.
+ * @returns {Promise<string>} O nome do município ou "Não Identificado".
+ */
+async function getMunicipioFromCoordinates(latlng) {
+    const { lat, lng } = latlng;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+    console.log("Buscando município na URL:", url);
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Erro na API do Nominatim: ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log("Resposta da API Nominatim:", data);
+        
+        // A API retorna o nome da cidade em 'city', 'town', 'village', etc.
+        const municipio = data.address?.city || data.address?.town || data.address?.village || "Não Identificado";
+        return municipio;
+    } catch (error) {
+        console.error("Erro ao buscar município:", error);
+        return "Não Identificado";
+    }
+}
