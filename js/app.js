@@ -641,7 +641,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0; 
+    let lotesRiscoAltoMuitoAlto = 0;
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -650,42 +650,58 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
-        
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+        // Converte o valor de 'grau', 'risco', ou 'status_risco' para um número inteiro
+        const grau = parseInt(p.grau || p.risco || p.status_risco, 10);
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-            lotesRiscoAltoMuitoAlto++;
+        // **NOVA LÓGICA DE CONTAGEM DE RISCO BASEADA EM NÚMEROS**
+        switch (grau) {
+            case 1:
+                riskCounts['Baixo']++;
+                break;
+            case 2:
+                riskCounts['Médio']++;
+                break;
+            case 3:
+                riskCounts['Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            case 4:
+                riskCounts['Muito Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            default:
+                // Se não for um número de 1 a 4, não faz nada com a contagem de risco
+                break;
         }
         
-        const dentroApp = Number(p.dentro_app || p.app || 0); 
-        if (dentroApp > 0) lotesAppCount++;
+        // Contagem de Lotes em APP
+        const dentroApp = Number(p.dentro_app || p.app || 0);
+        if (dentroApp > 0) {
+            lotesAppCount++;
+        }
 
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
-        if (!isNaN(valorCusto) && valorCusto > 0) { 
+        // Cálculo do Custo de Intervenção
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
+        if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
+    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
