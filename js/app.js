@@ -31,8 +31,6 @@ function downloadText(filename, text) {
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url); // Libera o objeto URL
 }
 
@@ -123,33 +121,17 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
 
 // ===================== Simulações de IBGE e IA (para ambiente client-side) =====================
 // Estas funções substituem as chamadas ao backend Flask no ambiente de produção do GitHub Pages.
-// ===================== Detecção de Município por Coordenadas =====================
-/**
- * Usa a API do Nominatim (OpenStreetMap) para descobrir o município a partir de coordenadas.
- * @param {L.LatLng} latlng - As coordenadas (latitude, longitude) do ponto central.
- * @returns {Promise<string>} O nome do município ou "Não Identificado".
- */
-async function getMunicipioFromCoordinates(latlng) {
-    const { lat, lng } = latlng;
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-    console.log("Buscando município na URL:", url);
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Erro na API do Nominatim: ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log("Resposta da API Nominatim:", data);
-        
-        // A API retorna o nome da cidade em 'city', 'town', 'village', etc.
-        const municipio = data.address?.city || data.address?.town || data.address?.village || "Não Identificado";
-        return municipio;
-    } catch (error) {
-        console.error("Erro ao buscar município:", error);
-        return "Não Identificado";
-    }
-}
+const ibgeDataSimulado = {
+    "Conselheiro Lafaiete": {
+        municipio: "Conselheiro Lafaiete",
+        regiao: "Sudeste",
+        populacao: "131.200 (estimativa 2023)",
+        area_km2: "367.359"
+    },
+    // Adicione mais dados simulados para outros municípios ou núcleos se quiser.
+    // O GeoJSON de lotes precisa ter a propriedade 'nm_mun' ou 'municipio' para que isso funcione.
+};
 
 /** Simula a busca de dados do IBGE para um município. */
 function getSimulatedMunicipioData(nomeMunicipio) {
@@ -258,6 +240,10 @@ function initNav() {
                 console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
                 state.map.invalidateSize();
             }
+            // Garante que a tabela de lotes seja atualizada ao entrar na aba "Dados Lotes"
+            if (targetSectionId === 'dados-lotes') {
+                fillLotesTable();
+            }
         });
     });
 }
@@ -344,8 +330,8 @@ function initUpload() {
         files.forEach(file => dataTransfer.items.add(file));
         return dataTransfer.files;
     }
-
-    // Listener para o botão "Processar e Carregar Dados"
+    
+      // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
@@ -481,43 +467,6 @@ function initUpload() {
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
-        // Processa lotes e extrai núcleos
-        state.allLotes = newLotesFeatures; 
-        newLotesFeatures.forEach(f => {
-            if (f.properties && f.properties.desc_nucleo) { 
-                state.nucleusSet.add(f.properties.desc_nucleo);
-            }
-        });
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
-        L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
-
-        // Ajusta o mapa para a extensão de todos os dados carregados
-        const allLayersGroup = L.featureGroup([state.layers.lotes, state.layers.app, state.layers.poligonais]);
-        if (allLayersGroup.getLayers().length > 0) {
-            try { 
-                state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] }); 
-                console.log('Mapa ajustado para os bounds dos dados carregados.');
-            } catch (e) {
-                console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas dos seus GeoJSONs.", e);
-            }
-        } else {
-            state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
-            console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
-        }
-
-        // Atualiza UI
-        populateNucleusFilter();
-        refreshDashboard();
-        fillLotesTable(); 
-
-        uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
-        uploadStatus.className = 'status-message success';
-        console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
-    });
-}
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
