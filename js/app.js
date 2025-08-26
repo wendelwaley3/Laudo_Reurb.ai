@@ -457,25 +457,30 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para número
-    const grau = parseInt(feature.properties.grau || feature.properties.risco || feature.properties.status_risco, 10);
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
 
-    switch (grau) {
-        case 1:
-            color = '#2ecc71'; // Verde (Baixo Risco)
+    // Mapeamento de risco para cores
+    switch (risco) {
+        case '1':
+        case 'baixo':
+            color = '#2ecc71'; // Verde
             break;
-        case 2:
-            color = '#f1c40f'; // Amarelo (Médio Risco)
+        case '2':
+        case 'médio':
+        case 'medio':
+            color = '#f1c40f'; // Amarelo
             break;
-        case 3:
-            color = '#e67e22'; // Laranja (Alto Risco)
+        case '3':
+        case 'alto':
+            color = '#e67e22'; // Laranja
             break;
-        case 4:
-            color = '#c0392b'; // Vermelho (Muito Alto Risco)
+        case '4':
+        case 'muito alto':
+            color = '#c0392b'; // Vermelho
             break;
         default:
-            color = '#3498db'; // Azul padrão (Sem Risco / N/A)
+            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
             break;
     }
 
@@ -533,12 +538,13 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        color: '#e74c3c', // Vermelho para APP
-        weight: 2,
-        opacity: 0.7,
-        fillOpacity: 0.2
+        fillColor: '#006400', // Verde escuro
+        weight: 2,           // Espessura da borda
+        opacity: 1,          // Opacidade da borda
+        color: '#006400',    // Cor da borda (verde escuro)
+        dashArray: '5, 5',   // Borda tracejada (5 pixels desenhados, 5 pixels vazios)
+        fillOpacity: 0.3     // Transparência do preenchimento (0.3 = 70% transparente)
     };
-}
 
 // Popup da camada APP
 function onEachAppFeature(feature, layer) {
