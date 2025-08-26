@@ -161,7 +161,7 @@ function generateSimulatedAILaudo(promptData) {
     }
 
     laudo += `**Análise Contextual:**\n`;
-    laudo += `Baseado nos dados fornecidos e em conhecimentos gerais de REURB, a área apresenta características urbanísticas e fundiárias que demandam avaliação conforme a legislação. A infraestrutura básica e a regularidade documental são pontos cruciais para a consolidação da regularização.\n\n`;
+    laudo += `Baseado nos dados fornecidos e em conhecimentos gerais de REURB, a área apresenta características urbanísticas e fundiárias que demandam avaliação conforme a legislação. A infraestrutura básica e a regularidade documental são pontos cruciais para a consolidação da regularização'.\n\n`;
 
     laudo += `**Recomendações:**\n`;
     laudo += `1. Verificação documental aprofundada dos títulos e matrículas.\n`;
