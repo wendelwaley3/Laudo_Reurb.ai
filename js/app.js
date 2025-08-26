@@ -478,7 +478,6 @@ function initUpload() {
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
-// Estilo dos lotes baseado no risco
 function styleLote(feature) {
     // Busca por 'grau', 'risco' ou 'status_risco' e converte para número
     const grau = parseInt(feature.properties.grau || feature.properties.risco || feature.properties.status_risco, 10);
@@ -571,7 +570,7 @@ function onEachAppFeature(feature, layer) {
             popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
         }
         layer.bindPopup(popupContent);
-    }
+    };
 }
 
 // Estilo da camada Poligonal (para tabela_geral e outros)
@@ -619,7 +618,6 @@ async function buscarInfoCidade(nomeCidade) {
     alert(info);
     console.log("Dados do município simulados:", dadosSimulados);
 }
-
 
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
