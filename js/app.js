@@ -31,6 +31,8 @@ function downloadText(filename, text) {
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url); // Libera o objeto URL
 }
 
@@ -239,10 +241,6 @@ function initNav() {
             if (targetSectionId === 'dashboard' && state.map) {
                 console.log('Navegação: Dashboard ativado, invalidando tamanho do mapa.'); 
                 state.map.invalidateSize();
-            }
-            // Garante que a tabela de lotes seja atualizada ao entrar na aba "Dados Lotes"
-            if (targetSectionId === 'dados-lotes') {
-                fillLotesTable();
             }
         });
     });
@@ -457,35 +455,13 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-
-    // Mapeamento de risco para cores
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#2ecc71'; // Verde
-            break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#f1c40f'; // Amarelo
-            break;
-        case '3':
-        case 'alto':
-        case 'geologico':
-        case 'hidrologico':
-            color = '#e67e22'; // Laranja
-            break;
-        case '4':
-        case 'muito alto':
-            color = '#c0392b'; // Vermelho
-            break;
-        default:
-            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
-            break;
-    }
+    if (risco === '1' || risco.includes('baixo')) color = '#2ecc71';      
+    else if (risco === '2' || risco.includes('médio')) color = '#f1c40f'; // Amarelo
+    else if (risco === '3' || risco.includes('alto')) color = '#e67e22'; // Laranja
+    else if (risco === '4' || risco.includes('muito alto')) color = '#c0392b'; 
+    else color = '#3498db'; 
 
     return {
         fillColor: color,
@@ -496,6 +472,7 @@ function styleLote(feature) {
         fillOpacity: 0.7
     };
 }
+
 // Popup ao clicar no lote
 function onEachLoteFeature(feature, layer) {
     if (feature.properties) {
@@ -508,8 +485,8 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
-                value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo de intervenção') && typeof value === 'number') { 
+                value = formatBRL(value);
             }
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
                 value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
@@ -529,6 +506,11 @@ function onEachLoteFeature(feature, layer) {
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
                 case 'status_risco': displayKey = 'Status Risco'; break; 
+                case 'cod_area': displayKey = 'Cód. Área'; break;
+                case 'grau': displayKey = 'Grau'; break;
+                case 'qtde_lote': displayKey = 'Qtde. Lote(s)'; break;
+                case 'intervencao': displayKey = 'Intervenção'; break;
+                case 'lotes_atingidos': displayKey = 'Lotes Atingidos'; break;
             }
 
             popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
@@ -540,13 +522,12 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        fillColor: '#006400', // Verde escuro
-        weight: 2,           // Espessura da borda
-        opacity: 1,          // Opacidade da borda
-        color: '#006400',    // Cor da borda (verde escuro)
-        dashArray: '5, 5',   // Borda tracejada (5 pixels desenhados, 5 pixels vazios)
-        fillOpacity: 0.3     // Transparência do preenchimento (0.3 = 70% transparente)
+        color: '#e74c3c', // Vermelho para APP
+        weight: 2,
+        opacity: 0.7,
+        fillOpacity: 0.2
     };
+}
 
 // Popup da camada APP
 function onEachAppFeature(feature, layer) {
@@ -559,7 +540,7 @@ function onEachAppFeature(feature, layer) {
     }
 }
 
-// Estilo da camada Poligonal (para tabela_geral e outros)
+// Estilo da camada Poligonal
 function stylePoligonal(feature) {
     return {
         color: '#2ecc71', // Verde para poligonais
@@ -569,7 +550,7 @@ function stylePoligonal(feature) {
     };
 }
 
-// Popup da camada Poligonal (para tabela_geral e outros)
+// Popup da camada Poligonal
 async function onEachPoligonalFeature(feature, layer) {
     if (feature.properties) {
         const props = feature.properties;
@@ -599,7 +580,7 @@ async function buscarInfoCidade(nomeCidade) {
     info += `- Região: ${dadosSimulados.regiao}\n`;
     info += `- População Estimada: ${dadosSimulados.populacao}\n`;
     info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
-    info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
+    info += `(Estes dados são simulados. Para dados reais, um backend seria necessário.)`;
 
     alert(info);
     console.log("Dados do município simulados:", dadosSimulados);
@@ -631,20 +612,15 @@ function populateNucleusFilter() {
             }
         });
     } else {
-        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
+        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
     }
 }
 
-/** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
     if (state.currentNucleusFilter === 'all') return state.allLotes;
-    return state.allLotes.filter(f => {
-        const nuc = (f.properties?.desc_nucleo || f.properties?.nucleo || '');
-        return nuc === state.currentNucleusFilter;
-    });
+    return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
 }
 
-/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
 function zoomToFilter() {
     const feats = filteredLotes();
     if (feats.length === 0) {
@@ -653,7 +629,7 @@ function zoomToFilter() {
     }
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
     try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
-        console.warn("Não foi possível ajustar o mapa ao filtro. Verifique as coordenadas dos lotes filtrados.", e);
+        console.warn("Não foi possível ajustar o mapa ao filtro.", e);
     }
 }
 
@@ -663,7 +639,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
+    let lotesRiscoAltoMuitoAlto = 0;
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -672,35 +648,19 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Pega o valor de risco de múltiplas colunas possíveis e converte para string e minúsculas
         const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        // Contagem por nível de risco para a lista "Análise de Riscos"
-        if (risco === '1' || risco.includes('baixo')) {
-            riskCounts['Baixo']++;
-        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
-            riskCounts['Médio']++;
-        } else if (risco === '3' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
-            riskCounts['Alto']++;
-        } else if (risco === '4' || risco.includes('muito alto')) {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
+        if (risco === '1' || risco.includes('baixo')) riskCounts['Baixo']++;
+        else if (risco === '2' || risco.includes('médio')) riskCounts['Médio']++;
+        else if (risco === '3' || risco.includes('alto')) riskCounts['Alto']++;
+        else if (risco === '4' || risco.includes('muito alto')) riskCounts['Muito Alto']++;
         
-        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
-        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            lotesEmRiscoGeral++;
-        }
+        if (risco === '3' || risco === '4' || risco.includes('alto')) lotesRiscoAltoMuitoAlto++;
         
-        // Contagem de Lotes em APP
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
+        const dentroApp = Number(p.dentro_app || 0);
+        if (dentroApp > 0) lotesAppCount++;
 
-        // Cálculo do Custo de Intervenção
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
+        const valorCusto = Number(p.valor || 0);
         if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
@@ -708,9 +668,8 @@ function refreshDashboard() {
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
@@ -719,10 +678,8 @@ function refreshDashboard() {
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    // Para o resumo, usamos a mesma contagem do card
-    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral;
-    document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral;
-
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
@@ -731,76 +688,52 @@ function refreshDashboard() {
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
     const tbody = document.querySelector('#lotesDataTable tbody');
-    const feats = filteredLotes(); 
-    tbody.innerHTML = ''; 
+    const feats = filteredLotes();
+    tbody.innerHTML = '';
 
     if (feats.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro ou ajuste os filtros.</td>';
-        tbody.appendChild(tr);
+        tbody.innerHTML = '<tr><td colspan="7">Nenhum dado disponível.</td></tr>';
         return;
     }
 
     const fragment = document.createDocumentFragment();
-    feats.forEach((f, idx) => {
+    feats.forEach(f => {
         const p = f.properties || {};
         const tr = document.createElement('tr');
-
-        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`; 
-        const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
-        const tipoUso = p.tipo_uso || 'N/A';
-        const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
-        const statusRisco = p.risco || p.status_risco || 'N/A'; 
-        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; 
-        
-        const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
+        const codLote = p.cod_lote || 'N/A';
         tr.innerHTML = `
             <td>${codLote}</td>
-            <td>${descNucleo}</td>
-            <td>${tipoUso}</td>
-            <td>${areaM2}</td>
-            <td>${statusRisco}</td>
-            <td>${emApp}</td>
-            <td>${btnHtml}</td>
+            <td>${p.desc_nucleo || 'N/A'}</td>
+            <td>${p.tipo_uso || 'N/A'}</td>
+            <td>${p.area_m2 ? p.area_m2.toLocaleString('pt-BR') : 'N/A'}</td>
+            <td>${p.risco || p.status_risco || p.grau || 'N/A'}</td>
+            <td>${(Number(p.dentro_app) > 0) ? 'Sim' : 'Não'}</td>
+            <td><button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button></td>
         `;
         fragment.appendChild(tr);
     });
     tbody.appendChild(fragment);
 
-    // **CORREÇÃO AQUI**: Adiciona listeners para os botões "Ver no Mapa"
     tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const codLoteToZoom = btn.getAttribute('data-codlote');
-            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote == codLoteToZoom)); // '==' para comparar string com número se necessário
-            
+            const loteToZoom = state.allLotes.find(l => l.properties?.cod_lote == codLoteToZoom);
             if (loteToZoom) {
                 document.querySelector('nav a[data-section="dashboard"]').click();
-                const tempLayer = L.geoJSON(loteToZoom); 
-                try { 
-                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
-                } catch (e) {
-                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
+                const tempLayer = L.geoJSON(loteToZoom);
+                try { state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); } catch (e) {
+                    console.warn("Erro ao dar zoom no lote:", e);
                 }
-                state.layers.lotes.eachLayer(layer => {
-                    if (layer.feature?.properties?.cod_lote == codLoteToZoom && layer.openPopup) { // '==' para comparar string com número
-                        layer.openPopup();
+                state.layers.lotes.eachLayer(l => {
+                    if (l.feature?.properties?.cod_lote == codLoteToZoom && l.openPopup) {
+                        l.openPopup();
                     }
                 });
-            } else {
-                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
             }
         });
     });
+}
 
-    // Funcionalidade de busca na tabela
-    const searchInput = document.getElementById('lotSearch');
-    searchInput.addEventListener('input', () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-            const textContent = tr.textContent.toLowerCase();
-            tr.style.display = textContent.includes(searchTerm) ? '' : 'none';
-        });
-    });
 
     // Funcionalidade de exportar CSV da tabela
     document.getElementById('exportTableBtn').onclick = () => {
@@ -817,7 +750,6 @@ function fillLotesTable() {
         downloadText('lotes_tabela.csv', csv);
     };
 }
-
 
 // ===================== Legenda / Toggle Camadas =====================
 function initLegendToggles() {
