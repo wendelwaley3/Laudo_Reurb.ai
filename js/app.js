@@ -703,27 +703,43 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
 
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
 document.addEventListener('DOMContentLoaded', () => {
-    // ... (código existente) ...
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); // Garante que esta função seja chamada e esteja no escopo correto
 
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
         refreshDashboard();
         fillLotesTable();
-        renderLayersOnMap(filteredLotes()); // Redesenha APENAS os lotes filtrados
-        zoomToFilter(); // Aplica o zoom aos lotes filtrados
+        zoomToFilter();
     });
 
-    // ... (código generateReportBtn e exportReportBtn, sem alterações) ...
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+    });
     
     document.getElementById('nucleusFilter').addEventListener('change', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
         refreshDashboard();
         fillLotesTable();
-        renderLayersOnMap(filteredLotes()); // Redesenha APENAS os lotes filtrados
-        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+        zoomToFilter(); 
     });
 
-    // ... (restante do DOMContentLoaded, sem alterações) ...
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); // Garante que esta função seja chamada e esteja no escopo correto
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
 // ===================== Dashboard =====================
 function refreshDashboard() {
@@ -1037,44 +1053,81 @@ async function gerarRelatorioIA() {
     generatedReportContent.textContent = reportText; 
     generatedReportContent.scrollTop = 0; 
 }
-
-// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
-    initMap(); 
-    initNav(); 
-    initUpload(); 
-    initLegendToggles(); 
-    initGeneralInfoForm(); 
-
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter();
-    });
-
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
-
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
+// ===================== Filtros por Núcleo =====================
+function populateNucleusFilter() {
+    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
+    const filterSelect = document.getElementById('nucleusFilter');
+    const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); 
-    });
+    filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
+    reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
+    
+    if (state.nucleusSet.size > 0) {
+        const sortedNucleos = Array.from(state.nucleusSet).sort();
+        sortedNucleos.forEach(nucleo => {
+            if (nucleo && nucleo.trim() !== '') { 
+                const option1 = document.createElement('option'); option1.value = nucleo; option1.textContent = nucleo; filterSelect.appendChild(option1);
+                const option2 = document.createElement('option'); option2.value = nucleo; option2.textContent = nucleo; reportNucleosSelect.appendChild(option2);
+            }
+        });
+    } else {
+        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
+    }
+}
+// ===================== Formulário de Informações Gerais (Manual) =====================
+function initGeneralInfoForm() {
+    const saveButton = document.getElementById('saveGeneralInfoBtn');
+    const statusMessage = document.getElementById('generalInfoStatus');
 
-    document.getElementById('dashboard').classList.add('active');
-    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    refreshDashboard(); 
-    fillLotesTable(); 
-    populateNucleusFilter(); 
-    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
-});
+    saveButton.addEventListener('click', () => {
+        const getRadioValue = (name) => {
+            const radios = document.getElementsByName(name);
+            for (let i = 0; i < radios.length; i++) {
+                if (radios[i].checked) {
+                    return radios[i].value;
+                }
+            }
+            return ''; 
+        };
+
+        state.generalProjectInfo = {
+            ucConservacao: getRadioValue('ucConservacao'),
+            protecaoMananciais: getRadioValue('protecaoMananciais'),
+            tipoAbastecimento: document.getElementById('tipoAbastecimento').value.trim(),
+            responsavelAbastecimento: document.getElementById('responsavelAbastecimento').value.trim(),
+            tipoColetaEsgoto: document.getElementById('tipoColetaEsgoto').value.trim(),
+            responsavelColetaEsgoto: document.getElementById('responsavelColetaEsgoto').value.trim(),
+            sistemaDrenagem: getRadioValue('sistemaDrenagem'),
+            drenagemInadequada: getRadioValue('drenagemInadequada'),
+            logradourosIdentificados: getRadioValue('logradourosIdentificados'),
+            
+            linhaTransmissao: getRadioValue('linhaTransmissao'),
+            minerodutoGasoduto: getRadioValue('minerodutoGasoduto'),
+            linhaFerrea: getRadioValue('linhaFerrea'),
+            aeroporto: getRadioValue('aeroporto'),
+            limitacoesOutras: getRadioValue('limitacoesOutras'),
+            processoMP: getRadioValue('processoMP'),
+            processosJudiciais: getRadioValue('processosJudiciais'),
+            comarcasCRI: document.getElementById('comarcasCRI').value.trim(),
+            
+            titularidadeArea: getRadioValue('titularidadeArea'),
+            terraLegal: getRadioValue('terraLegal'),
+            instrumentoJuridico: document.getElementById('instrumentoJuridico').value.trim(),
+            legislacaoReurb: document.getElementById('legislacaoReurb').value.trim(),
+            legislacaoAmbiental: getRadioValue('legislacaoAmbiental'),
+            planoDiretor: getRadioValue('planoDiretor'),
+            zoneamento: getRadioValue('zoneamento'),
+            municipioOriginal: document.getElementById('municipioOriginal').value.trim(),
+            matriculasOrigem: document.getElementById('matriculasOrigem').value.trim(),
+            matriculasIdentificadas: document.getElementById('matriculasIdentificadas').value.trim(),
+
+            adequacaoDesconformidades: getRadioValue('adequacaoDesconformidades'),
+            obrasInfraestrutura: getRadioValue('obrasInfraestrutura'),
+            medidasCompensatorias: getRadioValue('medidasCompensatorias')
+        };
+
+        statusMessage.textContent = 'Informações gerais salvas com sucesso (localmente)!';
+        statusMessage.className = 'status-message success';
+        console.log('Informações Gerais Salvas:', state.generalProjectInfo); 
+    });
+}
