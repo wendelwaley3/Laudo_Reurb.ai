@@ -62,6 +62,11 @@
                     <span>estimativa total</span>
                 </div>
             </div>
+            
+            <!-- NOVO CAMPO: MUNICÍPIO PRINCIPAL NO DASHBOARD -->
+            <div style="margin-top: 20px; text-align: center;">
+                <h3>Município Principal: <span id="mainMunicipioDisplay">N/A</span></h3>
+            </div>
 
             <h2>Visualização Geoespacial</h2>
             <div id="mapid"></div>
@@ -397,16 +402,16 @@
                             <li>Para o Dashboard e Relatórios funcionarem, o arquivo GeoJSON principal dos lotes (que contiver "lotes" no nome) deve ter as seguintes propriedades (entre outras, conforme as suas tabelas):
                                 <ul>
                                     <li><code>desc_nucleo</code>: Nome do núcleo (para filtros).</li>
-                                    <li><code>risco</code>: Status do risco (ex: "Baixo", "Médio", "Alto", "Muito Alto").</li>
-                                    <li><code>dentro_app</code>: Indicador de se o lote está em APP (número >0 para sim, 0 ou N/A para não).</li>
-                                    <li><code>cod_lote</code>: Código identificador do lote.</li>
+                                    <li><code>risco</code> ou <code>status_risco</code> ou <code>grau</code>: Status do risco (ex: "Baixo", "Médio", "Alto", "Muito Alto" ou "1","2","3","4", "geologico", "hidrologico").</li>
+                                    <li><code>dentro_app</code> ou <code>app</code>: Indicador de se o lote está em APP (número >0 para sim, 0 ou N/A para não).</li>
+                                    <li><code>cod_lote</code> ou <code>codigo</code>: Código identificador do lote.</li>
                                     <li><code>area_m2</code>: Área do lote em metros quadrados.</li>
-                                    <li><code>valor</code>: Custo de intervenção (se disponível por lote).</li>
+                                    <li><code>valor</code> ou <code>custo_intervencao</code>: Custo de intervenção (se disponível por lote).</li>
                                     <li><code>municipio</code> ou <code>nm_mun</code>: Nome do município (para a camada de poligonais e informações IBGE).</li>
                                 </ul>
                             </li>
                             <li>Arquivos com "app" no nome serão tratados como Áreas de Preservação Permanente.</li>
-                            <li>Outros arquivos GeoJSON (como "tabela_geral" no seu caso) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
+                            <li>Outros arquivos GeoJSON (como "tabela_geral" ou poligonais de infraestrutura) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
                         </ul>
                     </p>
                 </li>
@@ -414,7 +419,7 @@
                 <li><strong>Processar e Carregar:</strong> Após selecionar os arquivos GeoJSON, clique em "Processar e Carregar Dados". O aplicativo irá ler, processar e exibir suas camadas no mapa.</li>
                 <li><strong>Dashboard:</strong> A aba "Dashboard" exibe um resumo estatístico dos seus dados, como total de lotes, lotes em risco, lotes em APP, e uma estimativa de custo. Use os filtros para visualizar dados de núcleos específicos.</li>
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
-                <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
+                <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados, incluindo custos mínimo e máximo de intervenção.</li>
                 <li><strong>Dados Lotes:</strong> A nova aba "Dados Lotes" lista os lotes em uma tabela detalhada com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
                 <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado (com dados IBGE/IA simulados).</li>
                 <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
