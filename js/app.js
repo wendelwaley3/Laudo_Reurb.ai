@@ -212,6 +212,40 @@ function zoomToFilter() {
         state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver lotes
         return;
     }
+/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
+function zoomToFilter() {
+    console.log(`zoomToFilter: Aplicando zoom para o núcleo: ${state.currentNucleusFilter}`);
+    const feats = filteredLotes(); // Pega os lotes já filtrados
+
+    if (feats.length === 0) {
+        console.warn('zoomToFilter: Nenhum lote para o filtro, centralizando no Brasil.');
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver lotes
+        return;
+    }
+
+    // Cria um FeatureGroup temporário APENAS com os lotes filtrados para calcular os bounds
+    const filteredLotesGroup = L.featureGroup();
+    L.geoJSON({ type: 'FeatureCollection', features: feats }).addTo(filteredLotesGroup);
+
+    if (filteredLotesGroup.getLayers().length > 0) {
+        try {
+            const bounds = filteredLotesGroup.getBounds();
+            if (bounds.isValid()) {
+                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
+                console.log('zoomToFilter: Mapa ajustado para os bounds do núcleo filtrado:', bounds);
+            } else {
+                console.warn("zoomToFilter: Bounds do núcleo filtrado inválidos. Verifique as coordenadas dos lotes neste núcleo.");
+                state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
+            }
+        } catch (e) {
+            console.error("zoomToFilter: Erro ao ajustar o mapa aos bounds do filtro.", e);
+            state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
+        }
+    } else {
+        console.warn('zoomToFilter: Nenhuma camada válida no grupo filtrado para ajuste de zoom.');
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados válidos
+    }
+}
 
     // Cria um FeatureGroup temporário APENAS com os lotes filtrados
     const filteredLotesGroup = L.featureGroup();
