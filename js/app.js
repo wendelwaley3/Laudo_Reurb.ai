@@ -131,7 +131,6 @@ function generateSimulatedAILaudo(promptData) {
     return laudo;
 }
 
-
 // ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
     console.log('initMap: Iniciando mapa Leaflet...'); 
@@ -153,14 +152,20 @@ function initMap() {
     L.control.layers(baseMaps).addTo(state.map); 
     console.log('initMap: Controle de camadas base adicionado.'); 
 
-    state.layers.lotes = L.featureGroup().addTo(state.map);
-    state.layers.app = L.featureGroup().addTo(state.map); 
-    state.layers.poligonais = L.featureGroup().addTo(state.map); 
-    state.layers.areasRisco = L.featureGroup().addTo(state.map); // NOVO: Adiciona a camada de áreas de risco
+    // INICIALIZA OS FEATUREGROUPS MAS NÃO OS ADICIONA AO MAPA AQUI.
+    // ELES SERÃO ADICIONADOS POR renderLayersOnMap() OU PELA LEGENDA.
+    state.layers.lotes = L.featureGroup();
+    state.layers.app = L.featureGroup(); 
+    state.layers.poligonais = L.featureGroup(); 
+    state.layers.areasRisco = L.featureGroup(); 
 
-    state.map.removeLayer(state.layers.app);
-    state.map.removeLayer(state.layers.poligonais);
-    state.map.removeLayer(state.layers.areasRisco); // NOVO: Remove áreas de risco por padrão
+    // Adiciona ao mapa os FeatureGroups que deveriam estar visíveis por padrão, conforme os checkboxes
+    // (Apenas lotes é checked por padrão no HTML)
+    document.getElementById('toggleLotes').checked = true; // Assume que o HTML tem este padrão
+    state.layers.lotes.addTo(state.map); 
+
+    // As outras camadas (APP, Poligonais, Áreas de Risco) não são adicionadas aqui,
+    // pois os checkboxes estão desmarcados por padrão no HTML.
 
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
@@ -327,15 +332,15 @@ function initUpload() {
     if (utmZoneInput) utmZoneInput.addEventListener('input', () => { state.utmOptions.zone = Number(utmZoneInput.value) || 23; console.log(`UTM Zone set to: ${state.utmOptions.zone}`); });
     if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'Norte'}`); });
 
-    // GARANTE QUE O BOTÃO VISÍVEL ATIVE O INPUT OCULTO
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
             fileInput.click();
         });
+    } else {
+        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
     }
 
-    // ATUALIZA A LISTA DE ARQUIVOS EXIBIDA QUANDO ARQUIVOS SÃO SELECIONADOS OU DROPPADOS
     fileInput.addEventListener('change', (e) => {
         console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
         const selectedFilesArray = Array.from(e.target.files);
@@ -349,22 +354,17 @@ function initUpload() {
         }
     });
 
-    // Lógica para ARRASTAR E SOLTAR arquivos
     dragDropArea.addEventListener('dragover', (e) => { e.preventDefault(); dragDropArea.classList.add('dragging'); });
     dragDropArea.addEventListener('dragleave', () => { dragDropArea.classList.remove('dragging'); });
     dragDropArea.addEventListener('drop', (e) => {
         e.preventDefault(); dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.geojson') || f.name.endsWith('.json'));
-        // Cria uma nova FileList para atribuir ao input
         const dataTransfer = new DataTransfer();
         droppedFiles.forEach(file => dataTransfer.items.add(file));
         fileInput.files = dataTransfer.files;
-        fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista exibida
+        fileInput.dispatchEvent(new Event('change')); 
     });
 
-    // =========================================================
-    // LISTENER PRINCIPAL DO BOTÃO "PROCESSAR E CARREGAR DADOS"
-    // =========================================================
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
@@ -377,7 +377,7 @@ function initUpload() {
         state.layers.lotes.clearLayers(); 
         state.layers.app.clearLayers(); 
         state.layers.poligonais.clearLayers(); 
-        state.layers.areasRisco.clearLayers(); // NOVO: Limpa áreas de risco
+        state.layers.areasRisco.clearLayers(); 
         state.allLotes = []; 
         state.allAPPGeoJSON.features = []; 
         state.allPoligonaisGeoJSON.features = []; 
@@ -393,10 +393,24 @@ function initUpload() {
                 const fileContent = await new Promise((resolve, reject) => { reader.onload = (e) => resolve(e.target.result); reader.onerror = (e) => reject(e); reader.readAsText(file); });
                 let geojsonData = JSON.parse(fileContent);
 
-                if (state.utmOptions.useUtm) {
-                    try { geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); console.log(`Reprojeção de ${file.name} concluída.`); } 
-                    catch (e) { console.error(`Falha na reprojeção de ${file.name}:`, e); uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}.`; uploadStatus.className = 'status-message error'; return; }
+                // **REPROJEÇÃO UTM SE O CHECKBOX ESTIVER MARCADO E OS CAMPOS PREENCHIDOS**
+                if (state.utmOptions.useUtm && state.utmOptions.zone && (state.utmOptions.south !== undefined)) {
+                    try { 
+                        console.log(`Reprojetando ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
+                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); 
+                        console.log(`Reprojeção de ${file.name} concluída.`); 
+                    } catch (e) { 
+                        console.error(`Falha na reprojeção de ${file.name}:`, e); 
+                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`; 
+                        uploadStatus.className = 'status-message error'; 
+                        // Não retorna aqui, tenta processar os próximos arquivos mesmo com erro de reprojeção em um.
+                        // O arquivo com erro pode ser ignorado ou marcado. Por simplicidade, vamos ignorá-lo neste laço.
+                        continue; 
+                    }
+                } else if (state.utmOptions.useUtm) {
+                     console.warn(`Reprojeção UTM ativada, mas zona ou hemisfério não configurados. Pulando reprojeção para ${file.name}.`);
                 }
+
 
                 if (!geojsonData.type || !geojsonData.features) throw new Error('Arquivo GeoJSON inválido');
                 if (geojsonData.type !== 'FeatureCollection') console.warn(`Arquivo ${file.name} não é um FeatureCollection`);
@@ -404,7 +418,6 @@ function initUpload() {
                 const fileNameLower = file.name.toLowerCase();
                 if (fileNameLower.includes('lote') && !fileNameLower.includes('risco')) { 
                     newLotesFeatures.push(...geojsonData.features);
-                    // Popula o nucleusSet aqui mesmo
                     geojsonData.features.forEach(f => { if (f.properties && f.properties.desc_nucleo) state.nucleusSet.add(f.properties.desc_nucleo); });
                 } else if (fileNameLower.includes('area de risco') || fileNameLower.includes('risco')) { 
                     newAreasRiscoFeatures.push(...geojsonData.features);
@@ -417,29 +430,24 @@ function initUpload() {
                 console.log(`Arquivo ${file.name} categorizado.`); 
 
             } catch (error) { 
-                console.error(`Erro fatal ao carregar ou parsear ${file.name}:`, error); 
-                uploadStatus.textContent = `Erro fatal ao processar ${file.name}. Detalhes: ${error.message}`; 
+                console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
+                uploadStatus.textContent = `Erro ao processar ${file.name}. Detalhes: ${error.message}`; 
                 uploadStatus.className = 'status-message error'; 
-                // Zera tudo em caso de erro fatal
-                state.layers.lotes.clearLayers(); state.layers.app.clearLayers(); state.layers.poligonais.clearLayers(); state.layers.areasRisco.clearLayers();
-                state.allLotes = []; state.allAPPGeoJSON.features = []; state.allPoligonaisGeoJSON.features = []; state.allAreasRiscoGeoJSON.features = []; state.nucleusSet.clear();
-                
-                // Reinicia a UI com dados vazios
-                populateNucleusFilter(); refreshDashboard(); fillLotesTable();
-                
-                return; // Interrompe o processo
+                // Continua o laço para tentar processar outros arquivos mesmo se um falhar
+                continue;
             }
         }
 
-        // Armazena as features globais (antes de adicionar às camadas do Leaflet)
+        // Armazena as features globais no estado
         state.allLotes = newLotesFeatures; 
         state.allAPPGeoJSON.features = newAPPFeatures;
         state.allPoligonaisGeoJSON.features = newPoligonaisFeatures;
         state.allAreasRiscoGeoJSON.features = newAreasRiscoFeatures;
         
-        renderLayersOnMap(); // Chamar renderLayersOnMap SEM ARGUMENTOS para ele usar state.allLotes
+        // Renderiza TUDO no mapa, chamando a função renderLayersOnMap (ela usará os dados de state)
+        renderLayersOnMap(); 
 
-        // Atualiza a UI após o carregamento e renderização
+        // ATUALIZA A UI APÓS O CARREGAMENTO E RENDERIZAÇÃO
         populateNucleusFilter();
         refreshDashboard();
         fillLotesTable(); 
@@ -594,7 +602,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
     state.layers.lotes.clearLayers();
     state.layers.app.clearLayers();
     state.layers.poligonais.clearLayers();
-    state.layers.areasRisco.clearLayers(); // NOVO: Limpa áreas de risco
+    state.layers.areasRisco.clearLayers();
 
     // Adiciona Lotes (filtrados ou todos)
     if (featuresToDisplay.length > 0) {
@@ -623,31 +631,30 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${state.allPoligonaisGeoJSON.features.length} feições de Poligonais adicionadas à camada.`);
     }
 
-    // NOVO: Adiciona Áreas de Risco (com estilo próprio)
+    // Adiciona Áreas de Risco (com estilo próprio)
     if (state.allAreasRiscoGeoJSON.features.length > 0) {
         L.geoJSON(state.allAreasRiscoGeoJSON.features, {
-            onEachFeature: onEachAreaRiscoFeature, // NOVA função para popup de área de risco
-            style: styleAreaRisco // NOVA função para estilo de área de risco
+            onEachFeature: onEachAreaRiscoFeature, 
+            style: styleAreaRisco 
         }).addTo(state.layers.areasRisco);
         console.log(`renderLayersOnMap: ${state.allAreasRiscoGeoJSON.features.length} feições de Áreas de Risco adicionadas à camada.`);
     }
 
-    // Ajusta o zoom do mapa para a extensão dos dados carregados
-    const allVisibleLayersGroup = L.featureGroup([
-        state.layers.lotes,
-        document.getElementById('toggleAPP')?.checked ? state.layers.app : null,
-        document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null,
-        document.getElementById('toggleAreasRisco')?.checked ? state.layers.areasRisco : null // NOVO: Inclui áreas de risco
-    ].filter(Boolean)); // Remove nulos
+    const allLayersGroupForBounds = L.featureGroup([
+        state.layers.lotes, 
+        state.layers.app, 
+        state.layers.poligonais, 
+        state.layers.areasRisco
+    ].filter(fg => fg && fg.getLayers().length > 0)); // Filtra FeatureGroups não vazios e com camadas
 
-    if (allVisibleLayersGroup.getLayers().length > 0) {
+    if (allLayersGroupForBounds.getLayers().length > 0) {
         try {
-            const bounds = allVisibleLayersGroup.getBounds();
+            const bounds = allLayersGroupForBounds.getBounds();
             if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] });
+                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
                 console.log('Mapa ajustado para os bounds dos dados carregados:', bounds);
             } else {
-                console.warn("Bounds inválidos. O mapa não será ajustado. Verifique as coordenadas dos seus GeoJSONs.");
+                console.warn("Bounds inválidos (possivelmente coordenadas problemáticas). O mapa não será ajustado automaticamente. Verifique as coordenadas dos seus GeoJSONs.");
                 state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil como fallback
             }
         } catch (e) {
@@ -658,19 +665,6 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
         console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
     }
-}
-/** Filtra os lotes com base no núcleo selecionado. */
-function filteredLotes() {
-    if (state.currentNucleusFilter === 'all') return state.allLotes;
-    return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
-}
-
-/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
-function zoomToFilter() {
-    const feats = filteredLotes();
-    if (feats.length === 0) { state.map.setView([-15.7801, -47.9292], 5); return; }
-    const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
-    try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) { console.warn("Não foi possível ajustar o mapa ao filtro.", e); }
 }
 
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
