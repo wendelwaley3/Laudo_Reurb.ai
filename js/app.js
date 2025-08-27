@@ -12,7 +12,7 @@ const state = {
     currentNucleusFilter: 'all', // Núcleo selecionado no filtro do Dashboard
     utmOptions: { useUtm: false, zone: 23, south: true }, // Configurações para reprojeção UTM client-side
     generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
-    lastReportData: null,   // Armazena os dados do último relatório gerado
+    lastReportText: '',     // Último relatório gerado (para exportação)
 };
 
 // ===================== Utilidades Diversas =====================
@@ -21,6 +21,40 @@ const state = {
 function formatBRL(n) {
     const v = Number(n || 0);
     return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Inicia o download de um arquivo de texto. */
+function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    URL.revokeObjectURL(url); // Libera o objeto URL
+}
+
+/** Calcula a área de uma feature usando Turf.js. */
+function featureAreaM2(feature) {
+    try {
+        // Turf.area retorna em metros quadrados se a projeção for WGS84
+        return turf.area(feature);
+    } catch (e) {
+        console.warn('Erro ao calcular área com Turf.js:', e);
+        return 0;
+    }
+}
+
+/** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
+function ensurePolygonClosed(coords) {
+    if (!coords || coords.length === 0) return coords;
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    // Se o primeiro e o último ponto não são iguais, adiciona o primeiro no final
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+        coords.push(first);
+    }
+    return coords;
 }
 
 // ===================== Reprojeção UTM → WGS84 (client-side com proj4js) =====================
@@ -111,6 +145,33 @@ function getSimulatedMunicipioData(nomeMunicipio) {
         populacao: "N/D (Dados simulados)",
         area_km2: "N/D (Dados simulados)"
     };
+}
+
+/** Simula a geração de um laudo com IA no navegador. */
+function generateSimulatedAILaudo(promptData) {
+    let laudo = `\n[RELATÓRIO GERADO POR IA - SIMULADO]\n\n`;
+    laudo += `**Tema Principal:** ${promptData.tema}\n`;
+    laudo += `**Detalhes da Análise:** ${promptData.detalhes}\n\n`;
+
+    if (promptData.dados_ibge && promptData.dados_ibge.municipio) {
+        laudo += `--- Dados IBGE para ${promptData.dados_ibge.municipio} ---\n`;
+        laudo += `Região: ${promptData.dados_ibge.regiao}\n`;
+        laudo += `População Estimada: ${promptData.dados_ibge.populacao}\n`;
+        laudo += `Área Territorial: ${promptData.dados_ibge.area_km2} km²\n\n`;
+    }
+
+    laudo += `**Análise Contextual:**\n`;
+    laudo += `Baseado nos dados fornecidos e em conhecimentos gerais de REURB, a área apresenta características urbanísticas e fundiárias que demandam avaliação conforme a legislação. A infraestrutura básica e a regularidade documental são pontos cruciais para a consolidação da regularização.\n\n`;
+
+    laudo += `**Recomendações:**\n`;
+    laudo += `1. Verificação documental aprofundada dos títulos e matrículas.\n`;
+    laudo += `2. Levantamento topográfico e cadastral detalhado para delimitação precisa dos lotes.\n`;
+    laudo += `3. Análise ambiental para identificar e mitigar impactos, especialmente em áreas de preservação.\n`;
+    laudo += `4. Planejamento de obras de infraestrutura quando necessário.\n\n`;
+
+    laudo += `Este laudo é uma simulação e deve ser complementado por uma análise técnica e jurídica completa realizada por profissionais habilitados.\n\n`;
+
+    return laudo;
 }
 
 
@@ -396,13 +457,32 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
-    else color = '#3498db'; 
+
+    // Mapeamento de risco para cores
+    switch (risco) {
+        case '1':
+        case 'baixo':
+            color = '#2ecc71'; // Verde
+            break;
+        case '2':
+        case 'médio':
+        case 'medio':
+            color = '#f1c40f'; // Amarelo
+            break;
+        case '3':
+        case 'alto':
+            color = '#e67e22'; // Laranja
+            break;
+        case '4':
+        case 'muito alto':
+            color = '#c0392b'; // Vermelho
+            break;
+        default:
+            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
+            break;
+    }
 
     return {
         fillColor: color,
@@ -458,12 +538,13 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        color: '#e74c3c', // Vermelho para APP
-        weight: 2,
-        opacity: 0.7,
-        fillOpacity: 0.2
+        fillColor: '#006400', // Verde escuro
+        weight: 2,           // Espessura da borda
+        opacity: 1,          // Opacidade da borda
+        color: '#006400',    // Cor da borda (verde escuro)
+        dashArray: '5, 5',   // Borda tracejada (5 pixels desenhados, 5 pixels vazios)
+        fillOpacity: 0.3     // Transparência do preenchimento (0.3 = 70% transparente)
     };
-}
 
 // Popup da camada APP
 function onEachAppFeature(feature, layer) {
@@ -580,7 +661,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0; 
+    let lotesRiscoAltoMuitoAlto = 0;
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -589,42 +670,58 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
-        
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+        // Converte o valor de 'grau', 'risco', ou 'status_risco' para um número inteiro
+        const grau = parseInt(p.grau || p.risco || p.status_risco, 10);
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-            lotesRiscoAltoMuitoAlto++;
+        // **NOVA LÓGICA DE CONTAGEM DE RISCO BASEADA EM NÚMEROS**
+        switch (grau) {
+            case 1:
+                riskCounts['Baixo']++;
+                break;
+            case 2:
+                riskCounts['Médio']++;
+                break;
+            case 3:
+                riskCounts['Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            case 4:
+                riskCounts['Muito Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            default:
+                // Se não for um número de 1 a 4, não faz nada com a contagem de risco
+                break;
         }
         
-        const dentroApp = Number(p.dentro_app || p.app || 0); 
-        if (dentroApp > 0) lotesAppCount++;
+        // Contagem de Lotes em APP
+        const dentroApp = Number(p.dentro_app || p.app || 0);
+        if (dentroApp > 0) {
+            lotesAppCount++;
+        }
 
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
-        if (!isNaN(valorCusto) && valorCusto > 0) { 
+        // Cálculo do Custo de Intervenção
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
+        if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
+    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
