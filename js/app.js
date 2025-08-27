@@ -205,16 +205,6 @@ function filteredLotes() {
 /** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
 function zoomToFilter() {
     console.log(`zoomToFilter: Aplicando zoom para o núcleo: ${state.currentNucleusFilter}`);
-    const feats = filteredLotes();
-
-    if (feats.length === 0) {
-        console.warn('zoomToFilter: Nenhum lote para o filtro, centralizando no Brasil.');
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver lotes
-        return;
-    }
-/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
-function zoomToFilter() {
-    console.log(`zoomToFilter: Aplicando zoom para o núcleo: ${state.currentNucleusFilter}`);
     const feats = filteredLotes(); // Pega os lotes já filtrados
 
     if (feats.length === 0) {
@@ -354,7 +344,6 @@ function initUpload() {
     if (!fileInput) console.error('initUpload ERRO: #geojsonFileInput não encontrado!');
     if (!selectFilesVisibleButton) console.error('initUpload ERRO: #selectFilesVisibleButton não encontrado!');
 
-    // Listener para o checkbox UTM
     if (useUtmCheckbox) {
         useUtmCheckbox.addEventListener('change', () => {
             state.utmOptions.useUtm = useUtmCheckbox.checked;
@@ -362,7 +351,6 @@ function initUpload() {
             console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
         });
     }
-    // Listeners para os campos de configuração UTM
     if (utmZoneInput) utmZoneInput.addEventListener('input', () => { state.utmOptions.zone = Number(utmZoneInput.value) || 23; console.log(`UTM Zone set to: ${state.utmOptions.zone}`); });
     if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'Norte'}`); });
 
@@ -434,11 +422,9 @@ function initUpload() {
                         geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); 
                         console.log(`Reprojeção de ${file.name} concluída.`); 
                     } catch (e) { 
-                        console.error(`Falha na reprojeção de ${file.name}:`, e); 
+                        console.error(`Falha na reprojeção de ${file.name}:`, e, geojsonData); // Adicionado geojsonData para debug
                         uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`; 
                         uploadStatus.className = 'status-message error'; 
-                        // Não retorna aqui, tenta processar os próximos arquivos mesmo com erro de reprojeção em um.
-                        // O arquivo com erro pode ser ignorado ou marcado. Por simplicidade, vamos ignorá-lo neste laço.
                         continue; 
                     }
                 } else if (state.utmOptions.useUtm) {
@@ -467,7 +453,6 @@ function initUpload() {
                 console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
                 uploadStatus.textContent = `Erro ao processar ${file.name}. Detalhes: ${error.message}`; 
                 uploadStatus.className = 'status-message error'; 
-                // Continua o laço para tentar processar outros arquivos mesmo se um falhar
                 continue;
             }
         }
@@ -674,6 +659,9 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${state.allAreasRiscoGeoJSON.features.length} feições de Áreas de Risco adicionadas à camada.`);
     }
 
+
+    // Ajusta o zoom do mapa para a extensão dos dados carregados
+    // AQUI: Usamos os FeatureGroups do state.layers para o fitBounds
     const allLayersGroupForBounds = L.featureGroup([
         state.layers.lotes, 
         state.layers.app, 
@@ -700,7 +688,6 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
     }
 }
-
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
@@ -750,15 +737,14 @@ function refreshDashboard() {
     let lotesEmRiscoGeral = 0; 
     let lotesAppCount = 0;
     let custoTotal = 0;
-    let custoMin = Infinity; // Inicializa com Infinity
-    let custoMax = -Infinity; // Inicializa com -Infinity
+    let custoMin = Infinity; 
+    let custoMax = -Infinity; 
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     feats.forEach(f => {
         const p = f.properties || {};
         const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        // Lógica de contagem de risco (ajustada para ser mais abrangente)
         if (risco.includes('baixo') || risco === '1') {
             riskCounts['Baixo']++;
         } else if (risco.includes('médio') || risco.includes('medio') || risco === '2') {
@@ -771,18 +757,15 @@ function refreshDashboard() {
             console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
         }
         
-        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo' ou 'N/A')
         if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco.trim() !== '') {
             lotesEmRiscoGeral++;
         }
         
-        // Contagem de Lotes em APP
         const dentroApp = Number(p.dentro_app || p.app || 0);
         if (dentroApp > 0) {
             lotesAppCount++;
         }
 
-        // Cálculo do Custo de Intervenção
         const valorCusto = Number(p.valor || p.custo_intervencao || 0);
         if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
@@ -791,7 +774,6 @@ function refreshDashboard() {
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
@@ -802,28 +784,12 @@ function refreshDashboard() {
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    // Para o resumo, usamos a mesma contagem do card
     document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral; 
     document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral; 
 
-    // Atualiza os custos mínimo e máximo, verificando se foram encontrados valores válidos
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
-
-    // Exibir Município Principal no Dashboard
-    let mainMunicipio = 'N/A';
-    // Prioriza o município do primeiro lote
-    if (state.allLotes.length > 0 && state.allLotes[0].properties) {
-        mainMunicipio = state.allLotes[0].properties.nm_mun || state.allLotes[0].properties.municipio || 'N/A';
-    } 
-    // Se não houver lotes, tenta pegar do primeiro poligonal (se existir)
-    else if (state.allPoligonaisGeoJSON.features.length > 0) { 
-        const firstPoligonalProps = state.allPoligonaisGeoJSON.features[0].properties;
-        if (firstPoligonalProps) {
-            mainMunicipio = firstPoligonalProps.municipio || firstPoligonalProps.nm_mun || 'N/A';
-        }
-    }
-    document.getElementById('mainMunicipioDisplay').textContent = mainMunicipio;
+.getElementById('mainMunicipioDisplay').textContent = mainMunicipio;
 }
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
