@@ -473,47 +473,57 @@ function initLegendToggles() {
     toggle('toggleAPP', state.layers.app);
     toggle('toggleAreasRisco', state.layers.areasRisco); // NOVO: Adiciona toggle para áreas de risco
 }
-// ===================== Estilos e Popups das Camadas Geoespaciais =====================
-function styleLote(feature) {
+// ===================== Estilos e Popups para Áreas de Risco =====================
+function styleAreaRisco(feature) {
+    // Busca por 'grau', 'risco' ou 'status_risco' da feature da área de risco
     const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
     let color;
+    let borderColor = 'black'; // Borda padrão
+    let dashArray = '5,5'; // Linha tracejada padrão
 
-    // Mapeamento de risco para cores
     switch (risco) {
         case '1':
         case 'baixo':
-            color = '#2ecc71'; // Verde
+            color = '#8BC34A'; // Verde claro para preenchimento
+            borderColor = '#558B2F'; // Verde escuro para borda
             break;
         case '2':
         case 'médio':
         case 'medio':
-            color = '#f1c40f'; // Amarelo
+            color = '#FFC107'; // Amarelo para preenchimento
+            borderColor = '#FFA000'; // Laranja para borda
             break;
         case '3':
         case 'alto':
         case 'geologico':
-        case 'hidrologico': // Incluindo 'geologico' e 'hidrologico' como Alto Risco
-            color = '#e67e22'; // Laranja
+        case 'hidrologico':
+            color = '#FF5722'; // Laranja avermelhado para preenchimento
+            borderColor = '#D84315'; // Vermelho para borda
+            dashArray = '10,5'; // Linha mais destacada
             break;
         case '4':
         case 'muito alto':
-            color = '#c0392b'; // Vermelho
+            color = '#D32F2F'; // Vermelho escuro para preenchimento
+            borderColor = '#B71C1C'; // Vermelho intenso para borda
+            dashArray = '1, 5'; // Linha pontilhada (alerta)
             break;
         default:
-            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
+            color = '#90A4AE'; // Cinza padrão para preenchimento
+            borderColor = '#546E7A'; // Cinza escuro para borda
             break;
     }
 
     return {
         fillColor: color,
-        weight: 1,
-        opacity: 1,
-        color: 'white', 
-        dashArray: '3', 
-        fillOpacity: 0.7
+        weight: 2, // Borda um pouco mais grossa para destacar áreas
+        opacity: 0.8,
+        color: borderColor, 
+        dashArray: dashArray, 
+        fillOpacity: 0.4 // Transparência para ver o mapa base por baixo
     };
 }
 
+// ... (onEachAreaRiscoFeature e o restante do código permanecem como na última entrega) ...
 function onEachLoteFeature(feature, layer) {
     if (feature.properties) {
         let popupContent = "<h3>Detalhes do Lote:</h3>";
@@ -664,31 +674,29 @@ function zoomToFilter() {
 }
 
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-function initMainButtons() {
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (código existente) ...
+
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
         refreshDashboard();
         fillLotesTable();
-        zoomToFilter();
+        renderLayersOnMap(filteredLotes()); // Redesenha APENAS os lotes filtrados
+        zoomToFilter(); // Aplica o zoom aos lotes filtrados
     });
 
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
-
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
+    // ... (código generateReportBtn e exportReportBtn, sem alterações) ...
     
     document.getElementById('nucleusFilter').addEventListener('change', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
         refreshDashboard();
         fillLotesTable();
-        zoomToFilter(); 
+        renderLayersOnMap(filteredLotes()); // Redesenha APENAS os lotes filtrados
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
     });
-}
+
+    // ... (restante do DOMContentLoaded, sem alterações) ...
+});
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
