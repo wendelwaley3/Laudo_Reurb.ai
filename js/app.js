@@ -337,10 +337,9 @@ function initUpload() {
         return dataTransfer.files;
     }
 
-
-    // Listener para o botão "Processar e Carregar Dados"
+       // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
-        console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
+        console.log('Evento: Botão "Processar e Carregar Dados" clicado.');
         const filesToProcess = Array.from(fileInput.files || []);
 
         if (filesToProcess.length === 0) {
@@ -359,34 +358,63 @@ function initUpload() {
         state.allLotes = [];
         state.nucleusSet.clear();
 
-        const newLotesFeatures = []; // Coleta todos os lotes de todos os arquivos 'lotes'
-        const newAPPFeatures = [];   // Coleta todas as APPs de todos os arquivos 'app'
-        const newPoligonaisFeatures = []; // Coleta todas as poligonais de outros arquivos
+        const newLotesFeatures = [];
+        const newAPPFeatures = [];
+        const newPoligonaisFeatures = [];
 
         for (const file of filesToProcess) {
             try {
-                console.log(`Processando arquivo: ${file.name}`); 
-                const reader = new FileReader();
-                const fileContent = await new Promise((resolve, reject) => {
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.onerror = (e) => reject(e);
-                    reader.readAsText(file);
-                });
-                let geojsonData = JSON.parse(fileContent);
+                let text = await file.text();
+                let geojsonData = JSON.parse(text);
 
-                // --- Reprojeção UTM, se ativada ---
+                // **REPROJEÇÃO AQUI, SE ATIVADA**
                 if (state.utmOptions.useUtm) {
-                    console.log(`Tentando reprojetar ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
-                    try {
-                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south);
-                        console.log(`Reprojeção de ${file.name} concluída.`);
-                    } catch (e) {
-                        console.error(`Falha na reprojeção de ${file.name}:`, e);
-                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`;
-                        uploadStatus.className = 'status-message error';
-                        return; 
-                    }
+                    const zone = document.getElementById('utmZoneInput').value;
+                    const south = document.getElementById('utmHemisphereSelect').value === 'S';
+                    geojsonData = reprojectGeoJSONFromUTM(geojsonData, zone, south);
                 }
+
+                // ... (o resto da lógica de categorização permanece a mesma) ...
+                const lname = file.name.toLowerCase();
+                if (lname.includes('lote')) {
+                    newLotesFeatures.push(...geojsonData.features);
+                    geojsonData.features.forEach(f => state.nucleusSet.add(f.properties.desc_nucleo));
+                } else if (lname.includes('app')) {
+                    newAPPFeatures.push(...geojsonData.features);
+                } else {
+                    newPoligonaisFeatures.push(...geojsonData.features);
+                }
+            } catch (e) {
+                uploadStatus.textContent = `Erro ao processar ${file.name}: ${e.message}`;
+                uploadStatus.className = 'status-message error';
+                return;
+            }
+        }
+
+        // Adiciona as feições processadas ao mapa
+        state.allLotes = newLotesFeatures;
+        L.geoJSON(newAPPFeatures, { style: styleApp, onEachFeature: onEachAppFeature }).addTo(state.layers.app);
+        L.geoJSON(newPoligonaisFeatures, { style: stylePoligonal, onEachFeature: onEachPoligonalFeature }).addTo(state.layers.poligonais);
+        L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
+
+        // Ajusta o zoom do mapa para a extensão dos dados
+        const allLayersGroup = L.featureGroup([...state.layers.lotes.getLayers(), ...state.layers.app.getLayers(), ...state.layers.poligonais.getLayers()]);
+        if (allLayersGroup.getLayers().length > 0) {
+            try {
+                state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] });
+            } catch (e) {
+                console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas.", e);
+            }
+        }
+        
+        // Atualiza o restante da UI
+        populateNucleusFilter();
+        refreshDashboard();
+        fillLotesTable();
+
+        uploadStatus.textContent = 'Dados carregados com sucesso!';
+        uploadStatus.className = 'status-message success';
+    });
                 // --- Fim da Reprojeção UTM ---
 
                 // Validação básica do GeoJSON
@@ -678,7 +706,6 @@ async function buscarInfoCidade(nomeCidade) {
     console.log("Dados do município simulados:", dadosSimulados);
 }
 
-
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
@@ -725,7 +752,6 @@ function zoomToFilter() {
     }
 }
 
-// ===================== Dashboard =====================
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
@@ -905,11 +931,6 @@ function updateUseTypesAnalysis(features) {
         useTypesContainer.innerHTML += itemHTML;
     }
 }```
-
-**b) Inserir as chamadas para a nova função:**
-Agora, precisamos chamar essa função nos lugares certos.
-
-*   **Encontre a função `initUpload()`**. Dentro dela, localize o final do `processAndLoadBtn.addEventListener`, onde estão as outras chamadas de atualização.
 
     ```javascript
     // ...
