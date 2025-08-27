@@ -191,26 +191,50 @@ function initNav() {
     });
 }
 // ===================== Filtros por Núcleo =====================
-function populateNucleusFilter() {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
-    const filterSelect = document.getElementById('nucleusFilter');
-    const reportNucleosSelect = document.getElementById('nucleosAnalise');
-    
-    filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
-    reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
-    
-    if (state.nucleusSet.size > 0) {
-        const sortedNucleos = Array.from(state.nucleusSet).sort();
-        sortedNucleos.forEach(nucleo => {
-            if (nucleo && nucleo.trim() !== '') { 
-                const option1 = document.createElement('option'); option1.value = nucleo; option1.textContent = nucleo; filterSelect.appendChild(option1);
-                const option2 = document.createElement('option'); option2.value = nucleo; option2.textContent = nucleo; reportNucleosSelect.appendChild(option2);
+
+function filteredLotes() {
+    if (state.currentNucleusFilter === 'all') return state.allLotes;
+    return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
+}
+
+/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
+function zoomToFilter() {
+    console.log(`zoomToFilter: Aplicando zoom para o núcleo: ${state.currentNucleusFilter}`);
+    const feats = filteredLotes();
+
+    if (feats.length === 0) {
+        console.warn('zoomToFilter: Nenhum lote para o filtro, centralizando no Brasil.');
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver lotes
+        return;
+    }
+
+    // Cria um FeatureGroup temporário APENAS com os lotes filtrados
+    const filteredLotesGroup = L.featureGroup();
+    L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+        style: styleLote, // Usa o estilo de lotes para renderização temporária
+        onEachFeature: onEachLoteFeature // Mantém os popups se houver necessidade
+    }).addTo(filteredLotesGroup);
+
+    if (filteredLotesGroup.getLayers().length > 0) {
+        try {
+            const bounds = filteredLotesGroup.getBounds();
+            if (bounds.isValid()) {
+                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
+                console.log('zoomToFilter: Mapa ajustado para os bounds do núcleo filtrado:', bounds);
+            } else {
+                console.warn("zoomToFilter: Bounds do núcleo filtrado inválidos. Verifique as coordenadas dos lotes neste núcleo.");
+                state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
             }
-        });
+        } catch (e) {
+            console.error("zoomToFilter: Erro ao ajustar o mapa aos bounds do filtro.", e);
+            state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
+        }
     } else {
-        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
+        console.warn('zoomToFilter: Nenhuma camada válida no grupo filtrado para ajuste de zoom.');
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados válidos
     }
 }
+
 // ===================== Estilos e Popups para Áreas de Risco (Nova Camada) =====================
 function styleAreaRisco(feature) {
     // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
