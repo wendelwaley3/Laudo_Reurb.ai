@@ -580,9 +580,10 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        color: '#e74c3c', // Vermelho para APP
+        color: '#9b59b6', // Roxo claro para borda
         weight: 2,
         opacity: 0.7,
+        fillColor: '#d7bde2', // Roxo claro para preenchimento
         fillOpacity: 0.2
     };
 }
@@ -712,6 +713,7 @@ function populateNucleusFilter() {
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
+    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
@@ -735,11 +737,13 @@ function populateNucleusFilter() {
     }
 }
 
+/** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
     if (state.currentNucleusFilter === 'all') return state.allLotes;
     return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
 }
 
+/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
 function zoomToFilter() {
     const feats = filteredLotes();
     if (feats.length === 0) {
@@ -750,6 +754,34 @@ function zoomToFilter() {
     try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
         console.warn("Não foi possível ajustar o mapa ao filtro.", e);
     }
+}
+
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+function initMainButtons() {
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+    });
+    
+    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+    });
 }
 
 // ===================== Dashboard =====================
