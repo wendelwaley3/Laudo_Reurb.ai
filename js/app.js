@@ -1,11 +1,10 @@
 // ===================== Estado Global do Aplicativo =====================
-// Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
     map: null,
     layers: { // FeatureGroups para gerenciar as camadas do Leaflet
-        lotes: null, // Será inicializado como L.featureGroup() em initMap
-        app: null,   // Será inicializado como L.featureGroup() em initMap
-        poligonais: null // Será inicializado como L.featureGroup() em initMap
+        lotes: null, 
+        app: null,   
+        poligonais: null 
     },
     allLotes: [],           // Array de todas as feições de lotes carregadas
     allAPPGeoJSON: { type: 'FeatureCollection', features: [] }, // Armazena todas as APPs carregadas
@@ -16,7 +15,6 @@ const state = {
     generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
     lastReportText: '',     // Último relatório gerado (para exportação)
 };
-
 // ===================== Utilidades Diversas =====================
 
 /** Formata um número para moeda BRL. */
@@ -212,10 +210,9 @@ function initUpload() {
         });
     }
     if (utmZoneInput) utmZoneInput.addEventListener('input', () => { state.utmOptions.zone = Number(utmZoneInput.value) || 23; console.log(`UTM Zone set to: ${state.utmOptions.zone}`); });
-    if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`); });
+    if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'Norte'}`); });
 
     // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
-    // O input está fora do label, então o JS é necessário
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
@@ -243,11 +240,10 @@ function initUpload() {
     dragDropArea.addEventListener('drop', (e) => {
         e.preventDefault(); dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.geojson') || f.name.endsWith('.json'));
-        // Cria uma nova FileList para atribuir ao input
         const dataTransfer = new DataTransfer();
         droppedFiles.forEach(file => dataTransfer.items.add(file));
         fileInput.files = dataTransfer.files;
-        fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista exibida
+        fileInput.dispatchEvent(new Event('change')); 
     });
 
     processAndLoadBtn.addEventListener('click', async () => {
@@ -259,7 +255,7 @@ function initUpload() {
         uploadStatus.textContent = 'Processando e carregando dados...'; uploadStatus.className = 'status-message info';
 
         state.layers.lotes.clearLayers(); state.layers.app.clearLayers(); state.layers.poligonais.clearLayers();
-        state.allLotes = []; state.allAPPGeoJSON = { type: 'FeatureCollection', features: [] }; state.allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; state.nucleusSet.clear();
+        state.allLotes = []; state.allAPPGeoJSON.features = []; state.allPoligonaisGeoJSON.features = []; state.nucleusSet.clear();
 
         const newLotesFeatures = []; const newAPPFeatures = []; const newPoligonaisFeatures = [];
 
@@ -271,7 +267,8 @@ function initUpload() {
                 let geojsonData = JSON.parse(fileContent);
 
                 if (state.utmOptions.useUtm) {
-                    try { geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); } catch (e) { console.error(`Falha na reprojeção de ${file.name}:`, e); uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}.`; uploadStatus.className = 'status-message error'; return; }
+                    try { geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); console.log(`Reprojeção de ${file.name} concluída.`); } 
+                    catch (e) { console.error(`Falha na reprojeção de ${file.name}:`, e); uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}.`; uploadStatus.className = 'status-message error'; return; }
                 }
 
                 if (!geojsonData.type || !geojsonData.features) throw new Error('Arquivo GeoJSON inválido');
@@ -389,7 +386,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
     state.layers.app.clearLayers();
     state.layers.poligonais.clearLayers();
 
-    // Adiciona Lotes
+    // Adiciona Lotes (filtrados ou todos)
     if (featuresToDisplay.length > 0) {
         L.geoJSON(featuresToDisplay, {
             onEachFeature: onEachLoteFeature,
@@ -398,7 +395,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${featuresToDisplay.length} lotes adicionados à camada.`);
     }
 
-    // Adiciona APP (se houver)
+    // Adiciona APP (todos os dados APP carregados)
     if (state.allAPPGeoJSON.features.length > 0) {
         L.geoJSON(state.allAPPGeoJSON.features, {
             onEachFeature: onEachAppFeature,
@@ -407,7 +404,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${state.allAPPGeoJSON.features.length} feições de APP adicionadas à camada.`);
     }
 
-    // Adiciona Poligonais (se houver)
+    // Adiciona Poligonais (todos os dados Poligonais carregados)
     if (state.allPoligonaisGeoJSON.features.length > 0) {
         L.geoJSON(state.allPoligonaisGeoJSON.features, {
             onEachFeature: onEachPoligonalFeature,
@@ -417,16 +414,16 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
     }
 
     // Ajusta o zoom do mapa para a extensão dos dados carregados
-    const allLayersGroup = L.featureGroup([
+    const allVisibleLayersGroup = L.featureGroup([
         state.layers.lotes,
-        state.layers.app,
-        state.layers.poligonais
-    ]);
+        // Inclui APP e Poligonais apenas se estiverem visíveis (marcadas na legenda)
+        document.getElementById('toggleAPP')?.checked ? state.layers.app : null,
+        document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null
+    ].filter(Boolean)); // Remove nulos
 
-    if (allLayersGroup.getLayers().length > 0) {
+    if (allVisibleLayersGroup.getLayers().length > 0) {
         try {
-            const bounds = allLayersGroup.getBounds();
-            // Verifica se os bounds são válidos antes de tentar dar zoom
+            const bounds = allVisibleLayersGroup.getBounds();
             if (bounds.isValid()) {
                 state.map.fitBounds(bounds, { padding: [50, 50] });
                 console.log('Mapa ajustado para os bounds dos dados carregados:', bounds);
@@ -443,28 +440,6 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
     }
 }
-// ===================== Filtros por Núcleo =====================
-function populateNucleusFilter() {
-    console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
-    const filterSelect = document.getElementById('nucleusFilter');
-    const reportNucleosSelect = document.getElementById('nucleosAnalise');
-    
-    filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
-    reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
-    
-    if (state.nucleusSet.size > 0) {
-        const sortedNucleos = Array.from(state.nucleusSet).sort();
-        sortedNucleos.forEach(nucleo => {
-            if (nucleo && nucleo.trim() !== '') { 
-                const option1 = document.createElement('option'); option1.value = nucleo; option1.textContent = nucleo; filterSelect.appendChild(option1);
-                const option2 = document.createElement('option'); option2.value = nucleo; option2.textContent = nucleo; reportNucleosSelect.appendChild(option2);
-            }
-        });
-    } else {
-        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
-    }
-}
-
 /** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
     if (state.currentNucleusFilter === 'all') return state.allLotes;
