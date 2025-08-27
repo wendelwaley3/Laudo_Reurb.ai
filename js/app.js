@@ -258,35 +258,27 @@ function initUpload() {
     // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
-    // Elementos da UI de Reprojeção UTM (são opcionais, verificaremos se existem)
+    // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
     const utmZoneInput = document.getElementById('utmZoneInput');
     const utmHemisphereSelect = document.getElementById('utmHemisphereSelect');
 
     // Listener para o checkbox UTM
-    if (useUtmCheckbox) {
-        useUtmCheckbox.addEventListener('change', () => {
-            state.utmOptions.useUtm = useUtmCheckbox.checked;
-            if (utmOptionsContainer) {
-                utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
-            }
-            console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
-        });
-    }
+    useUtmCheckbox.addEventListener('change', () => {
+        state.utmOptions.useUtm = useUtmCheckbox.checked;
+        utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
+        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
+    });
     // Listeners para os campos de configuração UTM
-    if (utmZoneInput) {
-        utmZoneInput.addEventListener('input', () => { 
-            state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
-            console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
-        });
-    }
-    if (utmHemisphereSelect) {
-        utmHemisphereSelect.addEventListener('change', () => { 
-            state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
-            console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
-        });
-    }
+    utmZoneInput.addEventListener('input', () => { 
+        state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
+        console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
+    });
+    utmHemisphereSelect.addEventListener('change', () => { 
+        state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
+        console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
+    });
 
     // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
     if (selectFilesVisibleButton && fileInput) {
@@ -337,9 +329,10 @@ function initUpload() {
         return dataTransfer.files;
     }
 
-       // Listener para o botão "Processar e Carregar Dados"
+
+    // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
-        console.log('Evento: Botão "Processar e Carregar Dados" clicado.');
+        console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
         const filesToProcess = Array.from(fileInput.files || []);
 
         if (filesToProcess.length === 0) {
@@ -358,63 +351,34 @@ function initUpload() {
         state.allLotes = [];
         state.nucleusSet.clear();
 
-        const newLotesFeatures = [];
-        const newAPPFeatures = [];
-        const newPoligonaisFeatures = [];
+        const newLotesFeatures = []; // Coleta todos os lotes de todos os arquivos 'lotes'
+        const newAPPFeatures = [];   // Coleta todas as APPs de todos os arquivos 'app'
+        const newPoligonaisFeatures = []; // Coleta todas as poligonais de outros arquivos
 
         for (const file of filesToProcess) {
             try {
-                let text = await file.text();
-                let geojsonData = JSON.parse(text);
+                console.log(`Processando arquivo: ${file.name}`); 
+                const reader = new FileReader();
+                const fileContent = await new Promise((resolve, reject) => {
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsText(file);
+                });
+                let geojsonData = JSON.parse(fileContent);
 
-                // **REPROJEÇÃO AQUI, SE ATIVADA**
+                // --- Reprojeção UTM, se ativada ---
                 if (state.utmOptions.useUtm) {
-                    const zone = document.getElementById('utmZoneInput').value;
-                    const south = document.getElementById('utmHemisphereSelect').value === 'S';
-                    geojsonData = reprojectGeoJSONFromUTM(geojsonData, zone, south);
+                    console.log(`Tentando reprojetar ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
+                    try {
+                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south);
+                        console.log(`Reprojeção de ${file.name} concluída.`);
+                    } catch (e) {
+                        console.error(`Falha na reprojeção de ${file.name}:`, e);
+                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`;
+                        uploadStatus.className = 'status-message error';
+                        return; 
+                    }
                 }
-
-                // ... (o resto da lógica de categorização permanece a mesma) ...
-                const lname = file.name.toLowerCase();
-                if (lname.includes('lote')) {
-                    newLotesFeatures.push(...geojsonData.features);
-                    geojsonData.features.forEach(f => state.nucleusSet.add(f.properties.desc_nucleo));
-                } else if (lname.includes('app')) {
-                    newAPPFeatures.push(...geojsonData.features);
-                } else {
-                    newPoligonaisFeatures.push(...geojsonData.features);
-                }
-            } catch (e) {
-                uploadStatus.textContent = `Erro ao processar ${file.name}: ${e.message}`;
-                uploadStatus.className = 'status-message error';
-                return;
-            }
-        }
-
-        // Adiciona as feições processadas ao mapa
-        state.allLotes = newLotesFeatures;
-        L.geoJSON(newAPPFeatures, { style: styleApp, onEachFeature: onEachAppFeature }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { style: stylePoligonal, onEachFeature: onEachPoligonalFeature }).addTo(state.layers.poligonais);
-        L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
-
-        // Ajusta o zoom do mapa para a extensão dos dados
-        const allLayersGroup = L.featureGroup([...state.layers.lotes.getLayers(), ...state.layers.app.getLayers(), ...state.layers.poligonais.getLayers()]);
-        if (allLayersGroup.getLayers().length > 0) {
-            try {
-                state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] });
-            } catch (e) {
-                console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas.", e);
-            }
-        }
-        
-        // Atualiza o restante da UI
-        populateNucleusFilter();
-        refreshDashboard();
-        fillLotesTable();
-
-        uploadStatus.textContent = 'Dados carregados com sucesso!';
-        uploadStatus.className = 'status-message success';
-    });
                 // --- Fim da Reprojeção UTM ---
 
                 // Validação básica do GeoJSON
@@ -491,35 +455,13 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-
-    // Mapeamento de risco para cores
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#2ecc71'; // Verde
-            break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#f1c40f'; // Amarelo
-            break;
-        case '3':
-        case 'alto':
-        case 'geologico':
-        case 'hidrologico':
-            color = '#e67e22'; // Laranja
-            break;
-        case '4':
-        case 'muito alto':
-            color = '#c0392b'; // Vermelho
-            break;
-        default:
-            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
-            break;
-    }
+    if (risco === '1' || risco.includes('baixo')) color = '#2ecc71';      
+    else if (risco === '2' || risco.includes('médio')) color = '#f1c40f'; // Amarelo
+    else if (risco === '3' || risco.includes('alto')) color = '#e67e22'; // Laranja
+    else if (risco === '4' || risco.includes('muito alto')) color = '#c0392b'; 
+    else color = '#3498db'; 
 
     return {
         fillColor: color,
@@ -580,10 +522,9 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        color: '#9b59b6', // Roxo claro para borda
+        color: '#e74c3c', // Vermelho para APP
         weight: 2,
         opacity: 0.7,
-        fillColor: '#d7bde2', // Roxo claro para preenchimento
         fillOpacity: 0.2
     };
 }
@@ -629,69 +570,7 @@ async function onEachPoligonalFeature(feature, layer) {
         layer.bindPopup(popupContent);
     }
 }
-// ===================== Renderização de Camadas no Mapa =====================
-function renderLayersOnMap(featuresToDisplay = state.allLotes) {
-    console.log('renderLayersOnMap: Renderizando camadas...');
-    
-    // Limpa todas as camadas antes de redesenhar
-    state.layers.lotes.clearLayers();
-    state.layers.app.clearLayers();
-    state.layers.poligonais.clearLayers();
 
-    // Adiciona Lotes
-    if (featuresToDisplay.length > 0) {
-        L.geoJSON(featuresToDisplay, {
-            onEachFeature: onEachLoteFeature,
-            style: styleLote
-        }).addTo(state.layers.lotes);
-        console.log(`renderLayersOnMap: ${featuresToDisplay.length} lotes adicionados à camada.`);
-    }
-
-    // Adiciona APP (se houver)
-    if (state.allAPPGeoJSON && state.allAPPGeoJSON.features.length > 0) {
-        L.geoJSON(state.allAPPGeoJSON, {
-            onEachFeature: onEachAppFeature,
-            style: styleApp
-        }).addTo(state.layers.app);
-        console.log(`renderLayersOnMap: ${state.allAPPGeoJSON.features.length} feições de APP adicionadas à camada.`);
-    }
-
-    // Adiciona Poligonais (se houver)
-    if (state.allPoligonaisGeoJSON && state.allPoligonaisGeoJSON.features.length > 0) {
-        L.geoJSON(state.allPoligonaisGeoJSON, {
-            onEachFeature: onEachPoligonalFeature,
-            style: stylePoligonal
-        }).addTo(state.layers.poligonais);
-        console.log(`renderLayersOnMap: ${state.allPoligonaisGeoJSON.features.length} feições de Poligonais adicionadas à camada.`);
-    }
-
-    // Ajusta o zoom do mapa para a extensão dos dados carregados
-    const allLayersGroup = L.featureGroup([
-        state.layers.lotes,
-        state.layers.app,
-        state.layers.poligonais
-    ]);
-
-    if (allLayersGroup.getLayers().length > 0) {
-        try {
-            const bounds = allLayersGroup.getBounds();
-            // Verifica se os bounds são válidos antes de tentar dar zoom
-            if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] });
-                console.log('Mapa ajustado para os bounds dos dados carregados:', bounds);
-            } else {
-                console.warn("Bounds inválidos. O mapa não será ajustado. Verifique as coordenadas dos seus GeoJSONs.");
-                state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil como fallback
-            }
-        } catch (e) {
-            console.error("Erro ao ajustar o mapa aos bounds. Verifique as coordenadas.", e);
-            state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil como fallback
-        }
-    } else {
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
-        console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
-    }
-}
 // ===================== Função simulada para buscar dados extras de cidade =====================
 async function buscarInfoCidade(nomeCidade) {
     alert(`Buscando dados simulados para ${nomeCidade}...`);
@@ -707,13 +586,13 @@ async function buscarInfoCidade(nomeCidade) {
     console.log("Dados do município simulados:", dadosSimulados);
 }
 
+
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
-    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
@@ -737,13 +616,11 @@ function populateNucleusFilter() {
     }
 }
 
-/** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
     if (state.currentNucleusFilter === 'all') return state.allLotes;
     return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
 }
 
-/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
 function zoomToFilter() {
     const feats = filteredLotes();
     if (feats.length === 0) {
@@ -756,41 +633,13 @@ function zoomToFilter() {
     }
 }
 
-// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-function initMainButtons() {
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter();
-    });
-
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
-
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
-    
-    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
-    });
-}
-
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
+    let lotesRiscoAltoMuitoAlto = 0;
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -799,35 +648,19 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Pega o valor de risco de múltiplas colunas possíveis e converte para string e minúsculas
         const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        // Contagem por nível de risco para a lista "Análise de Riscos"
-        if (risco === '1' || risco.includes('baixo')) {
-            riskCounts['Baixo']++;
-        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
-            riskCounts['Médio']++;
-        } else if (risco === '3' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
-            riskCounts['Alto']++;
-        } else if (risco === '4' || risco.includes('muito alto')) {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
+        if (risco === '1' || risco.includes('baixo')) riskCounts['Baixo']++;
+        else if (risco === '2' || risco.includes('médio')) riskCounts['Médio']++;
+        else if (risco === '3' || risco.includes('alto')) riskCounts['Alto']++;
+        else if (risco === '4' || risco.includes('muito alto')) riskCounts['Muito Alto']++;
         
-        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
-        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            lotesEmRiscoGeral++;
-        }
+        if (risco === '3' || risco === '4' || risco.includes('alto')) lotesRiscoAltoMuitoAlto++;
         
-        // Contagem de Lotes em APP
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
+        const dentroApp = Number(p.dentro_app || 0);
+        if (dentroApp > 0) lotesAppCount++;
 
-        // Cálculo do Custo de Intervenção
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
+        const valorCusto = Number(p.valor || 0);
         if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
@@ -835,9 +668,8 @@ function refreshDashboard() {
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
@@ -846,13 +678,12 @@ function refreshDashboard() {
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    // Para o resumo, usamos a mesma contagem do card
-    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral;
-    document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral;
-
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
+
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
@@ -903,124 +734,6 @@ function fillLotesTable() {
     });
 }
 
-// ===================== Análise de Tipos de Uso =====================
-function updateUseTypesAnalysis(features) {
-    console.log('updateUseTypesAnalysis: Atualizando análise de tipos de uso...');
-    const useTypesContainer = document.getElementById('useTypesAnalysis');
-    useTypesContainer.innerHTML = ''; // Limpa o conteúdo anterior
-
-    if (features.length === 0) {
-        useTypesContainer.innerHTML = '<p>Nenhum dado para analisar.</p>';
-        return;
-    }
-
-    const useTypeCounts = {};
-    let totalWithUseType = 0;
-
-    // 1. Contar a ocorrência de cada 'tipo_uso'
-    features.forEach(f => {
-        const p = f.properties || {};
-        const useType = p.tipo_uso; // Pega o valor da propriedade 'tipo_uso'
-        
-        if (useType && useType !== 'N/A' && useType.trim() !== '') {
-            if (useTypeCounts[useType]) {
-                useTypeCounts[useType]++;
-            } else {
-                useTypeCounts[useType] = 1;
-            }
-            totalWithUseType++;
-        }
-    });
-
-    if (totalWithUseType === 0) {
-        useTypesContainer.innerHTML = "<p>Nenhum lote com a propriedade 'tipo_uso' definida foi encontrado.</p>";
-        return;
-    }
-
-    // 2. Criar e adicionar os elementos HTML para cada tipo de uso
-    for (const useType in useTypeCounts) {
-        const count = useTypeCounts[useType];
-        const percentage = ((count / totalWithUseType) * 100).toFixed(1);
-
-        // Define um "ícone" com base no nome do tipo de uso (exemplo)
-        let icon = '❓'; // Ícone padrão
-        const lowerUseType = useType.toLowerCase();
-        if (lowerUseType.includes('residencial')) icon = '🏠';
-        if (lowerUseType.includes('comercial')) icon = '🏢';
-        if (lowerUseType.includes('misto')) icon = '🏘️';
-        if (lowerUseType.includes('institucional')) icon = '🏛️';
-        if (lowerUseType.includes('vago')) icon = '🌳';
-
-        const itemHTML = `
-            <div class="use-type-item">
-                <div class="icon">${icon}</div>
-                <h4>${useType}</h4>
-                <div class="percentage">${percentage}%</div>
-                <div class="count">(${count} lotes)</div>
-            </div>
-        `;
-        
-        useTypesContainer.innerHTML += itemHTML;
-    }
-}```
-
-    ```javascript
-    // ...
-    // Atualiza UI
-    populateNucleusFilter();
-    refreshDashboard();
-    fillLotesTable(); 
-    // ...
-    ```
-    **Insira a nova linha aqui:**
-    ```javascript
-    // ...
-    // Atualiza UI
-    populateNucleusFilter();
-    refreshDashboard();
-    fillLotesTable(); 
-    updateUseTypesAnalysis(state.allLotes); // <-- INSERIR ESTA LINHA
-    // ...
-    ```
-
-*   **Encontre a função `initMainButtons()`**. Dentro dela, localize o `applyFiltersBtn.onclick` e o `nucleusFilter.addEventListener`.
-
-    ```javascript
-    // ...
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter();
-    });
-
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); 
-    });
-    // ...
-    ```
-    **Insira a nova linha em ambos os locais:**
-    ```javascript
-    // ...
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        updateUseTypesAnalysis(filteredLotes()); // <-- INSERIR ESTA LINHA
-        zoomToFilter();
-    });
-
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        updateUseTypesAnalysis(filteredLotes()); // <-- INSERIR ESTA LINHA
-        zoomToFilter(); 
-    });
-    
 /// ===================== Legenda / Toggle Camadas =====================
 function initLegendToggles() {
     const toggle = (id, layer) => {
