@@ -457,7 +457,8 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
+    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
     let color;
 
     // Mapeamento de risco para cores
@@ -473,6 +474,8 @@ function styleLote(feature) {
             break;
         case '3':
         case 'alto':
+        case 'geologico':
+        case 'hidrologico':
             color = '#e67e22'; // Laranja
             break;
         case '4':
@@ -493,7 +496,6 @@ function styleLote(feature) {
         fillOpacity: 0.7
     };
 }
-
 // Popup ao clicar no lote
 function onEachLoteFeature(feature, layer) {
     if (feature.properties) {
@@ -661,7 +663,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0;
+    let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -670,28 +672,25 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Converte o valor de 'grau', 'risco', ou 'status_risco' para um número inteiro
-        const grau = parseInt(p.grau || p.risco || p.status_risco, 10);
+        // Pega o valor de risco de múltiplas colunas possíveis e converte para string e minúsculas
+        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        // **NOVA LÓGICA DE CONTAGEM DE RISCO BASEADA EM NÚMEROS**
-        switch (grau) {
-            case 1:
-                riskCounts['Baixo']++;
-                break;
-            case 2:
-                riskCounts['Médio']++;
-                break;
-            case 3:
-                riskCounts['Alto']++;
-                lotesRiscoAltoMuitoAlto++;
-                break;
-            case 4:
-                riskCounts['Muito Alto']++;
-                lotesRiscoAltoMuitoAlto++;
-                break;
-            default:
-                // Se não for um número de 1 a 4, não faz nada com a contagem de risco
-                break;
+        // Contagem por nível de risco para a lista "Análise de Riscos"
+        if (risco === '1' || risco.includes('baixo')) {
+            riskCounts['Baixo']++;
+        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
+            riskCounts['Médio']++;
+        } else if (risco === '3' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
+            riskCounts['Alto']++;
+        } else if (risco === '4' || risco.includes('muito alto')) {
+            riskCounts['Muito Alto']++;
+        } else if (risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
+            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        }
+        
+        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
+        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
+            lotesEmRiscoGeral++;
         }
         
         // Contagem de Lotes em APP
@@ -711,7 +710,7 @@ function refreshDashboard() {
 
     // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral;
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
 
@@ -720,8 +719,9 @@ function refreshDashboard() {
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
+    // Para o resumo, usamos a mesma contagem do card
+    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral;
+    document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral;
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
