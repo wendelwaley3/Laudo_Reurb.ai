@@ -480,14 +480,13 @@ function initMainButtons() {
         zoomToFilter(); 
     });
 }
-
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesEmRiscoGeral = 0; 
+    let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -498,18 +497,29 @@ function refreshDashboard() {
         const p = f.properties || {};
         const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
-        if (risco === '1' || risco.includes('baixo')) riskCounts['Baixo']++;
-        else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) riskCounts['Médio']++;
-        else if (risco === '3' || risco.includes('alto') || risco.includes('geologico') || risco.includes('hidrologico')) riskCounts['Alto']++;
-        else if (risco === '4' || risco.includes('muito alto')) riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        if (risco === '1' || risco.includes('baixo')) {
+            riskCounts['Baixo']++;
+        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
+            riskCounts['Médio']++;
+        } else if (risco === '3' || risco.includes('alto') || risco.includes('geologico') || risco.includes('hidrologico')) {
+            riskCounts['Alto']++;
+        } else if (risco === '4' || risco.includes('muito alto')) {
+            riskCounts['Muito Alto']++;
+        } else if (risco !== 'n/a' && risco.trim() !== '') {
+            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        }
         
-        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco.trim() !== '') {
+        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
+        if ((risco === '2' || risco.includes('médio') || risco.includes('medio') || 
+             risco === '3' || risco.includes('alto') || risco.includes('geologico') || risco.includes('hidrologico') ||
+             risco === '4' || risco.includes('muito alto')) && risco !== 'n/a' && risco.trim() !== '') {
             lotesEmRiscoGeral++;
         }
         
         const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) lotesAppCount++;
+        if (dentroApp > 0) {
+            lotesAppCount++;
+        }
 
         const valorCusto = Number(p.valor || p.custo_intervencao || 0);
         if (!isNaN(valorCusto) && valorCusto > 0) {
@@ -519,10 +529,11 @@ function refreshDashboard() {
         }
     });
 
+    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim(); // Remove 'R$' duplicado
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal); // Mantém o R$ na formatação
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
@@ -535,14 +546,17 @@ function refreshDashboard() {
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 
-    // NOVO: Exibir Município Principal no Dashboard
+    // Exibir Município Principal no Dashboard
     let mainMunicipio = 'N/A';
+    // Prioriza o município do primeiro lote
     if (state.allLotes.length > 0 && state.allLotes[0].properties) {
         mainMunicipio = state.allLotes[0].properties.nm_mun || state.allLotes[0].properties.municipio || 'N/A';
-    } else if (state.allPoligonaisGeoJSON.features.length > 0) { // Verifica na camada poligonal
-        const firstPoligonal = state.allPoligonaisGeoJSON.features[0].properties;
-        if (firstPoligonal) {
-            mainMunicipio = firstPoligonal.municipio || firstPoligonal.nm_mun || 'N/A';
+    } 
+    // Se não houver lotes, tenta pegar do primeiro poligonal (se existir)
+    else if (state.allPoligonaisGeoJSON.features.length > 0) { 
+        const firstPoligonalProps = state.allPoligonaisGeoJSON.features[0].properties;
+        if (firstPoligonalProps) {
+            mainMunicipio = firstPoligonalProps.municipio || firstPoligonalProps.nm_mun || 'N/A';
         }
     }
     document.getElementById('mainMunicipioDisplay').textContent = mainMunicipio;
@@ -563,12 +577,13 @@ function fillLotesTable() {
     feats.forEach(f => {
         const p = f.properties || {};
         const tr = document.createElement('tr');
-        const codLote = p.cod_lote || 'N/A';
+        const codLote = p.cod_lote || p.codigo || 'N/A'; // Adapta para 'cod_lote' ou 'codigo'
+        
         tr.innerHTML = `
             <td>${codLote}</td>
             <td>${p.desc_nucleo || 'N/A'}</td>
             <td>${p.tipo_uso || 'N/A'}</td>
-            <td>${p.area_m2 ? p.area_m2.toLocaleString('pt-BR') : 'N/A'}</td>
+            <td>${p.area_m2 ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A'}</td>
             <td>${p.risco || p.status_risco || p.grau || 'N/A'}</td>
             <td>${(Number(p.dentro_app) > 0) ? 'Sim' : 'Não'}</td>
             <td><button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button></td>
@@ -577,24 +592,57 @@ function fillLotesTable() {
     });
     tbody.appendChild(fragment);
 
+    // Adiciona listeners para os botões "Ver no Mapa"
     tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
         btn.addEventListener('click', () => {
             const codLoteToZoom = btn.getAttribute('data-codlote');
-            const loteToZoom = state.allLotes.find(l => l.properties?.cod_lote == codLoteToZoom);
+            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) == codLoteToZoom); // Adapta para 'cod_lote' ou 'codigo'
+            
             if (loteToZoom) {
+                // Navega para o dashboard (onde está o mapa)
                 document.querySelector('nav a[data-section="dashboard"]').click();
-                const tempLayer = L.geoJSON(loteToZoom);
-                try { state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); } catch (e) {
-                    console.warn("Erro ao dar zoom no lote:", e);
+                
+                const tempLayer = L.geoJSON(loteToZoom); 
+                try { 
+                    // Ajusta o zoom do mapa para o lote selecionado
+                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                } catch (e) {
+                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
                 }
-                state.layers.lotes.eachLayer(l => {
-                    if (l.feature?.properties?.cod_lote == codLoteToZoom && l.openPopup) {
-                        l.openPopup();
+                // Tenta abrir o popup do lote no mapa
+                state.layers.lotes.eachLayer(layer => {
+                    if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) == codLoteToZoom && layer.openPopup) {
+                        layer.openPopup();
                     }
                 });
+            } else {
+                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
             }
         });
     });
+
+    const searchInput = document.getElementById('lotSearch');
+    searchInput.addEventListener('input', () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const textContent = tr.textContent.toLowerCase();
+            tr.style.display = textContent.includes(searchTerm) ? '' : 'none';
+        });
+    });
+
+    document.getElementById('exportTableBtn').onclick = () => {
+        const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            if (tr.style.display === 'none') return; 
+            const tds = tr.querySelectorAll('td');
+            if (tds.length >= 6) rows.push([
+                tds[0].textContent, tds[1].textContent, tds[2].textContent,
+                tds[3].textContent, tds[4].textContent, tds[5].textContent
+            ]);
+        });
+        const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
+        downloadText('lotes_tabela.csv', csv);
+    };
 }
 // ===================== Geração de Relatório com IA (Simulado) =====================
 async function gerarRelatorioIA() {
