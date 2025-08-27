@@ -1,19 +1,21 @@
 // ===================== Estado Global do Aplicativo =====================
 const state = {
     map: null,
-    layers: { // FeatureGroups para gerenciar as camadas do Leaflet
+    layers: { 
         lotes: null, 
         app: null,   
-        poligonais: null 
+        poligonais: null,
+        areasRisco: null // NOVO: FeatureGroup para áreas de risco
     },
-    allLotes: [],           // Array de todas as feições de lotes carregadas
-    allAPPGeoJSON: { type: 'FeatureCollection', features: [] }, // Armazena todas as APPs carregadas
-    allPoligonaisGeoJSON: { type: 'FeatureCollection', features: [] }, // Armazena outras poligonais carregadas
-    nucleusSet: new Set(),  // Set para armazenar nomes de núcleos únicos
-    currentNucleusFilter: 'all', // Núcleo selecionado no filtro do Dashboard
-    utmOptions: { useUtm: false, zone: 23, south: true }, // Configurações para reprojeção UTM client-side
-    generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
-    lastReportText: '',     // Último relatório gerado (para exportação)
+    allLotes: [],           
+    allAPPGeoJSON: { type: 'FeatureCollection', features: [] }, 
+    allPoligonaisGeoJSON: { type: 'FeatureCollection', features: [] }, 
+    allAreasRiscoGeoJSON: { type: 'FeatureCollection', features: [] }, // NOVO: Armazena áreas de risco
+    nucleusSet: new Set(),  
+    currentNucleusFilter: 'all', 
+    utmOptions: { useUtm: false, zone: 23, south: true }, 
+    generalProjectInfo: {}, 
+    lastReportText: '',     
 };
 // ===================== Utilidades Diversas =====================
 
@@ -154,9 +156,11 @@ function initMap() {
     state.layers.lotes = L.featureGroup().addTo(state.map);
     state.layers.app = L.featureGroup().addTo(state.map); 
     state.layers.poligonais = L.featureGroup().addTo(state.map); 
+    state.layers.areasRisco = L.featureGroup().addTo(state.map); // NOVO: Adiciona a camada de áreas de risco
 
     state.map.removeLayer(state.layers.app);
     state.map.removeLayer(state.layers.poligonais);
+    state.map.removeLayer(state.layers.areasRisco); // NOVO: Remove áreas de risco por padrão
 
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
@@ -186,7 +190,57 @@ function initNav() {
         });
     });
 }
+// ===================== Estilos e Popups para Áreas de Risco (Nova Camada) =====================
+function styleAreaRisco(feature) {
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
+    let color;
 
+    switch (risco) {
+        case '1':
+        case 'baixo':
+            color = '#8BC34A'; // Verde claro
+            break;
+        case '2':
+        case 'médio':
+        case 'medio':
+            color = '#FFC107'; // Amarelo
+            break;
+        case '3':
+        case 'alto':
+        case 'geologico':
+        case 'hidrologico':
+            color = '#FF5722'; // Laranja avermelhado
+            break;
+        case '4':
+        case 'muito alto':
+            color = '#D32F2F'; // Vermelho escuro
+            break;
+        default:
+            color = '#90A4AE'; // Cinza padrão
+            break;
+    }
+
+    return {
+        fillColor: color,
+        weight: 2,
+        opacity: 0.8,
+        color: 'black', // Borda preta para destaque
+        dashArray: '5,5', // Linha tracejada
+        fillOpacity: 0.4
+    };
+}
+
+function onEachAreaRiscoFeature(feature, layer) {
+    if (feature.properties) {
+        let popupContent = "<h3>Detalhes da Área de Risco:</h3>";
+        for (let key in feature.properties) {
+            let value = feature.properties[key];
+            if (value === null || value === undefined || value === '') value = 'N/A';
+            popupContent += `<strong>${key}:</strong> ${value}<br>`;
+        }
+        layer.bindPopup(popupContent);
+    }
+}
 // ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...'); 
@@ -212,7 +266,6 @@ function initUpload() {
     if (utmZoneInput) utmZoneInput.addEventListener('input', () => { state.utmOptions.zone = Number(utmZoneInput.value) || 23; console.log(`UTM Zone set to: ${state.utmOptions.zone}`); });
     if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { state.utmOptions.south = (utmHemisphereSelect.value === 'S'); console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'Norte'}`); });
 
-    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
     if (selectFilesVisibleButton && fileInput) {
         selectFilesVisibleButton.addEventListener('click', () => {
             console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
@@ -254,10 +307,10 @@ function initUpload() {
 
         uploadStatus.textContent = 'Processando e carregando dados...'; uploadStatus.className = 'status-message info';
 
-        state.layers.lotes.clearLayers(); state.layers.app.clearLayers(); state.layers.poligonais.clearLayers();
-        state.allLotes = []; state.allAPPGeoJSON.features = []; state.allPoligonaisGeoJSON.features = []; state.nucleusSet.clear();
+        state.layers.lotes.clearLayers(); state.layers.app.clearLayers(); state.layers.poligonais.clearLayers(); state.layers.areasRisco.clearLayers(); // NOVO: Limpa áreas de risco
+        state.allLotes = []; state.allAPPGeoJSON.features = []; state.allPoligonaisGeoJSON.features = []; state.allAreasRiscoGeoJSON.features = []; state.nucleusSet.clear(); // NOVO: Limpa allAreasRiscoGeoJSON
 
-        const newLotesFeatures = []; const newAPPFeatures = []; const newPoligonaisFeatures = [];
+        const newLotesFeatures = []; const newAPPFeatures = []; const newPoligonaisFeatures = []; const newAreasRiscoFeatures = []; // NOVO: Coleta áreas de risco
 
         for (const file of filesToProcess) {
             try {
@@ -275,12 +328,15 @@ function initUpload() {
                 if (geojsonData.type !== 'FeatureCollection') console.warn(`Arquivo ${file.name} não é um FeatureCollection`);
 
                 const fileNameLower = file.name.toLowerCase();
-                if (fileNameLower.includes('lote')) { 
+                if (fileNameLower.includes('lotes') && !fileNameLower.includes('risco')) { // 'lotes laudo.geojson'
                     newLotesFeatures.push(...geojsonData.features);
                     geojsonData.features.forEach(f => { if (f.properties && f.properties.desc_nucleo) state.nucleusSet.add(f.properties.desc_nucleo); });
-                } else if (fileNameLower.includes('app')) { 
+                } else if (fileNameLower.includes('area de risco') || fileNameLower.includes('risco')) { // NOVO: 'lotes area de risco.geojson'
+                    newAreasRiscoFeatures.push(...geojsonData.features);
+                }
+                 else if (fileNameLower.includes('app')) { // 'lotesapp_laudo.geojson'
                     newAPPFeatures.push(...geojsonData.features);
-                } else { 
+                } else { // 'tabela_geral.geojson' e outras poligonais
                     newPoligonaisFeatures.push(...geojsonData.features);
                 }
                 console.log(`Arquivo ${file.name} categorizado.`); 
@@ -291,6 +347,7 @@ function initUpload() {
         state.allLotes = newLotesFeatures; 
         state.allAPPGeoJSON.features = newAPPFeatures;
         state.allPoligonaisGeoJSON.features = newPoligonaisFeatures;
+        state.allAreasRiscoGeoJSON.features = newAreasRiscoFeatures; // NOVO: Armazena áreas de risco
         
         renderLayersOnMap(); // Renderiza TUDO no mapa
         populateNucleusFilter();
@@ -302,7 +359,30 @@ function initUpload() {
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
 }
-
+// ===================== Legenda / Toggle Camadas =====================
+function initLegendToggles() {
+    const toggle = (id, layer) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => {
+            if (el.checked) layer.addTo(state.map); else state.map.removeLayer(layer);
+            // Após togglar, reajusta o mapa para as camadas VISÍVEIS
+            const allVisibleLayersGroup = L.featureGroup([
+                state.layers.lotes,
+                document.getElementById('toggleAPP')?.checked ? state.layers.app : null,
+                document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null,
+                document.getElementById('toggleAreasRisco')?.checked ? state.layers.areasRisco : null
+            ].filter(Boolean));
+            if (allVisibleLayersGroup.getLayers().length > 0) {
+                 try { state.map.fitBounds(allVisibleLayersGroup.getBounds(), { padding: [50, 50] }); } catch (e) {}
+            }
+        });
+    };
+    toggle('toggleLotes', state.layers.lotes);
+    toggle('togglePoligonais', state.layers.poligonais);
+    toggle('toggleAPP', state.layers.app);
+    toggle('toggleAreasRisco', state.layers.areasRisco); // NOVO: Adiciona toggle para áreas de risco
+}
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 function styleLote(feature) {
     const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
@@ -414,6 +494,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
     state.layers.lotes.clearLayers();
     state.layers.app.clearLayers();
     state.layers.poligonais.clearLayers();
+    state.layers.areasRisco.clearLayers(); // NOVO: Limpa áreas de risco
 
     // Adiciona Lotes (filtrados ou todos)
     if (featuresToDisplay.length > 0) {
@@ -433,7 +514,7 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${state.allAPPGeoJSON.features.length} feições de APP adicionadas à camada.`);
     }
 
-    // Adiciona Poligonais (todos os dados Poligonais carregados)
+    // Adiciona Poligonais (todos os dados Poligonais carregados, exceto as áreas de risco específicas)
     if (state.allPoligonaisGeoJSON.features.length > 0) {
         L.geoJSON(state.allPoligonaisGeoJSON.features, {
             onEachFeature: onEachPoligonalFeature,
@@ -442,12 +523,21 @@ function renderLayersOnMap(featuresToDisplay = state.allLotes) {
         console.log(`renderLayersOnMap: ${state.allPoligonaisGeoJSON.features.length} feições de Poligonais adicionadas à camada.`);
     }
 
+    // NOVO: Adiciona Áreas de Risco (com estilo próprio)
+    if (state.allAreasRiscoGeoJSON.features.length > 0) {
+        L.geoJSON(state.allAreasRiscoGeoJSON.features, {
+            onEachFeature: onEachAreaRiscoFeature, // NOVA função para popup de área de risco
+            style: styleAreaRisco // NOVA função para estilo de área de risco
+        }).addTo(state.layers.areasRisco);
+        console.log(`renderLayersOnMap: ${state.allAreasRiscoGeoJSON.features.length} feições de Áreas de Risco adicionadas à camada.`);
+    }
+
     // Ajusta o zoom do mapa para a extensão dos dados carregados
     const allVisibleLayersGroup = L.featureGroup([
         state.layers.lotes,
-        // Inclui APP e Poligonais apenas se estiverem visíveis (marcadas na legenda)
         document.getElementById('toggleAPP')?.checked ? state.layers.app : null,
-        document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null
+        document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null,
+        document.getElementById('toggleAreasRisco')?.checked ? state.layers.areasRisco : null // NOVO: Inclui áreas de risco
     ].filter(Boolean)); // Remove nulos
 
     if (allVisibleLayersGroup.getLayers().length > 0) {
@@ -518,14 +608,15 @@ function refreshDashboard() {
     let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
     let lotesAppCount = 0;
     let custoTotal = 0;
-    let custoMin = Infinity;
-    let custoMax = -Infinity;
+    let custoMin = Infinity; // Inicializa com Infinity
+    let custoMax = -Infinity; // Inicializa com -Infinity
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
 
     feats.forEach(f => {
         const p = f.properties || {};
         const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
 
+        // Contagem por nível de risco para a lista "Análise de Riscos"
         if (risco === '1' || risco.includes('baixo')) {
             riskCounts['Baixo']++;
         } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
@@ -539,9 +630,7 @@ function refreshDashboard() {
         }
         
         // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
-        if ((risco === '2' || risco.includes('médio') || risco.includes('medio') || 
-             risco === '3' || risco.includes('alto') || risco.includes('geologico') || risco.includes('hidrologico') ||
-             risco === '4' || risco.includes('muito alto')) && risco !== 'n/a' && risco.trim() !== '') {
+        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco.trim() !== '') {
             lotesEmRiscoGeral++;
         }
         
@@ -558,11 +647,10 @@ function refreshDashboard() {
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal); // Mantém o R$ na formatação
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim(); // Remove 'R$' duplicado
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
@@ -572,16 +660,15 @@ function refreshDashboard() {
     document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral; 
     document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral; 
 
+    // Atualiza os custos mínimo e máximo, verificando se foram encontrados valores válidos
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 
     // Exibir Município Principal no Dashboard
     let mainMunicipio = 'N/A';
-    // Prioriza o município do primeiro lote
     if (state.allLotes.length > 0 && state.allLotes[0].properties) {
         mainMunicipio = state.allLotes[0].properties.nm_mun || state.allLotes[0].properties.municipio || 'N/A';
     } 
-    // Se não houver lotes, tenta pegar do primeiro poligonal (se existir)
     else if (state.allPoligonaisGeoJSON.features.length > 0) { 
         const firstPoligonalProps = state.allPoligonaisGeoJSON.features[0].properties;
         if (firstPoligonalProps) {
