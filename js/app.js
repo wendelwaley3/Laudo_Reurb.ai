@@ -258,27 +258,35 @@ function initUpload() {
     // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
-    // Elementos da UI de Reprojeção UTM
+    // Elementos da UI de Reprojeção UTM (são opcionais, verificaremos se existem)
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
     const utmZoneInput = document.getElementById('utmZoneInput');
     const utmHemisphereSelect = document.getElementById('utmHemisphereSelect');
 
     // Listener para o checkbox UTM
-    useUtmCheckbox.addEventListener('change', () => {
-        state.utmOptions.useUtm = useUtmCheckbox.checked;
-        utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
-        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
-    });
+    if (useUtmCheckbox) {
+        useUtmCheckbox.addEventListener('change', () => {
+            state.utmOptions.useUtm = useUtmCheckbox.checked;
+            if (utmOptionsContainer) {
+                utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
+            }
+            console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
+        });
+    }
     // Listeners para os campos de configuração UTM
-    utmZoneInput.addEventListener('input', () => { 
-        state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
-        console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
-    });
-    utmHemisphereSelect.addEventListener('change', () => { 
-        state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
-        console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
-    });
+    if (utmZoneInput) {
+        utmZoneInput.addEventListener('input', () => { 
+            state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
+            console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
+        });
+    }
+    if (utmHemisphereSelect) {
+        utmHemisphereSelect.addEventListener('change', () => { 
+            state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
+            console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
+        });
+    }
 
     // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
     if (selectFilesVisibleButton && fileInput) {
