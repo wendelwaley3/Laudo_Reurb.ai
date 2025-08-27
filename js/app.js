@@ -213,41 +213,52 @@ function populateNucleusFilter() {
 }
 // ===================== Estilos e Popups para Áreas de Risco (Nova Camada) =====================
 function styleAreaRisco(feature) {
+    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
+    // Assume que a área de risco também tem uma propriedade que indica seu nível de risco.
     const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
     let color;
+    let borderColor = 'black'; // Borda padrão
+    let dashArray = '5,5'; // Linha tracejada padrão
 
     switch (risco) {
         case '1':
         case 'baixo':
-            color = '#8BC34A'; // Verde claro
+            color = '#8BC34A'; // Verde claro para preenchimento
+            borderColor = '#558B2F'; // Verde escuro para borda
             break;
         case '2':
         case 'médio':
         case 'medio':
-            color = '#FFC107'; // Amarelo
+            color = '#FFC107'; // Amarelo para preenchimento
+            borderColor = '#FFA000'; // Laranja para borda
             break;
         case '3':
         case 'alto':
         case 'geologico':
         case 'hidrologico':
-            color = '#FF5722'; // Laranja avermelhado
+            color = '#FF5722'; // Laranja avermelhado para preenchimento
+            borderColor = '#D84315'; // Vermelho para borda
+            dashArray = '10,5'; // Linha mais destacada
             break;
         case '4':
         case 'muito alto':
-            color = '#D32F2F'; // Vermelho escuro
+            color = '#D32F2F'; // Vermelho escuro para preenchimento
+            borderColor = '#B71C1C'; // Vermelho intenso para borda
+            dashArray = '1, 5'; // Linha pontilhada (alerta)
             break;
         default:
-            color = '#90A4AE'; // Cinza padrão
+            color = '#90A4AE'; // Cinza padrão para preenchimento
+            borderColor = '#546E7A'; // Cinza escuro para borda
             break;
     }
 
     return {
         fillColor: color,
-        weight: 2,
+        weight: 2, // Borda um pouco mais grossa
         opacity: 0.8,
-        color: 'black', // Borda preta para destaque
-        dashArray: '5,5', // Linha tracejada
-        fillOpacity: 0.4
+        color: borderColor, 
+        dashArray: dashArray, 
+        fillOpacity: 0.4 // Transparência para ver o mapa base por baixo
     };
 }
 
