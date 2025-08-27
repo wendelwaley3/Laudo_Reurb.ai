@@ -307,12 +307,41 @@ function initUpload() {
 function styleLote(feature) {
     const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
     let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f1c40f'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3' || risco.includes('geologico') || risco.includes('hidrologico')) color = '#e67e22'; 
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
-    else color = '#3498db'; 
-    return { fillColor: color, weight: 1, opacity: 1, color: 'white', dashArray: '3', fillOpacity: 0.7 };
+
+    // Mapeamento de risco para cores
+    switch (risco) {
+        case '1':
+        case 'baixo':
+            color = '#2ecc71'; // Verde
+            break;
+        case '2':
+        case 'médio':
+        case 'medio':
+            color = '#f1c40f'; // Amarelo
+            break;
+        case '3':
+        case 'alto':
+        case 'geologico':
+        case 'hidrologico': // Incluindo 'geologico' e 'hidrologico' como Alto Risco
+            color = '#e67e22'; // Laranja
+            break;
+        case '4':
+        case 'muito alto':
+            color = '#c0392b'; // Vermelho
+            break;
+        default:
+            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
+            break;
+    }
+
+    return {
+        fillColor: color,
+        weight: 1,
+        opacity: 1,
+        color: 'white', 
+        dashArray: '3', 
+        fillOpacity: 0.7
+    };
 }
 
 function onEachLoteFeature(feature, layer) {
