@@ -719,3 +719,110 @@ function fillLotesTable() {
         downloadText('lotes_tabela.csv', csv);
     };
 }
+    processAndLoadBtn.addEventListener('click', async () => {
+        console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
+        const filesToProcess = Array.from(fileInput.files || []);
+
+        if (filesToProcess.length === 0) { 
+            uploadStatus.textContent = 'Nenhum arquivo para processar. Por favor, selecione arquivos GeoJSON.'; 
+            uploadStatus.className = 'status-message error'; 
+            return; 
+        }
+
+        uploadStatus.textContent = 'Processando e carregando dados...'; 
+        uploadStatus.className = 'status-message info';
+
+        // Limpa TODOS os dados e camadas ANTES de iniciar o novo processamento
+        state.layers.lotes.clearLayers(); 
+        state.layers.app.clearLayers(); 
+        state.layers.poligonais.clearLayers(); 
+        state.layers.areasRisco.clearLayers(); 
+        state.allLotes = []; 
+        state.allAPPGeoJSON.features = []; 
+        state.allPoligonaisGeoJSON.features = []; 
+        state.allAreasRiscoGeoJSON.features = []; 
+        state.nucleusSet.clear();
+
+        const newLotesFeatures = []; 
+        const newAPPFeatures = []; 
+        const newPoligonaisFeatures = []; 
+        const newAreasRiscoFeatures = [];
+
+        for (const file of filesToProcess) {
+            try {
+                console.log(`Processando arquivo: ${file.name}`); 
+                const reader = new FileReader();
+                const fileContent = await new Promise((resolve, reject) => { 
+                    reader.onload = (e) => resolve(e.target.result); 
+                    reader.onerror = (e) => reject(e); 
+                    reader.readAsText(file); 
+                });
+                let geojsonData = JSON.parse(fileContent);
+
+                // **REPROJEÇÃO UTM SE O CHECKBOX ESTIVER MARCADO E OS CAMPOS PREENCHIDOS**
+                if (state.utmOptions.useUtm && state.utmOptions.zone && (state.utmOptions.south !== undefined)) {
+                    try { 
+                        console.log(`Reprojetando ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
+                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); 
+                        console.log(`Reprojeção de ${file.name} concluída.`); 
+                    } catch (e) { 
+                        console.error(`Falha na reprojeção de ${file.name}:`, e, geojsonData); 
+                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`; 
+                        uploadStatus.className = 'status-message error'; 
+                        // Continua, mas com a mensagem de erro específica para o arquivo
+                        continue; 
+                    }
+                } else if (state.utmOptions.useUtm) {
+                     console.warn(`Reprojeção UTM ativada, mas zona ou hemisfério não configurados. Pulando reprojeção para ${file.name}.`);
+                }
+
+                if (!geojsonData.type || !geojsonData.features) throw new Error('Arquivo GeoJSON inválido');
+                if (geojsonData.type !== 'FeatureCollection') console.warn(`Arquivo ${file.name} não é um FeatureCollection`);
+
+                const fileNameLower = file.name.toLowerCase();
+                if (fileNameLower.includes('lote') && !fileNameLower.includes('risco')) { 
+                    newLotesFeatures.push(...geojsonData.features);
+                    geojsonData.features.forEach(f => { if (f.properties && f.properties.desc_nucleo) state.nucleusSet.add(f.properties.desc_nucleo); });
+                } else if (fileNameLower.includes('area de risco') || fileNameLower.includes('risco')) { 
+                    newAreasRiscoFeatures.push(...geojsonData.features);
+                }
+                 else if (fileNameLower.includes('app')) { 
+                    newAPPFeatures.push(...geojsonData.features);
+                } else { 
+                    newPoligonaisFeatures.push(...geojsonData.features);
+                }
+                console.log(`Arquivo ${file.name} categorizado.`); 
+
+            } catch (error) { 
+                console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
+                uploadStatus.textContent = `Erro ao processar ${file.name}. Detalhes: ${error.message}`; 
+                uploadStatus.className = 'status-message error'; 
+                // Continua o laço para tentar processar outros arquivos mesmo se um falhar
+                continue;
+            }
+        }
+
+        // --- ATUALIZA O ESTADO GLOBAL COM OS DADOS PROCESSADOS ---
+        state.allLotes = newLotesFeatures; 
+        state.allAPPGeoJSON.features = newAPPFeatures;
+        state.allPoligonaisGeoJSON.features = newPoligonaisFeatures;
+        state.allAreasRiscoGeoJSON.features = newAreasRiscoFeatures;
+        
+        // --- RENDERIZAÇÃO NO MAPA E ATUALIZAÇÃO DA UI ---
+        renderLayersOnMap(); // Renderiza TUDO no mapa (ela usará os dados de state)
+
+        populateNucleusFilter(); // Popula o filtro com os núcleos coletados
+        refreshDashboard();      // Atualiza o dashboard com os novos dados
+        fillLotesTable();        // Preenche a tabela com os novos dados
+
+        // Verifica se algum dado foi carregado para mostrar mensagem de sucesso
+        if (state.allLotes.length > 0 || state.allAPPGeoJSON.features.length > 0 || state.allPoligonaisGeoJSON.features.length > 0 || state.allAreasRiscoGeoJSON.features.length > 0) {
+             uploadStatus.textContent = 'Dados carregados com sucesso! Vá para o Dashboard ou Dados Lotes.';
+             uploadStatus.className = 'status-message success';
+        } else {
+             uploadStatus.textContent = 'Nenhum dado válido foi carregado de nenhum arquivo GeoJSON.';
+             uploadStatus.className = 'status-message error';
+        }
+        
+        console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
+    });
