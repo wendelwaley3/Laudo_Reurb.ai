@@ -1,22 +1,24 @@
 // ===================== Estado Global do Aplicativo =====================
+// Centraliza variáveis de estado para facilitar a organização e manutenção.
 const state = {
     map: null,
-    layers: { 
+    layers: { // FeatureGroups para gerenciar as camadas do Leaflet
         lotes: null, 
         app: null,   
         poligonais: null,
-        areasRisco: null // NOVO: FeatureGroup para áreas de risco
+        areasRisco: null // Camada para áreas de risco (lotes area de risco.geojson)
     },
-    allLotes: [],           
+    allLotes: [],           // Array de todas as feições de lotes carregadas
     allAPPGeoJSON: { type: 'FeatureCollection', features: [] }, 
     allPoligonaisGeoJSON: { type: 'FeatureCollection', features: [] }, 
-    allAreasRiscoGeoJSON: { type: 'FeatureCollection', features: [] }, // NOVO: Armazena áreas de risco
-    nucleusSet: new Set(),  
-    currentNucleusFilter: 'all', 
-    utmOptions: { useUtm: false, zone: 23, south: true }, 
-    generalProjectInfo: {}, 
-    lastReportText: '',     
+    allAreasRiscoGeoJSON: { type: 'FeatureCollection', features: [] }, // Armazena as feições de áreas de risco
+    nucleusSet: new Set(),  // Set para armazenar nomes de núcleos únicos
+    currentNucleusFilter: 'all', // Núcleo selecionado no filtro do Dashboard
+    utmOptions: { useUtm: false, zone: 23, south: true }, // Configurações para reprojeção UTM client-side
+    generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
+    lastReportText: '',     // Último relatório gerado (para exportação)
 };
+
 // ===================== Utilidades Diversas =====================
 
 /** Formata um número para moeda BRL. */
@@ -104,6 +106,12 @@ const ibgeDataSimulado = {
         populacao: "131.200 (estimativa 2023)",
         area_km2: "367.359"
     },
+    "Diogo de Vasconcelos": { // Adicionado conforme sua imagem
+        municipio: "Diogo de Vasconcelos",
+        regiao: "Sudeste",
+        populacao: "4.000 (estimativa 2023)",
+        area_km2: "165.123"
+    }
     // Adicione mais dados simulados
 };
 
@@ -131,6 +139,7 @@ function generateSimulatedAILaudo(promptData) {
     return laudo;
 }
 
+
 // ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
     console.log('initMap: Iniciando mapa Leaflet...'); 
@@ -152,18 +161,14 @@ function initMap() {
     L.control.layers(baseMaps).addTo(state.map); 
     console.log('initMap: Controle de camadas base adicionado.'); 
 
-    // INICIALIZA OS FEATUREGROUPS MAS NÃO OS ADICIONA AO MAPA AQUI.
-    // ELES SERÃO ADICIONADOS POR renderLayersOnMap() OU PELA LEGENDA.
     state.layers.lotes = L.featureGroup();
     state.layers.app = L.featureGroup(); 
     state.layers.poligonais = L.featureGroup(); 
     state.layers.areasRisco = L.featureGroup(); 
 
     // Adiciona ao mapa os FeatureGroups que deveriam estar visíveis por padrão, conforme os checkboxes
-    // (Apenas lotes é checked por padrão no HTML)
     document.getElementById('toggleLotes').checked = true; // Assume que o HTML tem este padrão
     state.layers.lotes.addTo(state.map); 
-
     // As outras camadas (APP, Poligonais, Áreas de Risco) não são adicionadas aqui,
     // pois os checkboxes estão desmarcados por padrão no HTML.
 
@@ -195,137 +200,7 @@ function initNav() {
         });
     });
 }
-// ===================== Filtros por Núcleo =====================
 
-function filteredLotes() {
-    if (state.currentNucleusFilter === 'all') return state.allLotes;
-    return state.allLotes.filter(f => f.properties?.desc_nucleo === state.currentNucleusFilter);
-}
-
-/** Aplica zoom ao mapa para a extensão dos lotes filtrados. */
-function zoomToFilter() {
-    console.log(`zoomToFilter: Aplicando zoom para o núcleo: ${state.currentNucleusFilter}`);
-    const feats = filteredLotes(); // Pega os lotes já filtrados
-
-    if (feats.length === 0) {
-        console.warn('zoomToFilter: Nenhum lote para o filtro, centralizando no Brasil.');
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver lotes
-        return;
-    }
-
-    // Cria um FeatureGroup temporário APENAS com os lotes filtrados para calcular os bounds
-    const filteredLotesGroup = L.featureGroup();
-    L.geoJSON({ type: 'FeatureCollection', features: feats }).addTo(filteredLotesGroup);
-
-    if (filteredLotesGroup.getLayers().length > 0) {
-        try {
-            const bounds = filteredLotesGroup.getBounds();
-            if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
-                console.log('zoomToFilter: Mapa ajustado para os bounds do núcleo filtrado:', bounds);
-            } else {
-                console.warn("zoomToFilter: Bounds do núcleo filtrado inválidos. Verifique as coordenadas dos lotes neste núcleo.");
-                state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
-            }
-        } catch (e) {
-            console.error("zoomToFilter: Erro ao ajustar o mapa aos bounds do filtro.", e);
-            state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
-        }
-    } else {
-        console.warn('zoomToFilter: Nenhuma camada válida no grupo filtrado para ajuste de zoom.');
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados válidos
-    }
-}
-
-    // Cria um FeatureGroup temporário APENAS com os lotes filtrados
-    const filteredLotesGroup = L.featureGroup();
-    L.geoJSON({ type: 'FeatureCollection', features: feats }, {
-        style: styleLote, // Usa o estilo de lotes para renderização temporária
-        onEachFeature: onEachLoteFeature // Mantém os popups se houver necessidade
-    }).addTo(filteredLotesGroup);
-
-    if (filteredLotesGroup.getLayers().length > 0) {
-        try {
-            const bounds = filteredLotesGroup.getBounds();
-            if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
-                console.log('zoomToFilter: Mapa ajustado para os bounds do núcleo filtrado:', bounds);
-            } else {
-                console.warn("zoomToFilter: Bounds do núcleo filtrado inválidos. Verifique as coordenadas dos lotes neste núcleo.");
-                state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
-            }
-        } catch (e) {
-            console.error("zoomToFilter: Erro ao ajustar o mapa aos bounds do filtro.", e);
-            state.map.setView([-15.7801, -47.9292], 10); // Zoom mais próximo como fallback
-        }
-    } else {
-        console.warn('zoomToFilter: Nenhuma camada válida no grupo filtrado para ajuste de zoom.');
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados válidos
-    }
-}
-
-// ===================== Estilos e Popups para Áreas de Risco (Nova Camada) =====================
-function styleAreaRisco(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
-    // Assume que a área de risco também tem uma propriedade que indica seu nível de risco.
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
-    let color;
-    let borderColor = 'black'; // Borda padrão
-    let dashArray = '5,5'; // Linha tracejada padrão
-
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#8BC34A'; // Verde claro para preenchimento
-            borderColor = '#558B2F'; // Verde escuro para borda
-            break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#FFC107'; // Amarelo para preenchimento
-            borderColor = '#FFA000'; // Laranja para borda
-            break;
-        case '3':
-        case 'alto':
-        case 'geologico':
-        case 'hidrologico':
-            color = '#FF5722'; // Laranja avermelhado para preenchimento
-            borderColor = '#D84315'; // Vermelho para borda
-            dashArray = '10,5'; // Linha mais destacada
-            break;
-        case '4':
-        case 'muito alto':
-            color = '#D32F2F'; // Vermelho escuro para preenchimento
-            borderColor = '#B71C1C'; // Vermelho intenso para borda
-            dashArray = '1, 5'; // Linha pontilhada (alerta)
-            break;
-        default:
-            color = '#90A4AE'; // Cinza padrão para preenchimento
-            borderColor = '#546E7A'; // Cinza escuro para borda
-            break;
-    }
-
-    return {
-        fillColor: color,
-        weight: 2, // Borda um pouco mais grossa
-        opacity: 0.8,
-        color: borderColor, 
-        dashArray: dashArray, 
-        fillOpacity: 0.4 // Transparência para ver o mapa base por baixo
-    };
-}
-
-function onEachAreaRiscoFeature(feature, layer) {
-    if (feature.properties) {
-        let popupContent = "<h3>Detalhes da Área de Risco:</h3>";
-        for (let key in feature.properties) {
-            let value = feature.properties[key];
-            if (value === null || value === undefined || value === '') value = 'N/A';
-            popupContent += `<strong>${key}:</strong> ${value}<br>`;
-        }
-        layer.bindPopup(popupContent);
-    }
-}
 // ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...'); 
@@ -395,16 +270,8 @@ function initUpload() {
 
         uploadStatus.textContent = 'Processando e carregando dados...'; uploadStatus.className = 'status-message info';
 
-        // Limpa TUDO antes de carregar
-        state.layers.lotes.clearLayers(); 
-        state.layers.app.clearLayers(); 
-        state.layers.poligonais.clearLayers(); 
-        state.layers.areasRisco.clearLayers(); 
-        state.allLotes = []; 
-        state.allAPPGeoJSON.features = []; 
-        state.allPoligonaisGeoJSON.features = []; 
-        state.allAreasRiscoGeoJSON.features = []; 
-        state.nucleusSet.clear();
+        state.layers.lotes.clearLayers(); state.layers.app.clearLayers(); state.layers.poligonais.clearLayers(); state.layers.areasRisco.clearLayers();
+        state.allLotes = []; state.allAPPGeoJSON.features = []; state.allPoligonaisGeoJSON.features = []; state.allAreasRiscoGeoJSON.features = []; state.nucleusSet.clear();
 
         const newLotesFeatures = []; const newAPPFeatures = []; const newPoligonaisFeatures = []; const newAreasRiscoFeatures = [];
 
@@ -415,21 +282,10 @@ function initUpload() {
                 const fileContent = await new Promise((resolve, reject) => { reader.onload = (e) => resolve(e.target.result); reader.onerror = (e) => reject(e); reader.readAsText(file); });
                 let geojsonData = JSON.parse(fileContent);
 
-                // **REPROJEÇÃO UTM SE O CHECKBOX ESTIVER MARCADO E OS CAMPOS PREENCHIDOS**
                 if (state.utmOptions.useUtm && state.utmOptions.zone && (state.utmOptions.south !== undefined)) {
-                    try { 
-                        console.log(`Reprojetando ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
-                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); 
-                        console.log(`Reprojeção de ${file.name} concluída.`); 
-                    } catch (e) { 
-                        console.error(`Falha na reprojeção de ${file.name}:`, e, geojsonData); // Adicionado geojsonData para debug
-                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`; 
-                        uploadStatus.className = 'status-message error'; 
-                        continue; 
-                    }
-                } else if (state.utmOptions.useUtm) {
-                     console.warn(`Reprojeção UTM ativada, mas zona ou hemisfério não configurados. Pulando reprojeção para ${file.name}.`);
-                }
+                    try { geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south); console.log(`Reprojeção de ${file.name} concluída.`); } 
+                    catch (e) { console.error(`Falha na reprojeção de ${file.name}:`, e, geojsonData); uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}.`; uploadStatus.className = 'status-message error'; continue; }
+                } else if (state.utmOptions.useUtm) { console.warn(`Reprojeção UTM ativada, mas zona ou hemisfério não configurados. Pulando reprojeção para ${file.name}.`); }
 
 
                 if (!geojsonData.type || !geojsonData.features) throw new Error('Arquivo GeoJSON inválido');
@@ -449,24 +305,16 @@ function initUpload() {
                 }
                 console.log(`Arquivo ${file.name} categorizado.`); 
 
-            } catch (error) { 
-                console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
-                uploadStatus.textContent = `Erro ao processar ${file.name}. Detalhes: ${error.message}`; 
-                uploadStatus.className = 'status-message error'; 
-                continue;
-            }
+            } catch (error) { console.error(`Erro ao carregar ou parsear ${file.name}:`, error); uploadStatus.textContent = `Erro ao processar ${file.name}. Detalhes: ${error.message}`; uploadStatus.className = 'status-message error'; continue; }
         }
 
-        // Armazena as features globais no estado
         state.allLotes = newLotesFeatures; 
         state.allAPPGeoJSON.features = newAPPFeatures;
         state.allPoligonaisGeoJSON.features = newPoligonaisFeatures;
         state.allAreasRiscoGeoJSON.features = newAreasRiscoFeatures;
         
-        // Renderiza TUDO no mapa, chamando a função renderLayersOnMap (ela usará os dados de state)
-        renderLayersOnMap(); 
+        renderLayersOnMap(); // Renderiza TUDO no mapa
 
-        // ATUALIZA A UI APÓS O CARREGAMENTO E RENDERIZAÇÃO
         populateNucleusFilter();
         refreshDashboard();
         fillLotesTable(); 
@@ -474,380 +322,6 @@ function initUpload() {
         uploadStatus.textContent = 'Dados carregados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
-    });
-}
-// ===================== Legenda / Toggle Camadas =====================
-function initLegendToggles() {
-    const toggle = (id, layer) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('change', () => {
-            if (el.checked) layer.addTo(state.map); else state.map.removeLayer(layer);
-            // Após togglar, reajusta o mapa para as camadas VISÍVEIS
-            const allVisibleLayersGroup = L.featureGroup([
-                state.layers.lotes,
-                document.getElementById('toggleAPP')?.checked ? state.layers.app : null,
-                document.getElementById('togglePoligonais')?.checked ? state.layers.poligonais : null,
-                document.getElementById('toggleAreasRisco')?.checked ? state.layers.areasRisco : null
-            ].filter(Boolean));
-            if (allVisibleLayersGroup.getLayers().length > 0) {
-                 try { state.map.fitBounds(allVisibleLayersGroup.getBounds(), { padding: [50, 50] }); } catch (e) {}
-            }
-        });
-    };
-    toggle('toggleLotes', state.layers.lotes);
-    toggle('togglePoligonais', state.layers.poligonais);
-    toggle('toggleAPP', state.layers.app);
-    toggle('toggleAreasRisco', state.layers.areasRisco); // NOVO: Adiciona toggle para áreas de risco
-}
-// ===================== Estilos e Popups para Áreas de Risco =====================
-function styleAreaRisco(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' da feature da área de risco
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
-    let color;
-    let borderColor = 'black'; // Borda padrão
-    let dashArray = '5,5'; // Linha tracejada padrão
-
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#8BC34A'; // Verde claro para preenchimento
-            borderColor = '#558B2F'; // Verde escuro para borda
-            break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#FFC107'; // Amarelo para preenchimento
-            borderColor = '#FFA000'; // Laranja para borda
-            break;
-        case '3':
-        case 'alto':
-        case 'geologico':
-        case 'hidrologico':
-            color = '#FF5722'; // Laranja avermelhado para preenchimento
-            borderColor = '#D84315'; // Vermelho para borda
-            dashArray = '10,5'; // Linha mais destacada
-            break;
-        case '4':
-        case 'muito alto':
-            color = '#D32F2F'; // Vermelho escuro para preenchimento
-            borderColor = '#B71C1C'; // Vermelho intenso para borda
-            dashArray = '1, 5'; // Linha pontilhada (alerta)
-            break;
-        default:
-            color = '#90A4AE'; // Cinza padrão para preenchimento
-            borderColor = '#546E7A'; // Cinza escuro para borda
-            break;
-    }
-
-    return {
-        fillColor: color,
-        weight: 2, // Borda um pouco mais grossa para destacar áreas
-        opacity: 0.8,
-        color: borderColor, 
-        dashArray: dashArray, 
-        fillOpacity: 0.4 // Transparência para ver o mapa base por baixo
-    };
-}
-
-// ... (onEachAreaRiscoFeature e o restante do código permanecem como na última entrega) ...
-function onEachLoteFeature(feature, layer) {
-    if (feature.properties) {
-        let popupContent = "<h3>Detalhes do Lote:</h3>";
-        for (let key in feature.properties) {
-            let value = feature.properties[key];
-            if (value === null || value === undefined || value === '') value = 'N/A'; 
-            if (key.toLowerCase() === 'area_m2' && typeof value === 'number') value = value.toLocaleString('pt-BR') + ' m²';
-            if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo de intervenção') && typeof value === 'number') value = formatBRL(value);
-            if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
-
-            let displayKey = key;
-            switch(key.toLowerCase()){
-                case 'cod_lote': displayKey = 'Código do Lote'; break;
-                case 'desc_nucleo': displayKey = 'Núcleo'; break;
-                case 'tipo_uso': displayKey = 'Tipo de Uso'; break;
-                case 'area_m2': displayKey = 'Área (m²)'; break;
-                case 'risco': displayKey = 'Status de Risco'; break;
-                case 'dentro_app': displayKey = 'Em APP'; break;
-                case 'valor': displayKey = 'Custo de Intervenção'; break;
-                case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
-                case 'nm_mun': displayKey = 'Município'; break; 
-                case 'nome_logradouro': displayKey = 'Logradouro'; break;
-                case 'numero_postal': displayKey = 'CEP'; break;
-                case 'status_risco': displayKey = 'Status Risco'; break; 
-                case 'cod_area': displayKey = 'Cód. Área'; break;
-                case 'grau': displayKey = 'Grau'; break;
-                case 'qtde_lote': displayKey = 'Qtde. Lote(s)'; break;
-                case 'intervencao': displayKey = 'Intervenção'; break;
-                case 'lotes_atingidos': displayKey = 'Lotes Atingidos'; break;
-            }
-            popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-        }
-        layer.bindPopup(popupContent);
-    }
-}
-
-function styleApp(feature) { return { color: '#9b59b6', weight: 2, opacity: 0.7, fillColor: '#d7bde2', fillOpacity: 0.2 }; }
-function onEachAppFeature(feature, layer) { if (feature.properties) { let popupContent = "<h3>Área de Preservação Permanente (APP)</h3>"; for (let key in feature.properties) popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`; layer.bindPopup(popupContent); } }
-
-function stylePoligonal(feature) { return { color: '#2ecc71', weight: 2, opacity: 0.7, fillOpacity: 0.2 }; }
-async function onEachPoligonalFeature(feature, layer) {
-    if (feature.properties) {
-        const props = feature.properties;
-        const municipioNome = props.municipio || props.nm_mun || 'Não informado'; 
-
-        let popupContent = `<h3>Informações da Poligonal: ${municipioNome}</h3>`;
-        popupContent += `<strong>Município:</strong> ${municipioNome}<br>`;
-        if (props.area_m2) popupContent += `<strong>Área (m²):</strong> ${props.area_m2.toLocaleString('pt-BR')} m²<br>`;
-        for (let key in props) { if (!['municipio', 'nm_mun', 'area_m2'].includes(key.toLowerCase())) popupContent += `<strong>${key}:</strong> ${props[key]}<br>`; }
-        popupContent += `<button onclick="buscarInfoCidade('${municipioNome}')" style="margin-top:8px;">Ver informações do município</button>`;
-        layer.bindPopup(popupContent);
-    }
-}
-
-function buscarInfoCidade(nomeCidade) {
-    alert(`Buscando dados simulados para ${nomeCidade}...`);
-    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
-    let info = `**Informações para ${dadosSimulados.municipio}:**\n- Região: ${dadosSimulados.regiao}\n- População Estimada: ${dadosSimulados.populacao}\n- Área Territorial: ${dadosSimulados.area_km2} km²\n\n(Estes dados são simulados. Para dados reais, um backend seria necessário.)`;
-    alert(info);
-    console.log("Dados do município simulados:", dadosSimulados);
-}
-
-// ===================== Renderização de Camadas no Mapa =====================
-function renderLayersOnMap(featuresToDisplay = state.allLotes) {
-    console.log('renderLayersOnMap: Renderizando camadas...');
-    
-    // Limpa todas as camadas antes de redesenhar
-    state.layers.lotes.clearLayers();
-    state.layers.app.clearLayers();
-    state.layers.poligonais.clearLayers();
-    state.layers.areasRisco.clearLayers();
-
-    // Adiciona Lotes (filtrados ou todos)
-    if (featuresToDisplay.length > 0) {
-        L.geoJSON(featuresToDisplay, {
-            onEachFeature: onEachLoteFeature,
-            style: styleLote
-        }).addTo(state.layers.lotes);
-        console.log(`renderLayersOnMap: ${featuresToDisplay.length} lotes adicionados à camada.`);
-    }
-
-    // Adiciona APP (todos os dados APP carregados)
-    if (state.allAPPGeoJSON.features.length > 0) {
-        L.geoJSON(state.allAPPGeoJSON.features, {
-            onEachFeature: onEachAppFeature,
-            style: styleApp
-        }).addTo(state.layers.app);
-        console.log(`renderLayersOnMap: ${state.allAPPGeoJSON.features.length} feições de APP adicionadas à camada.`);
-    }
-
-    // Adiciona Poligonais (todos os dados Poligonais carregados, exceto as áreas de risco específicas)
-    if (state.allPoligonaisGeoJSON.features.length > 0) {
-        L.geoJSON(state.allPoligonaisGeoJSON.features, {
-            onEachFeature: onEachPoligonalFeature,
-            style: stylePoligonal
-        }).addTo(state.layers.poligonais);
-        console.log(`renderLayersOnMap: ${state.allPoligonaisGeoJSON.features.length} feições de Poligonais adicionadas à camada.`);
-    }
-
-    // Adiciona Áreas de Risco (com estilo próprio)
-    if (state.allAreasRiscoGeoJSON.features.length > 0) {
-        L.geoJSON(state.allAreasRiscoGeoJSON.features, {
-            onEachFeature: onEachAreaRiscoFeature, 
-            style: styleAreaRisco 
-        }).addTo(state.layers.areasRisco);
-        console.log(`renderLayersOnMap: ${state.allAreasRiscoGeoJSON.features.length} feições de Áreas de Risco adicionadas à camada.`);
-    }
-
-
-    // Ajusta o zoom do mapa para a extensão dos dados carregados
-    // AQUI: Usamos os FeatureGroups do state.layers para o fitBounds
-    const allLayersGroupForBounds = L.featureGroup([
-        state.layers.lotes, 
-        state.layers.app, 
-        state.layers.poligonais, 
-        state.layers.areasRisco
-    ].filter(fg => fg && fg.getLayers().length > 0)); // Filtra FeatureGroups não vazios e com camadas
-
-    if (allLayersGroupForBounds.getLayers().length > 0) {
-        try {
-            const bounds = allLayersGroupForBounds.getBounds();
-            if (bounds.isValid()) {
-                state.map.fitBounds(bounds, { padding: [50, 50] }); // Ajusta o zoom com padding
-                console.log('Mapa ajustado para os bounds dos dados carregados:', bounds);
-            } else {
-                console.warn("Bounds inválidos (possivelmente coordenadas problemáticas). O mapa não será ajustado automaticamente. Verifique as coordenadas dos seus GeoJSONs.");
-                state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil como fallback
-            }
-        } catch (e) {
-            console.error("Erro ao ajustar o mapa aos bounds. Verifique as coordenadas.", e);
-            state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil como fallback
-        }
-    } else {
-        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
-        console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
-    }
-}
-// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
-    initMap(); 
-    initNav(); 
-    initUpload(); 
-    initLegendToggles(); 
-    initGeneralInfoForm(); // Garante que esta função seja chamada e esteja no escopo correto
-
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter();
-    });
-
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
-
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
-    
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); 
-    });
-
-    document.getElementById('dashboard').classList.add('active');
-    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    refreshDashboard(); 
-    fillLotesTable(); 
-    populateNucleusFilter(); // Garante que esta função seja chamada e esteja no escopo correto
-    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
-});
-// ===================== Dashboard =====================
-function refreshDashboard() {
-    console.log('refreshDashboard: Atualizando cards do dashboard.');
-    const feats = filteredLotes();
-    const totalLotesCount = feats.length;
-
-    let lotesEmRiscoGeral = 0; 
-    let lotesAppCount = 0;
-    let custoTotal = 0;
-    let custoMin = Infinity; 
-    let custoMax = -Infinity; 
-    let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
-
-    feats.forEach(f => {
-        const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
-
-        if (risco.includes('baixo') || risco === '1') {
-            riskCounts['Baixo']++;
-        } else if (risco.includes('médio') || risco.includes('medio') || risco === '2') {
-            riskCounts['Médio']++;
-        } else if (risco.includes('alto') || risco === '3' || risco.includes('geologico') || risco.includes('hidrologico')) {
-            riskCounts['Alto']++;
-        } else if (risco.includes('muito alto') || risco === '4') {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco.trim() !== '') {
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
-        
-        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco.trim() !== '') {
-            lotesEmRiscoGeral++;
-        }
-        
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
-
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
-        if (!isNaN(valorCusto) && valorCusto > 0) {
-            custoTotal += valorCusto;
-            if (valorCusto < custoMin) custoMin = valorCusto;
-            if (valorCusto > custoMax) custoMax = valorCusto;
-        }
-    });
-
-    document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral; 
-    document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
-
-    document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
-    document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
-    document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
-    document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
-
-    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral; 
-    document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral; 
-
-    document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
-    document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
-.getElementById('mainMunicipioDisplay').textContent = mainMunicipio;
-}
-// ===================== Tabela de Lotes =====================
-function fillLotesTable() {
-    console.log('fillLotesTable: Preenchendo tabela de lotes.');
-    const tbody = document.querySelector('#lotesDataTable tbody');
-    const feats = filteredLotes();
-    tbody.innerHTML = '';
-
-    if (feats.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7">Nenhum dado disponível.</td></tr>';
-        return;
-    }
-
-    const fragment = document.createDocumentFragment();
-    feats.forEach(f => {
-        const p = f.properties || {};
-        const tr = document.createElement('tr');
-        const codLote = p.cod_lote || p.codigo || 'N/A';
-        tr.innerHTML = `
-            <td>${codLote}</td>
-            <td>${p.desc_nucleo || 'N/A'}</td>
-            <td>${p.tipo_uso || 'N/A'}</td>
-            <td>${p.area_m2 ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A'}</td>
-            <td>${p.risco || p.status_risco || p.grau || 'N/A'}</td>
-            <td>${(Number(p.dentro_app) > 0) ? 'Sim' : 'Não'}</td>
-            <td><button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button></td>
-        `;
-        fragment.appendChild(tr);
-    });
-    tbody.appendChild(fragment);
-
-    tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const codLoteToZoom = btn.getAttribute('data-codlote');
-            // Busca pelo lote no ALL LOTES para garantir que a geometria esteja disponível
-            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote || l.properties?.codigo) == codLoteToZoom);
-            
-            if (loteToZoom) {
-                // Navega para o dashboard (onde está o mapa)
-                document.querySelector('nav a[data-section="dashboard"]').click();
-                
-                // Cria uma camada Leaflet temporária para obter os limites (bounds) do lote
-                const tempLayer = L.geoJSON(loteToZoom); 
-                try { 
-                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
-                } catch (e) {
-                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
-                }
-                // Tenta abrir o popup do lote no mapa
-                state.layers.lotes.eachLayer(layer => {
-                    if ((layer.feature?.properties?.cod_lote || layer.feature?.properties?.codigo) == codLoteToZoom && layer.openPopup) {
-                        layer.openPopup();
-                    }
-                });
-            } else {
-                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
-            }
-        });
     });
 }
 // ===================== Geração de Relatório com IA (Simulado) =====================
