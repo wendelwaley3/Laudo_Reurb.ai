@@ -663,7 +663,42 @@ async function onEachLoteFeature(feature, layer) {
         });
     }
 }
+// ===================== Busca de CEP por Endereço (ViaCEP) =====================
+/**
+ * Usa a API do ViaCEP para buscar um CEP a partir de UF, cidade e logradouro.
+ * @param {string} uf - A sigla do estado (ex: "MG").
+ * @param {string} cidade - O nome da cidade.
+ * @param {string} logradouro - O nome da rua/avenida.
+ * @returns {Promise<string>} O primeiro CEP encontrado ou "Não encontrado".
+ */
+async function buscarCepPorEndereco(uf, cidade, logradouro) {
+    if (!uf || !cidade || !logradouro) {
+        return "Dados insuficientes";
+    }
 
+    // Formata os dados para a URL da API
+    const url = `https://viacep.com.br/ws/${uf}/${cidade}/${logradouro}/json/`;
+    console.log("Buscando CEP na URL:", url);
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Erro na API do ViaCEP: ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log("Resposta da API ViaCEP:", data);
+
+        // Se a API retorna um array de resultados, pegamos o primeiro.
+        if (data && data.length > 0) {
+            return data[0].cep; // Retorna o CEP do primeiro resultado
+        } else {
+            return "Não encontrado";
+        }
+    } catch (error) {
+        console.error("Erro ao buscar CEP:", error);
+        return "Erro na busca";
+    }
+}
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
