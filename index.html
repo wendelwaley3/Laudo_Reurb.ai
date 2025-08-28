@@ -3,14 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoLaudo.AI - Análise REURB</title>
+    <title>GeoLaudo.AI - Teste Básico</title>
 
-    <!-- Google Fonts: Inter (para um visual moderno) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Inclui o CSS do Leaflet (biblioteca de mapas) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-    <!-- Inclui seu CSS personalizado -->
+    <!-- 1. CSS do Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- 2. Seu CSS Personalizado -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,180 +16,31 @@
         <nav>
             <a href="#" data-section="dashboard" class="active">Dashboard</a>
             <a href="#" data-section="upload">Upload de Dados</a>
-            <a href="#" data-section="informacoes-gerais">Informações Gerais</a>
-            <a href="#" data-section="dados-lotes">Dados Lotes</a>
-            <a href="#" data-section="relatorios">Relatórios</a>
-            <a href="#" data-section="instrucoes">Instruções</a>
         </nav>
-        <button id="exportReportBtn">Exportar Relatório</button>
     </header>
 
     <main>
         <!-- Dashboard Section -->
         <section id="dashboard" class="container active">
-            <h2>Filtros de Análise</h2>
-            <div class="filters">
-                <select id="nucleusFilter">
-                    <option value="all">Todos os Núcleos</option>
-                </select>
-                <button id="applyFiltersBtn">Aplicar Filtros</button>
-            </div>
-
-            <div class="dashboard-cards">
-                <div class="card">
-                    <h3>Total de Lotes</h3>
-                    <p id="totalLotes">0</p>
-                    <span>lotes cadastrados</span>
-                </div>
-                <div class="card error">
-                    <h3>Lotes em Risco</h3>
-                    <p id="lotesRisco">0</p>
-                    <span>do total</span>
-                </div>
-                <div class="card warning">
-                    <h3>Lotes em APP</h3>
-                    <p id="lotesApp">0</p>
-                    <span>necessitam atenção</span>
-                </div>
-                <div class="card info">
-                    <h3>Custo de Intervenção</h3>
-                    <p>R$ <span id="custoEstimado">0,00</span></p>
-                    <span>estimativa total</span>
-                </div>
-            </div>
-
             <h2>Visualização Geoespacial</h2>
             <div id="mapid"></div>
-
-            <div class="map-legend">
-                <h3>Legenda do Mapa</h3>
-                <div class="legend-item"><input type="checkbox" id="toggleLotes" checked><label for="toggleLotes">Lotes</label> <span class="legend-color lotes"></span></div>
-                <div class="legend-item"><input type="checkbox" id="togglePoligonais"><label for="togglePoligonais">Poligonais</label> <span class="legend-color poligonais"></span></div>
-                <div class="legend-item"><input type="checkbox" id="toggleAPP"><label for="toggleAPP">APP</label> <span class="legend-color app"></span></div>
-
-                <h4>Áreas de Risco:</h4>
-                <ul>
-                    <li class="risk-low">Baixo Risco (1)</li>
-                    <li class="risk-medium">Médio Risco (2)</li>
-                    <li class="risk-high">Alto Risco (3)</li>
-                    <li class="risk-very-high">Muito Alto Risco (4)</li>
-                </ul>
-                <p class="click-info">Clique nos elementos do mapa para ver detalhes</p>
-            </div>
-
-            <h2>Análise de Riscos</h2>
-            <ul class="risk-summary">
-                <li class="risk-low">Baixo Risco: <span id="riskLowCount">0</span> lotes</li>
-                <li class="risk-medium">Médio Risco: <span id="riskMediumCount">0</span> lotes</li>
-                <li class="risk-high">Alto Risco: <span id="riskHighCount">0</span> lotes</li>
-                <li class="risk-very-high">Muito Alto Risco: <span id="riskVeryHighCount">0</span> lotes</li>
-            </ul>
-            <h3>Resumo de Intervenções</h3>
-            <ul>
-                <li id="minCustoIntervencao">Custo Mínimo de Intervenção: R$ 0,00</li>
-                <li id="maxCustoIntervencao">Custo Máximo de Intervenção: R$ 0,00</li>
-                <li><span id="areasIdentificadas">0</span> áreas de risco identificadas</li>
-                <li><span id="areasIntervencao">0</span> áreas demandam intervenção estrutural</li>
-            </ul>
-
-            <h2>Análise Comparativa por Núcleo</h2>
-            <div id="nucleusComparisonChart" class="chart-container">
-                <p>Nenhum dado disponível. Faça o upload das camadas para visualizar o gráfico.</p>
-            </div>
         </section>
 
         <!-- Upload Section -->
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
-                <label for="geojsonFileInput" class="drag-drop-area">
-                    <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
-                    <p>ou clique para selecionar</p>
-                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button>
-                </label>
+                <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button>
                 <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
             </div>
-            <div class="uploaded-files-preview">
-                <h3>Arquivos Selecionados:</h3>
-                <ul id="fileList">
-                    <li>Nenhum arquivo selecionado.</li>
-                </ul>
-            </div>
-            <button id="processAndLoadBtn">Processar e Carregar Dados</button>
-            <p id="uploadStatus" class="status-message"></p>
-            <!-- CONTROLE DE REPROJEÇÃO UTM (ESSENCIAL PARA O JS FUNCIONAR) -->
-            <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
-                <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
-                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
-                    <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
-                        <label>Hemisfério:
-                            <select id="utmHemisphereSelect">
-                                <option value="S">Sul</option>
-                                <option value="N">Norte</option>
-                            </select>
-                        </label>
-                    </div>
-                </div>
-                <p style="font-size:0.85em; color:#666; margin-top:10px;">
-                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção apenas se não puder converter previamente.
-                </p>
-            </div>
+            <h3>Arquivos Selecionados:</h3>
+            <ul id="fileList"></ul>
         </section>
-
-        <!-- SEÇÃO: Informações Gerais (Preenchimento Manual) -->
-        <section id="informacoes-gerais" class="container">
-            <h2>Informações Gerais da Área / Projeto</h2>
-            <div class="form-grid">
-                 <!-- ... (conteúdo do formulário permanece o mesmo) ... -->
-            </div>
-            <button id="saveGeneralInfoBtn">Salvar Informações Gerais</button>
-            <p id="generalInfoStatus" class="status-message"></p>
-        </section>
-        
-        <!-- NOVA SEÇÃO: Dados Lotes -->
-        <section id="dados-lotes" class="container">
-            <h2>Dados Detalhados dos Lotes</h2>
-            <div class="data-table-controls">
-                <input type="text" id="lotSearch" placeholder="Buscar lote...">
-                <button id="exportTableBtn">Exportar</button>
-            </div>
-            <div class="table-scroll-wrapper">
-                <table id="lotesDataTable">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Núcleo</th>
-                            <th>Tipo de Uso</th>
-                            <th>Área (m²)</th>
-                            <th>Status Risco</th>
-                            <th>APP</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- ... (resto das seções Relatórios e Instruções permanecem as mesmas) ... -->
-
     </main>
 
-    <footer>
-        <p>&copy; 2023 GeoLaudo.AI. Todos os direitos reservados.</p>
-    </footer>
-
-    <!-- Inclui o JS do Leaflet -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <!-- Inclui proj4js para definição de sistemas de coordenadas -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
-    <!-- Inclui o Turf.js para operações geoespaciais client-side -->
-    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-    <!-- Inclui seu JS personalizado -->
+    <!-- 3. JS do Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- 4. Seu JS Personalizado -->
     <script src="js/app.js"></script>
 </body>
 </html>
