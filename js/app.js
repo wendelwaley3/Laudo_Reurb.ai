@@ -489,13 +489,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
+    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
     let color;
-    if (risco === '1' || risco.includes('baixo')) color = '#2ecc71';      
-    else if (risco === '2' || risco.includes('médio')) color = '#f1c40f'; // Amarelo
-    else if (risco === '3' || risco.includes('alto')) color = '#e67e22'; // Laranja
-    else if (risco === '4' || risco.includes('muito alto')) color = '#c0392b'; 
-    else color = '#3498db'; 
+
+    // Mapeamento de risco para cores
+    switch (risco) {
+        case '1':
+        case 'baixo':
+            color = '#2ecc71'; // Verde
+            break;
+        case '2':
+        case 'médio':
+        case 'medio':
+            color = '#f1c40f'; // Amarelo
+            break;
+        case '3':
+        case 'alto':
+        case 'geologico':
+        case 'hidrologico':
+            color = '#e67e22'; // Laranja
+            break;
+        case '4':
+        case 'muito alto':
+            color = '#c0392b'; // Vermelho
+            break;
+        default:
+            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
+            break;
+    }
 
     return {
         fillColor: color,
@@ -817,19 +839,38 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
+        // Converte o valor de 'grau', 'risco', ou 'status_risco' para um número inteiro
+        const grau = parseInt(p.grau || p.risco || p.status_risco, 10);
 
-        if (risco === '1' || risco.includes('baixo')) riskCounts['Baixo']++;
-        else if (risco === '2' || risco.includes('médio')) riskCounts['Médio']++;
-        else if (risco === '3' || risco.includes('alto')) riskCounts['Alto']++;
-        else if (risco === '4' || risco.includes('muito alto')) riskCounts['Muito Alto']++;
+        // **NOVA LÓGICA DE CONTAGEM DE RISCO BASEADA EM NÚMEROS**
+        switch (grau) {
+            case 1:
+                riskCounts['Baixo']++;
+                break;
+            case 2:
+                riskCounts['Médio']++;
+                break;
+            case 3:
+                riskCounts['Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            case 4:
+                riskCounts['Muito Alto']++;
+                lotesRiscoAltoMuitoAlto++;
+                break;
+            default:
+                // Se não for um número de 1 a 4, não faz nada com a contagem de risco
+                break;
+        }
         
-        if (risco === '3' || risco === '4' || risco.includes('alto')) lotesRiscoAltoMuitoAlto++;
-        
-        const dentroApp = Number(p.dentro_app || 0);
-        if (dentroApp > 0) lotesAppCount++;
+        // Contagem de Lotes em APP
+        const dentroApp = Number(p.dentro_app || p.app || 0);
+        if (dentroApp > 0) {
+            lotesAppCount++;
+        }
 
-        const valorCusto = Number(p.valor || 0);
+        // Cálculo do Custo de Intervenção
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
         if (!isNaN(valorCusto) && valorCusto > 0) {
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
@@ -837,6 +878,7 @@ function refreshDashboard() {
         }
     });
 
+    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('lotesApp').textContent = lotesAppCount;
@@ -849,6 +891,7 @@ function refreshDashboard() {
 
     document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
     document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
+
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
