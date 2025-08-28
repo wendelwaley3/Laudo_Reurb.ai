@@ -744,7 +744,64 @@ function zoomToFilter() {
         console.warn("Não foi possível ajustar o mapa ao filtro.", e);
     }
 }
+// ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
+// ... (a função styleLote e onEachLoteFeature continuam as mesmas) ...
+// ... (a função styleApp e onEachAppFeature continuam as mesmas) ...
+// ... (a função stylePoligonal continua a mesma) ...
+
+
+// **NOVA FUNÇÃO SIMULADA PARA BUSCAR CEP**
+// Esta função simula a busca de CEP para manter o app funcionando sem backend.
+async function buscarCepPorMunicipio(municipio) {
+    console.log(`Simulando busca de CEP para: ${municipio}`);
+    // Em um cenário real com backend, aqui seria a chamada fetch.
+    // Como não podemos buscar um CEP para um município inteiro, retornamos dados de exemplo.
+    const exemplosCep = {
+        "Conselheiro Lafaiete": "36400-000",
+        "Diogo de Vasconcelos": "35447-000"
+    };
+
+    return new Promise(resolve => {
+        setTimeout(() => { // Simula um pequeno atraso de rede
+            const cepEncontrado = exemplosCep[municipio] || "Não disponível";
+            resolve({ cep: cepEncontrado });
+        }, 500); // 0.5 segundos de atraso
+    });
+}
+
+
+// Popup da camada Poligonal (AGORA COM BUSCA DE CEP)
+async function onEachPoligonalFeature(feature, layer) {
+    if (feature.properties) {
+        const props = feature.properties;
+        const municipioNome = props.municipio || props.nm_mun || 'Não informado'; 
+
+        let popupContent = `<h3>Informações da Poligonal</h3>`;
+        popupContent += `<strong>Município:</strong> ${municipioNome}<br>`;
+        if (props.area_m2) popupContent += `<strong>Área (m²):</strong> ${props.area_m2.toLocaleString('pt-BR')} m²<br>`;
+        
+        // Placeholder para o CEP enquanto busca
+        popupContent += `<strong>CEP:</strong> <span id="cep-${props.id || 'temp'}">Buscando...</span><br>`;
+        
+        for (let key in props) {
+            if (!['municipio', 'nm_mun', 'area_m2'].includes(key.toLowerCase())) {
+                popupContent += `<strong>${key}:</strong> ${props[key]}<br>`;
+            }
+        }
+        
+        layer.bindPopup(popupContent);
+
+        // Quando o popup abre, dispara a busca de CEP
+        layer.on('popupopen', async () => {
+            const cepData = await buscarCepPorMunicipio(municipioNome);
+            const cepElement = document.getElementById(`cep-${props.id || 'temp'}`);
+            if (cepElement) {
+                cepElement.textContent = cepData ? cepData.cep : "Não encontrado";
+            }
+        });
+    }
+}
 // ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
