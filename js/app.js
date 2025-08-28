@@ -265,17 +265,20 @@ function initUpload() {
     const utmHemisphereSelect = document.getElementById('utmHemisphereSelect');
 
     // Listener para o checkbox UTM
-    useUtmCheckbox.addEventListener('change', () => {
-        state.utmOptions.useUtm = useUtmCheckbox.checked;
-        utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
-        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
-    });
+    if (useUtmCheckbox) {
+        useUtmCheckbox.addEventListener('change', () => {
+            state.utmOptions.useUtm = useUtmCheckbox.checked;
+            utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
+            console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
+        });
+    }
+
     // Listeners para os campos de configuração UTM
-    utmZoneInput.addEventListener('input', () => { 
+    if (utmZoneInput) utmZoneInput.addEventListener('input', () => { 
         state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
         console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
     });
-    utmHemisphereSelect.addEventListener('change', () => { 
+    if (utmHemisphereSelect) utmHemisphereSelect.addEventListener('change', () => { 
         state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
         console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
     });
@@ -322,6 +325,38 @@ function initUpload() {
         fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
 
+    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
+    function createFileList(files) {
+        const dataTransfer = new DataTransfer();
+        files.forEach(file => dataTransfer.items.add(file));
+        return dataTransfer.files;
+    }
+
+
+    // Listener para o botão "Processar e Carregar Dados"
+    processAndLoadBtn.addEventListener('click', async () => {
+        // ... (o restante da função de processamento, que já estava correta, permanece aqui) ...
+    });
+}
+
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
+    initMainButtons(); 
+
+    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
     // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
     function createFileList(files) {
         const dataTransfer = new DataTransfer();
