@@ -484,8 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
-}```
-
+}
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
@@ -620,7 +619,50 @@ async function buscarInfoCidade(nomeCidade) {
     alert(info);
     console.log("Dados do município simulados:", dadosSimulados);
 }
+// Popup ao clicar no lote (AGORA COM BUSCA DE CEP)
+async function onEachLoteFeature(feature, layer) {
+    if (feature.properties) {
+        const props = feature.properties;
+        let popupContent = "<h3>Detalhes do Lote:</h3>";
+        
+        // Adiciona um placeholder para o CEP que será preenchido depois
+        popupContent += `<strong>CEP:</strong> <span id="cep-${props.cod_lote || 'temp'}">Buscando...</span><br>`;
+        
+        for (let key in props) {
+            let value = props[key];
+            if (value === null || value === undefined || value === '') value = 'N/A';
 
+            let displayKey = key;
+            switch(key.toLowerCase()){
+                case 'cod_lote': displayKey = 'Código do Lote'; break;
+                case 'desc_nucleo': displayKey = 'Núcleo'; break;
+                case 'tipo_uso': displayKey = 'Tipo de Uso'; break;
+                case 'area_m2': displayKey = `Área (m²): ${value.toLocaleString('pt-BR')}`; value = ''; break;
+                case 'risco': displayKey = 'Status de Risco'; break;
+                case 'dentro_app': displayKey = `Em APP: ${(Number(value) > 0) ? `Sim (${value}%)` : 'Não'}`; value = ''; break;
+                case 'valor': displayKey = `Custo de Intervenção: ${formatBRL(value)}`; value = ''; break;
+                // ... (outros cases para renomear chaves) ...
+            }
+
+            popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
+        }
+        
+        layer.bindPopup(popupContent);
+
+        // Quando o popup abre, dispara a busca de CEP
+        layer.on('popupopen', async () => {
+            const uf = props.uf || 'MG'; // Pega o UF da propriedade ou usa 'MG' como padrão
+            const cidade = props.municipio || props.nm_mun;
+            const logradouro = props.nome_logradouro;
+            
+            const cep = await buscarCepPorEndereco(uf, cidade, logradouro);
+            const cepElement = document.getElementById(`cep-${props.cod_lote || 'temp'}`);
+            if (cepElement) {
+                cepElement.textContent = cep;
+            }
+        });
+    }
+}
 
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
