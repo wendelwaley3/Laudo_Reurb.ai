@@ -364,7 +364,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return dataTransfer.files;
     }
 
-
     // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
@@ -447,7 +446,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 return; 
             }
         }
+        
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
+        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
+        
+        // **NOVA LÓGICA DE DETECÇÃO DE MUNICÍPIO**
+        // A função onEachPoligonalFeature agora será assíncrona
+        await Promise.all(newPoligonaisFeatures.map(async feature => {
+            const tempLayer = L.geoJSON(feature);
+            const center = tempLayer.getBounds().getCenter();
+            const municipio = await getMunicipioFromCoordinates(center);
 
+            // Adiciona o nome do município detectado como uma nova propriedade
+            feature.properties.municipio_detectado = municipio;
+
+            // Se a propriedade 'municipio' original não existir, preenche com o detectado
+            if (!feature.properties.municipio) {
+                feature.properties.municipio = municipio;
+            }
+        }));
+        
+        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
+        
         // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
@@ -455,10 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.nucleusSet.add(f.properties.desc_nucleo);
             }
         });
-        
-        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
-        L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
-        L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
         // Ajusta o mapa para a extensão de todos os dados carregados
