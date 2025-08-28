@@ -97,6 +97,14 @@
                 <li><span id="areasIntervencao">0</span> áreas demandam intervenção estrutural</li>
             </ul>
 
+            <!-- NOVA SEÇÃO: Análise de Tipos de Uso -->
+            <h2>Análise de Tipos de Uso</h2>
+            <div id="useTypesAnalysis" class="use-types-grid">
+                <!-- O conteúdo será gerado dinamicamente pelo JavaScript -->
+                <p>Nenhum dado de tipo de uso disponível. Verifique se a propriedade 'tipo_uso' existe nos seus lotes.</p>
+            </div>
+
+
             <h2>Análise Comparativa por Núcleo</h2>
             <div id="nucleusComparisonChart" class="chart-container">
                 <p>Nenhum dado disponível. Faça o upload das camadas para visualizar o gráfico.</p>
@@ -109,13 +117,13 @@
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
-                <!-- REESTRUTURAÇÃO AQUI: INPUT TYPE="FILE" SEPARADO, BOTÃO COM ID, LABEL APENAS PARA A ÁREA DRAG/DROP -->
+                <!-- ESTRUTURA PARA UPLOAD -->
                 <label for="geojsonFileInput" class="drag-drop-area">
                     <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
                     <p>ou clique para selecionar</p>
                     <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button> 
                 </label>
-                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;"> <!-- AGORA O INPUT É ESPECIFICAMENTE REFERENCIADO PELO BOTÃO VISÍVEL VIA JS -->
+                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
             </div>
             <div class="uploaded-files-preview">
                 <h3>Arquivos Selecionados:</h3>
@@ -125,14 +133,14 @@
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
-            <!-- CONTROLE DE REPROJEÇÃO UTM (NOVO) -->
+            <!-- CONTROLE DE REPROJEÇÃO UTM (ESSENCIAL PARA O JS FUNCIONAR) -->
             <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
                 <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
                 <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
                     <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:flex; gap:10px; align-items:center; display:none;"> <!-- Display none por padrão -->
+                    <div id="utmOptionsContainer" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
                         <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
-                        <label>Hemisfério: 
+                        <label>Hemisfério:
                             <select id="utmHemisphereSelect">
                                 <option value="S">Sul</option>
                                 <option value="N">Norte</option>
@@ -141,7 +149,7 @@
                     </div>
                 </div>
                 <p style="font-size:0.85em; color:#666; margin-top:10px;">
-                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção de reprojeção UTM apenas se não puder converter previamente.
+                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção apenas se não puder converter previamente.
                 </p>
             </div>
         </section>
@@ -416,10 +424,10 @@
                 <li><strong>Visualização Geoespacial:</strong> O mapa interativo permite explorar suas camadas. Use a legenda para ligar/desligar a visibilidade das camadas. Clique nos elementos do mapa para ver seus atributos detalhados em um popup.</li>
                 <li><strong>Análise de Riscos:</strong> O dashboard também mostra um resumo da distribuição de risco dos lotes carregados.</li>
                 <li><strong>Dados Lotes:</strong> A nova aba "Dados Lotes" lista os lotes em uma tabela detalhada com seus principais atributos. Você pode buscar lotes específicos e exportar a tabela para CSV. O botão "Ver no Mapa" centraliza e dá zoom no lote selecionado.</li>
-                <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado (com dados IBGE/IA simulados).</li>
+                <li><strong>Relatórios:</strong> Na aba "Relatórios", configure o tipo de relatório, selecione os núcleos (se aplicável) e as seções a incluir. Agora você pode incluir as "Informações Gerais do Projeto", puxando os dados preenchidos manualmente. Clique em "Gerar Relatório com IA" para criar um relatório sumarizado.</li>
                 <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
             </ol>
-            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados. Para datasets muito grandes ou análises espaciais complexas em tempo real (como interseção de várias camadas grandes) ou para integração real com IBGE/IA, um sistema com backend seria mais adequada.</p>
+            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados. Para datasets muito grandes ou análises espaciais complexas em tempo real (como interseção de várias camadas grandes), um sistema com backend seria mais adequada.</p>
             <p>Esperamos que o GeoLaudo.AI seja uma ferramenta útil para você!</p>
         </section>
     </main>
@@ -431,11 +439,10 @@
     <!-- Inclui o JS do Leaflet -->
     <!-- ATENÇÃO: Atributo 'integrity' REMOVIDO para evitar bloqueios -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <!-- Inclui proj4js para definição de sistemas de coordenadas -->
+    <!-- Inclui proj4js e proj4leaflet para futuras necessidades de reprojeção (não usado ativamente agora) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
-    <!-- Inclui proj4leaflet para integração Leaflet com proj4js (não diretamente usado para reprojeção GeoJSON aqui, mas útil para context) -->
     <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
-    <!-- Inclui o Turf.js para operações geoespaciais client-side -->
+    <!-- Inclui o Turf.js para operações geoespaciais client-side (se for usar extensivamente) -->
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <!-- Inclui seu JS personalizado -->
     <script src="js/app.js"></script>
