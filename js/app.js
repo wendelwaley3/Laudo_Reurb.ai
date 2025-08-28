@@ -449,7 +449,8 @@ function initUpload() {
         uploadStatus.className = 'status-message success';
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
-}
+}```
+
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
 // Estilo dos lotes baseado no risco
