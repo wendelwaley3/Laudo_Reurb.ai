@@ -399,91 +399,76 @@ function styleLote(feature) {
 function onEachLoteFeature(feature, layer) {
     if (feature.properties) {
         let popupContent = "<h3>Detalhes do Lote:</h3>";
-        for (let key in feature.properties) {
-            let value = feature.properties[key];
-            if (value === null || value === undefined || value === '') value = 'N/A'; 
-
-            // Formatação de valores específicos conforme as suas tabelas
-            if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
-                value = value.toLocaleString('pt-BR') + ' m²';
-            }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
-                value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-            if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
-                value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
-            }
-            // Mapeamento de nomes de propriedades para exibição no popup (adaptado para suas tabelas)
-            let displayKey = key;
-            switch(key.toLowerCase()){
-                case 'cod_lote': displayKey = 'Código do Lote'; break;
-                case 'desc_nucleo': displayKey = 'Núcleo'; break;
-                case 'tipo_uso': displayKey = 'Tipo de Uso'; break;
-                case 'area_m2': displayKey = 'Área (m²)'; break;
-                case 'risco': displayKey = 'Status de Risco'; break;
-                case 'dentro_app': displayKey = 'Em APP'; break;
-                case 'valor': displayKey = 'Custo de Intervenção'; break;
-                case 'tipo_edificacao': displayKey = 'Tipo de Edificação'; break;
-                case 'nm_mun': displayKey = 'Município'; break; 
-                case 'nome_logradouro': displayKey = 'Logradouro'; break;
-                case 'numero_postal': displayKey = 'CEP'; break;
-                case 'status_risco': displayKey = 'Status Risco'; break; 
-            }
-
-            popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-        }
-        layer.bindPopup(popupContent);
-    }
-}
-
-// Estilo da camada APP
-function styleApp(feature) {
-    return {
-        color: '#e74c3c', // Vermelho para APP
-        weight: 2,
-        opacity: 0.7,
-        fillOpacity: 0.2
-    };
-}
-
-// Popup da camada APP
-function onEachAppFeature(feature, layer) {
-    if (feature.properties) {
-        let popupContent = "<h3>Área de Preservação Permanente (APP)</h3>";
-        for (let key in feature.properties) {
-            popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
-        }
-        layer.bindPopup(popupContent);
-    }
-}
-
-// Estilo da camada Poligonal (para tabela_geral e outros)
-function stylePoligonal(feature) {
-    return {
-        color: '#2ecc71', // Verde para poligonais
-        weight: 2,
-        opacity: 0.7,
-        fillOpacity: 0.2
-    };
-}
-
-// Popup da camada Poligonal (para tabela_geral e outros)
-async function onEachPoligonalFeature(feature, layer) {
-    if (feature.properties) {
-        const props = feature.properties;
-        const municipioNome = props.municipio || props.nm_mun || 'Não informado'; 
-
-        let popupContent = `<h3>Informações da Poligonal: ${municipioNome}</h3>`;
-        popupContent += `<strong>Município:</strong> ${municipioNome}<br>`;
-        if (props.area_m2) popupContent += `<strong>Área (m²):</strong> ${props.area_m2.toLocaleString('pt-BR')} m²<br>`;
-        for (let key in props) {
-            if (!['municipio', 'nm_mun', 'area_m2'].includes(key.toLowerCase())) {
-                popupContent += `<strong>${key}:</strong> ${props[key]}<br>`;
-            }
-        }
         
-        popupContent += `<button onclick="buscarInfoCidade('${municipioNome}')" style="margin-top:8px;">Ver informações do município</button>`;
+        // Mapeamento de chaves para nomes de exibição (conforme seu popup de exemplo)
+        const keyMappings = {
+            'cod_lote': 'Código',
+            'desc_nucleo': 'Núcleo',
+            'tipo_uso': 'Tipo de Uso',
+            'area_m2': 'Área (m²)',
+            'risco': 'Status de Risco',
+            'dentro_app': 'Em APP',
+            'valor': 'Custo de Intervenção',
+            'id_respondente': 'ID Respondente',
+            'cod_area': 'Cód. Área',
+            'grau': 'Grau',
+            'qtde_lote': 'Qtde. Lote',
+            'intervencao': 'Intervenção',
+            'lotes_atingidos': 'Lotes Atingidos',
+        };
+
+        // Ordem de exibição das propriedades (opcional, mas recomendado)
+        const displayOrder = [
+            'cod_lote',
+            'id_respondente',
+            'cod_area',
+            'grau',
+            'qtde_lote',
+            'intervencao',
+            'valor', // Custo de Intervenção
+            'desc_nucleo',
+            'risco',
+            'lotes_atingidos',
+            // Adicione outras chaves na ordem que você desejar
+        ];
+
+        // Adiciona as propriedades na ordem definida
+        displayOrder.forEach(key => {
+            if (feature.properties.hasOwnProperty(key)) {
+                let value = feature.properties[key];
+                const displayKey = keyMappings[key] || key; // Usa o nome mapeado ou a chave original
+
+                if (value === null || value === undefined || value === '') value = 'N/A'; 
+
+                // Formatação especial para valores específicos
+                if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
+                    value = formatBRL(value); // Usa nossa função de formatação de moeda
+                }
+                
+                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
+            }
+        });
         
+        // Adiciona outras propriedades que não estão na ordem definida
+        for (let key in feature.properties) {
+            if (!displayOrder.includes(key)) {
+                let value = feature.properties[key];
+                const displayKey = keyMappings[key] || key;
+                
+                if (value === null || value === undefined || value === '') value = 'N/A'; 
+
+                // Formatação para propriedades não listadas
+                if (key.toLowerCase() === 'area_m2' && typeof value === 'number') {
+                    value = value.toLocaleString('pt-BR') + ' m²';
+                }
+                if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') {
+                    value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
+                }
+
+                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
+            }
+        }
+
         layer.bindPopup(popupContent);
     }
 }
@@ -570,17 +555,20 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
-        
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+        // **CORREÇÃO AQUI**: Garante que o valor de 'risco' seja uma string e em minúsculas
+        const risco = String(p.risco || p.status_risco || '').trim().toLowerCase(); 
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-            lotesRiscoAltoMuitoAlto++;
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta e que ignora valores vazios
+        if (risco && risco !== 'n/a' && risco !== '') {
+            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+            else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+
+            if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+                lotesRiscoAltoMuitoAlto++;
+            }
         }
         
         const dentroApp = Number(p.dentro_app || p.app || 0); 
@@ -610,7 +598,6 @@ function refreshDashboard() {
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
-
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
