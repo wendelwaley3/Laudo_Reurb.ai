@@ -16,7 +16,79 @@ const state = {
 };
 
 // ===================== Utilidades Diversas =====================
+// Aguarda o HTML ser completamente carregado antes de executar qualquer script.
+document.addEventListener('DOMContentLoaded', () => {
+    
+    console.log('DOM completamente carregado. Iniciando script...');
 
+    // ===================== INICIALIZAÇÃO DO MAPA =====================
+    try {
+        console.log('Tentando inicializar o mapa...');
+        const map = L.map('mapid').setView([-15.7801, -47.9292], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        console.log('Mapa inicializado com sucesso!');
+        
+        // Corrige o problema de renderização do mapa em abas
+        setTimeout(() => map.invalidateSize(), 100);
+    } catch (e) {
+        console.error('ERRO CRÍTICO ao inicializar o mapa:', e);
+        alert('Ocorreu um erro ao carregar o mapa. Verifique o console para mais detalhes.');
+    }
+
+    // ===================== NAVEGAÇÃO ENTRE ABAS =====================
+    try {
+        console.log('Configurando a navegação entre abas...');
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('data-section');
+
+                document.querySelectorAll('main section').forEach(section => section.classList.remove('active'));
+                document.querySelectorAll('nav a').forEach(navLink => navLink.classList.remove('active'));
+
+                document.getElementById(targetId).classList.add('active');
+                this.classList.add('active');
+            });
+        });
+        console.log('Navegação configurada com sucesso!');
+    } catch(e) {
+        console.error('ERRO CRÍTICO ao configurar a navegação:', e);
+    }
+
+
+    // ===================== UPLOAD DE DADOS =====================
+    try {
+        console.log('Configurando o upload de dados...');
+        const fileInput = document.getElementById('geojsonFileInput');
+        const visibleButton = document.getElementById('selectFilesVisibleButton');
+        const fileListElement = document.getElementById('fileList');
+
+        // Garante que os elementos existem antes de adicionar listeners
+        if (visibleButton && fileInput) {
+            visibleButton.addEventListener('click', () => {
+                console.log('Botão "Selecionar Arquivos" clicado.');
+                fileInput.click(); // Dispara o seletor de arquivos
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                fileListElement.innerHTML = ''; // Limpa a lista
+                Array.from(e.target.files).forEach(file => {
+                    const li = document.createElement('li');
+                    li.textContent = file.name;
+                    fileListElement.appendChild(li);
+                });
+            });
+            console.log('Upload de dados configurado com sucesso!');
+        } else {
+            console.error('ERRO: Não foi possível encontrar os botões de upload no HTML.');
+        }
+    } catch(e) {
+        console.error('ERRO CRÍTICO ao configurar o upload de dados:', e);
+    }
+
+});
 /** Formata um número para moeda BRL. */
 function formatBRL(n) {
     const v = Number(n || 0);
