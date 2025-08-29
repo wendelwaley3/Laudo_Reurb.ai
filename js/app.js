@@ -12,7 +12,7 @@ const state = {
     currentNucleusFilter: 'all', // Núcleo selecionado no filtro do Dashboard
     utmOptions: { useUtm: false, zone: 23, south: true }, // Configurações para reprojeção UTM client-side
     generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
-    lastReportData: null,   // Armazena os dados do último relatório gerado
+    lastReportText: '',     // Último relatório gerado (para exportação)
 };
 
 // ===================== Utilidades Diversas =====================
@@ -22,68 +22,50 @@ function formatBRL(n) {
     const v = Number(n || 0);
     return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
-// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
-    initMap(); 
-    initNav(); 
-    initUpload(); 
-    initLegendToggles(); 
-    initGeneralInfoForm(); 
 
-    // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); // Garante que o zoom seja aplicado ao clicar no botão
-    });
+/** Inicia o download de um arquivo de texto. */
+function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    URL.revokeObjectURL(url); // Libera o objeto URL
+}
 
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+/** Calcula a área de uma feature usando Turf.js. */
+function featureAreaM2(feature) {
+    try {
+        // Turf.area retorna em metros quadrados se a projeção for WGS84
+        return turf.area(feature);
+    } catch (e) {
+        console.warn('Erro ao calcular área com Turf.js:', e);
+        return 0;
+    }
+}
 
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
-    
-    // **CORREÇÃO AQUI**: Adiciona o listener de 'change' ao select de filtros
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); // CHAMA A FUNÇÃO DE ZOOM QUANDO O FILTRO MUDA
-    });
-
-
-    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
-    document.getElementById('dashboard').classList.add('active');
-    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    refreshDashboard(); 
-    fillLotesTable(); 
-    populateNucleusFilter(); 
-    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
-});
-
-
+/** Garante que um anel de polígono seja fechado (primeiro e último ponto iguais). */
+function ensurePolygonClosed(coords) {
+    if (!coords || coords.length === 0) return coords;
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    // Se o primeiro e o último ponto não são iguais, adiciona o primeiro no final
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+        coords.push(first);
+    }
+    return coords;
+}
 
 // ===================== Reprojeção UTM → WGS84 (client-side com proj4js) =====================
 // Esta seção permite que o app tente reprojetar GeoJSONs em UTM, se necessário.
 
 /** Converte um ponto UTM (x,y) para Lat/Lng (WGS84). */
 function utmToLngLat(x, y, zone, south) {
-    // **NOVA VERIFICAÇÃO**: Garante que as coordenadas sejam números válidos
-    if (isNaN(x) || isNaN(y)) {
-        console.error(`Coordenada inválida encontrada: x=${x}, y=${y}. Pulando conversão.`);
-        return null; // Retorna nulo para indicar falha
-    }
     // Definição dinâmica da projeção UTM (ex: SIRGAS 2000 / UTM zone 23S)
     const def = `+proj=utm +zone=${Number(zone)} ${south ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
     // Retorna [longitude, latitude]
     const p = proj4(def, proj4.WGS84, [x, y]);
-    console.log(`UTM (${x}, ${y}) -> WGS84 (${p[0]}, ${p[1]})`); // DEBUG: Mostra a conversão
     return [p[0], p[1]]; 
 }
 
@@ -102,52 +84,35 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
     function convertGeometryCoords(coords, geomType) {
         if (!coords || coords.length === 0) return coords;
 
-        try {
-            if (geomType === 'Point') {
-                return utmToLngLat(coords[0], coords[1], zone, south);
-            } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
-                // **NOVA VERIFICAÇÃO**: Filtra coordenadas nulas após conversão
-                return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean);
-            } else if (geomType === 'Polygon') {
-                return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean)));
-            } else if (geomType === 'MultiLineString') {
-                return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean));
-            } else if (geomType === 'MultiPolygon') {
-                return coords.map(polygon => 
-                    polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean)))
-                );
-            }
-        } catch(e) {
-            console.error(`Erro ao converter geometria do tipo ${geomType}:`, e);
-            return null; // Retorna nulo se a conversão da geometria inteira falhar
+        if (geomType === 'Point') {
+            return utmToLngLat(coords[0], coords[1], zone, south);
+        } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
+            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
+        } else if (geomType === 'Polygon') {
+            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
+        } else if (geomType === 'MultiLineString') {
+            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
+        } else if (geomType === 'MultiPolygon') {
+            return coords.map(polygon => 
+                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
+            );
         }
         return coords; // Retorna as coordenadas originais para tipos não mapeados
     }
 
     if (converted.type === 'FeatureCollection') {
         converted.features = converted.features.map(feature => {
-            if (feature.geometry && feature.geometry.coordinates) {
-                const newCoords = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
-                if (newCoords && newCoords.length > 0) { // Garante que as coordenadas não fiquem vazias
-                    feature.geometry.coordinates = newCoords;
-                } else {
-                    console.warn(`Geometria da feature pulada devido a erro de conversão.`, feature);
-                }
+            if (feature.geometry) {
+                feature.geometry.coordinates = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
             }
             return feature;
         });
     } else if (converted.type === 'Feature') {
-        if (converted.geometry && converted.geometry.coordinates) {
-            const newCoords = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
-            if (newCoords) {
-                converted.geometry.coordinates = newCoords;
-            }
+        if (converted.geometry) {
+            converted.geometry.coordinates = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
         }
     } else { // Assume que é um objeto de geometria
-        const newCoords = convertGeometryCoords(converted.coordinates, converted.type);
-        if (newCoords) {
-            converted.coordinates = newCoords;
-        }
+        converted.coordinates = convertGeometryCoords(converted.coordinates, converted.type);
     }
 
     return converted;
@@ -180,6 +145,33 @@ function getSimulatedMunicipioData(nomeMunicipio) {
         populacao: "N/D (Dados simulados)",
         area_km2: "N/D (Dados simulados)"
     };
+}
+
+/** Simula a geração de um laudo com IA no navegador. */
+function generateSimulatedAILaudo(promptData) {
+    let laudo = `\n[RELATÓRIO GERADO POR IA - SIMULADO]\n\n`;
+    laudo += `**Tema Principal:** ${promptData.tema}\n`;
+    laudo += `**Detalhes da Análise:** ${promptData.detalhes}\n\n`;
+
+    if (promptData.dados_ibge && promptData.dados_ibge.municipio) {
+        laudo += `--- Dados IBGE para ${promptData.dados_ibge.municipio} ---\n`;
+        laudo += `Região: ${promptData.dados_ibge.regiao}\n`;
+        laudo += `População Estimada: ${promptData.dados_ibge.populacao}\n`;
+        laudo += `Área Territorial: ${promptData.dados_ibge.area_km2} km²\n\n`;
+    }
+
+    laudo += `**Análise Contextual:**\n`;
+    laudo += `Baseado nos dados fornecidos e em conhecimentos gerais de REURB, a área apresenta características urbanísticas e fundiárias que demandam avaliação conforme a legislação. A infraestrutura básica e a regularidade documental são pontos cruciais para a consolidação da regularização.\n\n`;
+
+    laudo += `**Recomendações:**\n`;
+    laudo += `1. Verificação documental aprofundada dos títulos e matrículas.\n`;
+    laudo += `2. Levantamento topográfico e cadastral detalhado para delimitação precisa dos lotes.\n`;
+    laudo += `3. Análise ambiental para identificar e mitigar impactos, especialmente em áreas de preservação.\n`;
+    laudo += `4. Planejamento de obras de infraestrutura quando necessário.\n\n`;
+
+    laudo += `Este laudo é uma simulação e deve ser complementado por uma análise técnica e jurídica completa realizada por profissionais habilitados.\n\n`;
+
+    return laudo;
 }
 
 
@@ -265,6 +257,9 @@ function initUpload() {
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
 
+    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
+
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
@@ -287,8 +282,15 @@ function initUpload() {
         console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
     });
 
-    // **CORREÇÃO AQUI**: Não precisamos mais do listener de clique no botão visível,
-    // pois a tag <label> no HTML já faz a conexão.
+    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
+            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+        });
+    } else {
+        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
+    }
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
@@ -565,137 +567,22 @@ async function onEachPoligonalFeature(feature, layer) {
         layer.bindPopup(popupContent);
     }
 }
-// ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
-// (Mantenha as funções 'styleLote', 'styleApp', 'onEachAppFeature', 'stylePoligonal' e 'onEachPoligonalFeature' como estão)
-
-// **CORREÇÃO AQUI**: Substitua a função 'onEachLoteFeature' pela função abaixo
-// Popup ao clicar no lote
-function onEachLoteFeature(feature, layer) {
-    if (feature.properties) {
-        let popupContent = "<h3>Detalhes do Lote:</h3>";
-        
-        // Mapeamento de chaves para nomes de exibição (conforme seu popup de exemplo e tabelas)
-        const keyMappings = {
-            'cod_lote': 'Código',
-            'desc_nucleo': 'Núcleo',
-            'tipo_uso': 'Tipo de Uso',
-            'area_m2': 'Área (m²)',
-            'risco': 'Status de Risco',
-            'status_risco': 'Status de Risco', // Adicionado para cobrir ambas as nomenclaturas
-            'dentro_app': 'Em APP',
-            'valor': 'Custo de Intervenção',
-            'custo_intervencao': 'Custo de Intervenção', // Adicionado para cobrir ambas as nomenclaturas
-            'id_respondente': 'ID Respondente',
-            'cod_area': 'Cód. Área',
-            'grau': 'Grau',
-            'qtde_lote': 'Qtde. Lote',
-            'intervencao': 'Intervenção',
-            'lotes_atingidos': 'Lotes Atingidos',
-        };
-
-        // Ordem de exibição das propriedades (opcional, mas recomendado)
-        const displayOrder = [
-            'cod_lote',
-            'id_respondente',
-            'cod_area',
-            'grau',
-
-            'qtde_lote',
-            'intervencao',
-            'valor', 
-            'custo_intervencao',
-            'desc_nucleo',
-            'risco',
-            'status_risco',
-            'lotes_atingidos',
-            // Adicione outras chaves na ordem que você desejar
-        ];
-
-        // Adiciona as propriedades na ordem definida
-        displayOrder.forEach(key => {
-            if (feature.properties.hasOwnProperty(key)) {
-                let value = feature.properties[key];
-                const displayKey = keyMappings[key] || key; // Usa o nome mapeado ou a chave original
-
-                if (value === null || value === undefined || value === '') value = 'N/A'; 
-
-                // Formatação especial para valores específicos
-                if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo_intervencao') && typeof value === 'number') { 
-                    value = formatBRL(value); // Usa nossa função de formatação de moeda
-                }
-                
-                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-            }
-        });
-        
-        // Adiciona outras propriedades que não estão na ordem definida
-        for (let key in feature.properties) {
-            if (!displayOrder.includes(key)) {
-                let value = feature.properties[key];
-                const displayKey = keyMappings[key] || key;
-                
-                if (value === null || value === undefined || value === '') value = 'N/A'; 
-
-                // Formatação para propriedades não listadas
-                if (key.toLowerCase() === 'area_m2' && typeof value === 'number') {
-                    value = value.toLocaleString('pt-BR') + ' m²';
-                }
-                if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') {
-                    value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
-                }
-
-                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-            }
-        }
-
-        layer.bindPopup(popupContent);
-    }
-}
-// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
-    initMap(); 
-    initNav(); // Garante que a navegação seja inicializada
-    initUpload(); 
-    initLegendToggles(); 
-    initGeneralInfoForm(); 
-
-    // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
-    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter();
-    });
-
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
-
-    document.getElementById('exportReportBtn').addEventListener('click', () => {
-        if (!state.lastReportText.trim()) {
-            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
-    });
+// ===================== Função simulada para buscar dados extras de cidade =====================
+async function buscarInfoCidade(nomeCidade) {
+    alert(`Buscando dados simulados para ${nomeCidade}...`);
+    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
     
-    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
-    document.getElementById('nucleusFilter').addEventListener('change', () => {
-        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
-        refreshDashboard();
-        fillLotesTable();
-        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
-    });
+    let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
+    info += `- Região: ${dadosSimulados.regiao}\n`;
+    info += `- População Estimada: ${dadosSimulados.populacao}\n`;
+    info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
+    info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
 
+    alert(info);
+    console.log("Dados do município simulados:", dadosSimulados);
+}
 
-    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
-    document.getElementById('dashboard').classList.add('active');
-    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
-    refreshDashboard(); 
-    fillLotesTable(); 
-    populateNucleusFilter(); 
-    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
-});
 
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
@@ -754,7 +641,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesEmRiscoCount = 0; // Contagem para o card 'Lotes em Risco'
+    let lotesRiscoAltoMuitoAlto = 0; 
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -763,30 +650,22 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
-        // --- LÓGICA DE RISCO CORRIGIDA PARA USAR 'grau' ---
-        const grauRisco = Number(p.grau); // Pega o valor da propriedade 'grau'
-        
-        if (!isNaN(grauRisco)) { // Verifica se 'grau' é um número válido
-            if (grauRisco === 1) {
-                riskCounts['Baixo']++;
-            } else if (grauRisco === 2) {
-                riskCounts['Médio']++;
-                lotesEmRiscoCount++; // Médio risco já conta como "em risco"
-            } else if (grauRisco === 3) {
-                riskCounts['Alto']++;
-                lotesEmRiscoCount++; // Alto risco conta como "em risco"
-            } else if (grauRisco >= 4) { // Maior ou igual a 4 é "Muito Alto"
-                riskCounts['Muito Alto']++;
-                lotesEmRiscoCount++; // Muito Alto risco conta como "em risco"
-            }
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
+        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+            lotesRiscoAltoMuitoAlto++;
         }
         
-        // Lógica para APP (baseada em 'dentro_app')
         const dentroApp = Number(p.dentro_app || p.app || 0); 
         if (dentroApp > 0) lotesAppCount++;
 
-        // Lógica para Custo de Intervenção (baseada em 'valor')
         const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
         if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
@@ -795,23 +674,127 @@ function refreshDashboard() {
         }
     });
 
-    // Atualiza os Cards do Dashboard
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesEmRiscoCount; // Card principal 'Lotes em Risco'
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
-    // Atualiza a Análise de Riscos (Listas Detalhadas)
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    // Atualiza o Resumo de Intervenções
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
+
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
-    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoCount; 
-    document.getElementById('areasIntervencao').textContent = lotesEmRiscoCount;
+}
+
+// ===================== Tabela de Lotes =====================
+function fillLotesTable() {
+    console.log('fillLotesTable: Preenchendo tabela de lotes.');
+    const tbody = document.querySelector('#lotesDataTable tbody');
+    const feats = filteredLotes(); 
+    tbody.innerHTML = ''; 
+
+    if (feats.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro ou ajuste os filtros.</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    feats.forEach((f, idx) => {
+        const p = f.properties || {};
+        const tr = document.createElement('tr');
+
+        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`; 
+        const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
+        const tipoUso = p.tipo_uso || 'N/A';
+        const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
+        const statusRisco = p.risco || p.status_risco || 'N/A'; 
+        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; 
+        
+        const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
+        tr.innerHTML = `
+            <td>${codLote}</td>
+            <td>${descNucleo}</td>
+            <td>${tipoUso}</td>
+            <td>${areaM2}</td>
+            <td>${statusRisco}</td>
+            <td>${emApp}</td>
+            <td>${btnHtml}</td>
+        `;
+        fragment.appendChild(tr);
+    });
+    tbody.appendChild(fragment);
+
+    // **CORREÇÃO AQUI**: Adiciona listeners para os botões "Ver no Mapa"
+    tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const codLoteToZoom = btn.getAttribute('data-codlote');
+            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote == codLoteToZoom)); // '==' para comparar string com número se necessário
+            
+            if (loteToZoom) {
+                document.querySelector('nav a[data-section="dashboard"]').click();
+                const tempLayer = L.geoJSON(loteToZoom); 
+                try { 
+                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                } catch (e) {
+                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
+                }
+                state.layers.lotes.eachLayer(layer => {
+                    if (layer.feature?.properties?.cod_lote == codLoteToZoom && layer.openPopup) { // '==' para comparar string com número
+                        layer.openPopup();
+                    }
+                });
+            } else {
+                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
+            }
+        });
+    });
+
+    // Funcionalidade de busca na tabela
+    const searchInput = document.getElementById('lotSearch');
+    searchInput.addEventListener('input', () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const textContent = tr.textContent.toLowerCase();
+            tr.style.display = textContent.includes(searchTerm) ? '' : 'none';
+        });
+    });
+
+    // Funcionalidade de exportar CSV da tabela
+    document.getElementById('exportTableBtn').onclick = () => {
+        const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            if (tr.style.display === 'none') return; 
+            const tds = tr.querySelectorAll('td');
+            if (tds.length >= 6) rows.push([
+                tds[0].textContent, tds[1].textContent, tds[2].textContent,
+                tds[3].textContent, tds[4].textContent, tds[5].textContent
+            ]);
+        });
+        const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
+        downloadText('lotes_tabela.csv', csv);
+    };
+}
+
+
+// ===================== Legenda / Toggle Camadas =====================
+function initLegendToggles() {
+    const toggle = (id, layer) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('change', () => {
+            if (el.checked) layer.addTo(state.map); else state.map.removeLayer(layer);
+        });
+    };
+    toggle('toggleLotes', state.layers.lotes);
+    toggle('togglePoligonais', state.layers.poligonais);
+    toggle('toggleAPP', state.layers.app);
 }
 
 // ===================== Formulário de Informações Gerais (Manual) =====================
@@ -1044,63 +1027,47 @@ async function gerarRelatorioIA() {
     generatedReportContent.scrollTop = 0; 
 }
 
-// ===================== Utilidades Diversas =====================
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
 
-/** Formata um número para moeda BRL. */
-function formatBRL(n) {
-    const v = Number(n || 0);
-    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-/** Inicia o download de um arquivo de texto. */
-function downloadText(filename, text) {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    URL.revokeObjectURL(url); // Libera o objeto URL
-}
-
-/** Calcula a área de uma feature usando Turf.js. */
-function featureAreaM2(feature) {
-    try {
-        // Turf.area retorna em metros quadrados se a projeção for WGS84
-        return turf.area(feature);
-    } catch (e) {
-        console.warn('Erro ao calcular área com Turf.js:', e);
-        return 0;
-    }
-}
-
-/** **ADICIONE ESTA FUNÇÃO AQUI**
- * Garante que um anel de polígono seja fechado (primeiro e último ponto iguais).
- */
-function ensurePolygonClosed(coords) {
-    if (!coords || coords.length === 0) return coords;
-    const first = coords[0];
-    const last = coords[coords.length - 1];
-    // Se o primeiro e o último ponto não são iguais, adiciona o primeiro no final
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-        coords.push(first);
-    }
-    return coords;
-}
-function initUpload() {
-    // ... código para selecionar os elementos HTML ...
-
-    // --- Lógica do Botão "Selecionar Arquivos" ---
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            fileInput.click(); 
-        });
-    }
-
-    // ... código para lidar com a seleção de arquivos e drag-and-drop ...
-
-    // --- Lógica do Botão "Processar e Carregar Dados" ---
-    processAndLoadBtn.addEventListener('click', async () => {
-        // ... todo o código para ler, reprojetar, categorizar, e carregar os dados no mapa e dashboard ...
+    // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
     });
-}
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+    });
+    
+    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+    });
+
+
+    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
