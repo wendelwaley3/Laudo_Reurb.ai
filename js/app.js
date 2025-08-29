@@ -332,10 +332,13 @@ function initNav() {
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...'); 
     const fileInput = document.getElementById('geojsonFileInput');
-    const dragDropArea = document.querySelector('.drag-drop-area'); 
+    const dragDropArea = document.querySelector('.drag-drop-area'); // A div que é a área de drop
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
+
+    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
@@ -347,7 +350,27 @@ function initUpload() {
     useUtmCheckbox.addEventListener('change', () => {
         state.utmOptions.useUtm = useUtmCheckbox.checked;
         utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
+        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
     });
+    // Listeners para os campos de configuração UTM
+    utmZoneInput.addEventListener('input', () => { 
+        state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
+        console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
+    });
+    utmHemisphereSelect.addEventListener('change', () => { 
+        state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
+        console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
+    });
+
+    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
+            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
+        });
+    } else {
+        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
+    }
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
@@ -356,7 +379,7 @@ function initUpload() {
         if (selectedFilesArray.length === 0) {
             fileListElement.innerHTML = '<li>Nenhum arquivo selecionado.</li>';
         } else {
-            fileListElement.innerHTML = ''; 
+            fileListElement.innerHTML = ''; // Limpa a lista antes de adicionar novos
             selectedFilesArray.forEach(file => {
                 const li = document.createElement('li');
                 li.textContent = file.name;
@@ -377,11 +400,11 @@ function initUpload() {
         e.preventDefault();
         dragDropArea.classList.remove('dragging');
         const droppedFiles = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.geojson') || file.name.endsWith('.json'));
-        fileInput.files = createFileList(droppedFiles); 
-        fileInput.dispatchEvent(new Event('change')); 
+        fileInput.files = createFileList(droppedFiles); // Usa a função auxiliar
+        fileInput.dispatchEvent(new Event('change')); // Dispara o evento change para atualizar a lista
     });
 
-    // Função auxiliar para criar uma FileList
+    // Função auxiliar para criar uma FileList (necessário para drag and drop em alguns navegadores)
     function createFileList(files) {
         const dataTransfer = new DataTransfer();
         files.forEach(file => dataTransfer.items.add(file));
@@ -410,12 +433,13 @@ function initUpload() {
         state.allLotes = [];
         state.nucleusSet.clear();
 
-        const newLotesFeatures = [];
-        const newAPPFeatures = [];
-        const newPoligonaisFeatures = [];
+        const newLotesFeatures = []; // Coleta todos os lotes de todos os arquivos 'lotes'
+        const newAPPFeatures = [];   // Coleta todas as APPs de todos os arquivos 'app'
+        const newPoligonaisFeatures = []; // Coleta todas as poligonais de outros arquivos
 
         for (const file of filesToProcess) {
             try {
+                console.log(`Processando arquivo: ${file.name}`); 
                 const reader = new FileReader();
                 const fileContent = await new Promise((resolve, reject) => {
                     reader.onload = (e) => resolve(e.target.result);
@@ -424,10 +448,30 @@ function initUpload() {
                 });
                 let geojsonData = JSON.parse(fileContent);
 
+                // --- Reprojeção UTM, se ativada ---
                 if (state.utmOptions.useUtm) {
-                    geojsonData = reprojectGeoJSONFromUTM(geojsonData, utmZoneInput.value, utmHemisphereSelect.value === 'S');
+                    console.log(`Tentando reprojetar ${file.name} de UTM para WGS84 (Zona ${state.utmOptions.zone}, Hemisfério ${state.utmOptions.south ? 'Sul' : 'Norte'})...`);
+                    try {
+                        geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south);
+                        console.log(`Reprojeção de ${file.name} concluída.`);
+                    } catch (e) {
+                        console.error(`Falha na reprojeção de ${file.name}:`, e);
+                        uploadStatus.textContent = `Erro: Falha na reprojeção UTM de ${file.name}. Verifique a zona/hemisfério ou converta o arquivo previamente.`;
+                        uploadStatus.className = 'status-message error';
+                        return; 
+                    }
                 }
-                
+                // --- Fim da Reprojeção UTM ---
+
+                // Validação básica do GeoJSON
+                if (!geojsonData.type || !geojsonData.features) {
+                     throw new Error('Arquivo GeoJSON inválido: missing "type" or "features" property.');
+                }
+                if (geojsonData.type !== 'FeatureCollection') {
+                     console.warn(`Arquivo ${file.name} não é um FeatureCollection, pode não ser processado corretamente.`);
+                }
+
+                // Lógica para categorizar camadas por nome do arquivo
                 const fileNameLower = file.name.toLowerCase();
                 if (fileNameLower.includes('lote')) { 
                     newLotesFeatures.push(...geojsonData.features);
@@ -436,13 +480,22 @@ function initUpload() {
                 } else { 
                     newPoligonaisFeatures.push(...geojsonData.features);
                 }
+                console.log(`Arquivo ${file.name} categorizado.`); 
+
             } catch (error) {
-                uploadStatus.textContent = `Erro ao processar ${file.name}: ${error.message}`;
+                console.error(`Erro ao carregar ou parsear ${file.name}:`, error); 
+                uploadStatus.textContent = `Erro ao processar ${file.name}. Verifique o formato GeoJSON ou se é válido. Detalhes: ${error.message}`;
                 uploadStatus.className = 'status-message error';
-                return;
+                state.layers.lotes.clearLayers();
+                state.layers.app.clearLayers();
+                state.layers.poligonais.clearLayers();
+                state.allLotes = [];
+                state.nucleusSet.clear();
+                return; 
             }
         }
-        
+
+        // Processa lotes e extrai núcleos
         state.allLotes = newLotesFeatures; 
         newLotesFeatures.forEach(f => {
             if (f.properties && f.properties.desc_nucleo) { 
@@ -450,25 +503,33 @@ function initUpload() {
             }
         });
         
+        // Adiciona as feições aos FeatureGroups do Leaflet para exibição no mapa
         L.geoJSON(newAPPFeatures, { onEachFeature: onEachAppFeature, style: styleApp }).addTo(state.layers.app);
         L.geoJSON(newPoligonaisFeatures, { onEachFeature: onEachPoligonalFeature, style: stylePoligonal }).addTo(state.layers.poligonais);
         L.geoJSON(state.allLotes, { onEachFeature: onEachLoteFeature, style: styleLote }).addTo(state.layers.lotes);
 
+        // Ajusta o mapa para a extensão de todos os dados carregados
         const allLayersGroup = L.featureGroup([state.layers.lotes, state.layers.app, state.layers.poligonais]);
         if (allLayersGroup.getLayers().length > 0) {
             try { 
                 state.map.fitBounds(allLayersGroup.getBounds(), { padding: [20, 20] }); 
+                console.log('Mapa ajustado para os bounds dos dados carregados.');
             } catch (e) {
-                console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas.", e);
+                console.warn("Não foi possível ajustar o mapa aos bounds. Verifique as coordenadas dos seus GeoJSONs.", e);
             }
+        } else {
+            state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil se não houver dados
+            console.log('Nenhum dado carregado, mapa centralizado no Brasil.');
         }
 
+        // Atualiza UI
         populateNucleusFilter();
         refreshDashboard();
-        fillLotesTable();
+        fillLotesTable(); 
 
-        uploadStatus.textContent = 'Dados carregados! Vá para o Dashboard.';
+        uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
         uploadStatus.className = 'status-message success';
+        console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
 }
 
@@ -476,12 +537,12 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
+    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase(); // Inclui 'grau'
     let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
+    if (risco === '1' || risco.includes('baixo')) color = '#2ecc71';      
+    else if (risco === '2' || risco.includes('médio')) color = '#f1c40f'; // Amarelo
+    else if (risco === '3' || risco.includes('alto')) color = '#e67e22'; // Laranja
+    else if (risco === '4' || risco.includes('muito alto')) color = '#c0392b'; 
     else color = '#3498db'; 
 
     return {
@@ -506,8 +567,8 @@ function onEachLoteFeature(feature, layer) {
             if (key.toLowerCase() === 'area_m2' && typeof value === 'number') { 
                 value = value.toLocaleString('pt-BR') + ' m²';
             }
-            if (key.toLowerCase() === 'valor' && typeof value === 'number') { 
-                value = 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo de intervenção') && typeof value === 'number') { 
+                value = formatBRL(value);
             }
             if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') { 
                 value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
@@ -527,6 +588,11 @@ function onEachLoteFeature(feature, layer) {
                 case 'nome_logradouro': displayKey = 'Logradouro'; break;
                 case 'numero_postal': displayKey = 'CEP'; break;
                 case 'status_risco': displayKey = 'Status Risco'; break; 
+                case 'cod_area': displayKey = 'Cód. Área'; break;
+                case 'grau': displayKey = 'Grau'; break;
+                case 'qtde_lote': displayKey = 'Qtde. Lote(s)'; break;
+                case 'intervencao': displayKey = 'Intervenção'; break;
+                case 'lotes_atingidos': displayKey = 'Lotes Atingidos'; break;
             }
 
             popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
@@ -556,7 +622,7 @@ function onEachAppFeature(feature, layer) {
     }
 }
 
-// Estilo da camada Poligonal (para tabela_geral e outros)
+// Estilo da camada Poligonal
 function stylePoligonal(feature) {
     return {
         color: '#2ecc71', // Verde para poligonais
@@ -566,7 +632,7 @@ function stylePoligonal(feature) {
     };
 }
 
-// Popup da camada Poligonal (para tabela_geral e outros)
+// Popup da camada Poligonal
 async function onEachPoligonalFeature(feature, layer) {
     if (feature.properties) {
         const props = feature.properties;
@@ -586,93 +652,7 @@ async function onEachPoligonalFeature(feature, layer) {
         layer.bindPopup(popupContent);
     }
 }
-// ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
-// (Mantenha as funções 'styleLote', 'styleApp', 'onEachAppFeature', 'stylePoligonal' e 'onEachPoligonalFeature' como estão)
-
-// **CORREÇÃO AQUI**: Substitua a função 'onEachLoteFeature' pela função abaixo
-// Popup ao clicar no lote
-function onEachLoteFeature(feature, layer) {
-    if (feature.properties) {
-        let popupContent = "<h3>Detalhes do Lote:</h3>";
-        
-        // Mapeamento de chaves para nomes de exibição (conforme seu popup de exemplo e tabelas)
-        const keyMappings = {
-            'cod_lote': 'Código',
-            'desc_nucleo': 'Núcleo',
-            'tipo_uso': 'Tipo de Uso',
-            'area_m2': 'Área (m²)',
-            'risco': 'Status de Risco',
-            'status_risco': 'Status de Risco', // Adicionado para cobrir ambas as nomenclaturas
-            'dentro_app': 'Em APP',
-            'valor': 'Custo de Intervenção',
-            'custo_intervencao': 'Custo de Intervenção', // Adicionado para cobrir ambas as nomenclaturas
-            'id_respondente': 'ID Respondente',
-            'cod_area': 'Cód. Área',
-            'grau': 'Grau',
-            'qtde_lote': 'Qtde. Lote',
-            'intervencao': 'Intervenção',
-            'lotes_atingidos': 'Lotes Atingidos',
-        };
-
-        // Ordem de exibição das propriedades (opcional, mas recomendado)
-        const displayOrder = [
-            'cod_lote',
-            'id_respondente',
-            'cod_area',
-            'grau',
-
-            'qtde_lote',
-            'intervencao',
-            'valor', 
-            'custo_intervencao',
-            'desc_nucleo',
-            'risco',
-            'status_risco',
-            'lotes_atingidos',
-            // Adicione outras chaves na ordem que você desejar
-        ];
-
-        // Adiciona as propriedades na ordem definida
-        displayOrder.forEach(key => {
-            if (feature.properties.hasOwnProperty(key)) {
-                let value = feature.properties[key];
-                const displayKey = keyMappings[key] || key; // Usa o nome mapeado ou a chave original
-
-                if (value === null || value === undefined || value === '') value = 'N/A'; 
-
-                // Formatação especial para valores específicos
-                if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo_intervencao') && typeof value === 'number') { 
-                    value = formatBRL(value); // Usa nossa função de formatação de moeda
-                }
-                
-                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-            }
-        });
-        
-        // Adiciona outras propriedades que não estão na ordem definida
-        for (let key in feature.properties) {
-            if (!displayOrder.includes(key)) {
-                let value = feature.properties[key];
-                const displayKey = keyMappings[key] || key;
-                
-                if (value === null || value === undefined || value === '') value = 'N/A'; 
-
-                // Formatação para propriedades não listadas
-                if (key.toLowerCase() === 'area_m2' && typeof value === 'number') {
-                    value = value.toLocaleString('pt-BR') + ' m²';
-                }
-                if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') {
-                    value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
-                }
-
-                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
-            }
-        }
-
-        layer.bindPopup(popupContent);
-    }
-}
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
