@@ -28,10 +28,16 @@ function formatBRL(n) {
 
 /** Converte um ponto UTM (x,y) para Lat/Lng (WGS84). */
 function utmToLngLat(x, y, zone, south) {
+    // **NOVA VERIFICAÇÃO**: Garante que as coordenadas sejam números válidos
+    if (isNaN(x) || isNaN(y)) {
+        console.error(`Coordenada inválida encontrada: x=${x}, y=${y}. Pulando conversão.`);
+        return null; // Retorna nulo para indicar falha
+    }
     // Definição dinâmica da projeção UTM (ex: SIRGAS 2000 / UTM zone 23S)
     const def = `+proj=utm +zone=${Number(zone)} ${south ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
     // Retorna [longitude, latitude]
     const p = proj4(def, proj4.WGS84, [x, y]);
+    console.log(`UTM (${x}, ${y}) -> WGS84 (${p[0]}, ${p[1]})`); // DEBUG: Mostra a conversão
     return [p[0], p[1]]; 
 }
 
@@ -50,35 +56,52 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
     function convertGeometryCoords(coords, geomType) {
         if (!coords || coords.length === 0) return coords;
 
-        if (geomType === 'Point') {
-            return utmToLngLat(coords[0], coords[1], zone, south);
-        } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
-            return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south));
-        } else if (geomType === 'Polygon') {
-            return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))));
-        } else if (geomType === 'MultiLineString') {
-            return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)));
-        } else if (geomType === 'MultiPolygon') {
-            return coords.map(polygon => 
-                polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south))))
-            );
+        try {
+            if (geomType === 'Point') {
+                return utmToLngLat(coords[0], coords[1], zone, south);
+            } else if (geomType === 'LineString' || geomType === 'MultiPoint') {
+                // **NOVA VERIFICAÇÃO**: Filtra coordenadas nulas após conversão
+                return coords.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean);
+            } else if (geomType === 'Polygon') {
+                return coords.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean)));
+            } else if (geomType === 'MultiLineString') {
+                return coords.map(line => line.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean));
+            } else if (geomType === 'MultiPolygon') {
+                return coords.map(polygon => 
+                    polygon.map(ring => ensurePolygonClosed(ring.map(coord => utmToLngLat(coord[0], coord[1], zone, south)).filter(Boolean)))
+                );
+            }
+        } catch(e) {
+            console.error(`Erro ao converter geometria do tipo ${geomType}:`, e);
+            return null; // Retorna nulo se a conversão da geometria inteira falhar
         }
         return coords; // Retorna as coordenadas originais para tipos não mapeados
     }
 
     if (converted.type === 'FeatureCollection') {
         converted.features = converted.features.map(feature => {
-            if (feature.geometry) {
-                feature.geometry.coordinates = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
+            if (feature.geometry && feature.geometry.coordinates) {
+                const newCoords = convertGeometryCoords(feature.geometry.coordinates, feature.geometry.type);
+                if (newCoords && newCoords.length > 0) { // Garante que as coordenadas não fiquem vazias
+                    feature.geometry.coordinates = newCoords;
+                } else {
+                    console.warn(`Geometria da feature pulada devido a erro de conversão.`, feature);
+                }
             }
             return feature;
         });
     } else if (converted.type === 'Feature') {
-        if (converted.geometry) {
-            converted.geometry.coordinates = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
+        if (converted.geometry && converted.geometry.coordinates) {
+            const newCoords = convertGeometryCoords(converted.geometry.coordinates, converted.geometry.type);
+            if (newCoords) {
+                converted.geometry.coordinates = newCoords;
+            }
         }
     } else { // Assume que é um objeto de geometria
-        converted.coordinates = convertGeometryCoords(converted.coordinates, converted.type);
+        const newCoords = convertGeometryCoords(converted.coordinates, converted.type);
+        if (newCoords) {
+            converted.coordinates = newCoords;
+        }
     }
 
     return converted;
