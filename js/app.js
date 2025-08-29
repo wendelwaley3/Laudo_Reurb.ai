@@ -603,7 +603,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0; 
+    let lotesEmRiscoCount = 0; // Contagem para o card 'Lotes em Risco'
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -612,25 +612,30 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // **CORREÇÃO AQUI**: Garante que o valor de 'risco' seja uma string e em minúsculas
-        const risco = String(p.risco || p.status_risco || '').trim().toLowerCase(); 
-
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta e que ignora valores vazios
-        if (risco && risco !== 'n/a' && risco !== '') {
-            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-            else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
-
-            if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-                lotesRiscoAltoMuitoAlto++;
+        
+        // --- LÓGICA DE RISCO CORRIGIDA PARA USAR 'grau' ---
+        const grauRisco = Number(p.grau); // Pega o valor da propriedade 'grau'
+        
+        if (!isNaN(grauRisco)) { // Verifica se 'grau' é um número válido
+            if (grauRisco === 1) {
+                riskCounts['Baixo']++;
+            } else if (grauRisco === 2) {
+                riskCounts['Médio']++;
+                lotesEmRiscoCount++; // Médio risco já conta como "em risco"
+            } else if (grauRisco === 3) {
+                riskCounts['Alto']++;
+                lotesEmRiscoCount++; // Alto risco conta como "em risco"
+            } else if (grauRisco >= 4) { // Maior ou igual a 4 é "Muito Alto"
+                riskCounts['Muito Alto']++;
+                lotesEmRiscoCount++; // Muito Alto risco conta como "em risco"
             }
         }
         
+        // Lógica para APP (baseada em 'dentro_app')
         const dentroApp = Number(p.dentro_app || p.app || 0); 
         if (dentroApp > 0) lotesAppCount++;
 
+        // Lógica para Custo de Intervenção (baseada em 'valor')
         const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
         if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
@@ -639,35 +644,23 @@ function refreshDashboard() {
         }
     });
 
+    // Atualiza os Cards do Dashboard
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('lotesRisco').textContent = lotesEmRiscoCount; // Card principal 'Lotes em Risco'
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
+    // Atualiza a Análise de Riscos (Listas Detalhadas)
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
-
+    // Atualiza o Resumo de Intervenções
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
-}
-
-// ===================== Legenda / Toggle Camadas =====================
-function initLegendToggles() {
-    const toggle = (id, layer) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('change', () => {
-            if (el.checked) layer.addTo(state.map); else state.map.removeLayer(layer);
-        });
-    };
-    toggle('toggleLotes', state.layers.lotes);
-    toggle('togglePoligonais', state.layers.poligonais);
-    toggle('toggleAPP', state.layers.app);
+    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoCount; 
+    document.getElementById('areasIntervencao').textContent = lotesEmRiscoCount;
 }
 
 // ===================== Formulário de Informações Gerais (Manual) =====================
