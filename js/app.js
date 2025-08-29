@@ -336,52 +336,28 @@ function initUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton'); 
+
+    // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
     const utmOptionsContainer = document.getElementById('utmOptionsContainer');
-
-    // **VERIFICAÇÕES PARA GARANTIR QUE OS ELEMENTOS EXISTEM**
-    if (!fileInput || !dragDropArea || !fileListElement || !processAndLoadBtn || !uploadStatus || !selectFilesVisibleButton || !useUtmCheckbox || !utmOptionsContainer) {
-        console.error("ERRO: Um ou mais elementos do HTML de upload não foram encontrados. A funcionalidade de upload será desativada.");
-        return; // Sai da função para não causar mais erros
-    }
-
     const utmZoneInput = document.getElementById('utmZoneInput');
     const utmHemisphereSelect = document.getElementById('utmHemisphereSelect');
-    let selectedFiles = []; 
 
     // Listener para o checkbox UTM
     useUtmCheckbox.addEventListener('change', () => {
         state.utmOptions.useUtm = useUtmCheckbox.checked;
         utmOptionsContainer.style.display = useUtmCheckbox.checked ? 'flex' : 'none';
-        console.log(`UTM reprojection toggled: ${state.utmOptions.useUtm}`);
-    });
-
-    // Listeners para os campos de configuração UTM
-    utmZoneInput.addEventListener('input', () => { 
-        state.utmOptions.zone = Number(utmZoneInput.value) || 23; 
-        console.log(`UTM Zone set to: ${state.utmOptions.zone}`);
-    });
-    utmHemisphereSelect.addEventListener('change', () => { 
-        state.utmOptions.south = (utmHemisphereSelect.value === 'S'); 
-        console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
-    });
-
-    // Ação do botão "Selecionar Arquivos"
-    selectFilesVisibleButton.addEventListener('click', () => {
-        console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado.'); 
-        fileInput.click();
     });
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
         console.log('Evento: Arquivos selecionados no input de arquivo.', e.target.files); 
-        selectedFiles = Array.from(e.target.files);
-        if (selectedFiles.length === 0) {
+        const selectedFilesArray = Array.from(e.target.files);
+        if (selectedFilesArray.length === 0) {
             fileListElement.innerHTML = '<li>Nenhum arquivo selecionado.</li>';
         } else {
-            fileListElement.innerHTML = '';
-            selectedFiles.forEach(file => {
+            fileListElement.innerHTML = ''; 
+            selectedFilesArray.forEach(file => {
                 const li = document.createElement('li');
                 li.textContent = file.name;
                 fileListElement.appendChild(li);
@@ -427,7 +403,7 @@ function initUpload() {
         uploadStatus.textContent = 'Processando e carregando dados...';
         uploadStatus.className = 'status-message info';
 
-        // O resto da lógica de processamento que já funcionava
+        // Limpa camadas existentes no mapa e nos FeatureGroups
         state.layers.lotes.clearLayers();
         state.layers.app.clearLayers();
         state.layers.poligonais.clearLayers();
@@ -449,7 +425,7 @@ function initUpload() {
                 let geojsonData = JSON.parse(fileContent);
 
                 if (state.utmOptions.useUtm) {
-                    geojsonData = reprojectGeoJSONFromUTM(geojsonData, state.utmOptions.zone, state.utmOptions.south);
+                    geojsonData = reprojectGeoJSONFromUTM(geojsonData, utmZoneInput.value, utmHemisphereSelect.value === 'S');
                 }
                 
                 const fileNameLower = file.name.toLowerCase();
@@ -493,16 +469,6 @@ function initUpload() {
 
         uploadStatus.textContent = 'Dados carregados! Vá para o Dashboard.';
         uploadStatus.className = 'status-message success';
-    });
-}
-        // Atualiza UI
-        populateNucleusFilter();
-        refreshDashboard();
-        fillLotesTable(); 
-
-        uploadStatus.textContent = 'Dados carregados e processados com sucesso! Vá para o Dashboard ou Dados Lotes.';
-        uploadStatus.className = 'status-message success';
-        console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
 }
 
