@@ -249,7 +249,7 @@ function initNav() {
     });
 }
 
-// ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
+/// ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...'); 
     const fileInput = document.getElementById('geojsonFileInput');
@@ -257,9 +257,6 @@ function initUpload() {
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
-
-    // **CORREÇÃO AQUI**: Seleciona o botão visível PELO SEU ID
-    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
     // Elementos da UI de Reprojeção UTM
     const useUtmCheckbox = document.getElementById('useUtmCheckbox');
@@ -283,15 +280,8 @@ function initUpload() {
         console.log(`UTM Hemisphere set to: ${state.utmOptions.south ? 'South' : 'North'}`);
     });
 
-    // **CORREÇÃO AQUI**: Adiciona um listener de clique ao botão visível para disparar o clique no input de arquivo oculto
-    if (selectFilesVisibleButton && fileInput) {
-        selectFilesVisibleButton.addEventListener('click', () => {
-            console.log('Evento: Botão "Selecionar Arquivos" (visível) clicado. Disparando clique no input oculto...'); 
-            fileInput.click(); // Isso abre o diálogo de seleção de arquivos do navegador
-        });
-    } else {
-        console.error('initUpload: Elementos de upload (botão visível ou input oculto) não encontrados ou inválidos. O upload não funcionará.');
-    }
+    // **CORREÇÃO AQUI**: Não precisamos mais do listener de clique no botão visível,
+    // pois a tag <label> no HTML já faz a conexão.
 
     // Listener para quando arquivos são selecionados no input de arquivo
     fileInput.addEventListener('change', (e) => {
