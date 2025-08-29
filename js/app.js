@@ -148,7 +148,6 @@ function generateSimulatedAILaudo(promptData) {
     return laudo;
 }
 
-
 // ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
     console.log('initMap: Iniciando mapa Leaflet...'); 
@@ -165,7 +164,7 @@ function initMap() {
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 18, 
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-    });
+    };
 
     const baseMaps = {
         "OpenStreetMap": osmLayer,
