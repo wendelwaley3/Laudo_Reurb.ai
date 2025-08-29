@@ -293,7 +293,103 @@ function initUpload() {
         return dataTransfer.files;
     }
 
+// ===================== Tabela de Lotes =====================
+function fillLotesTable() {
+    console.log('fillLotesTable: Preenchendo tabela de lotes.');
+    const tbody = document.querySelector('#lotesDataTable tbody');
+    const feats = filteredLotes(); // Obtém os lotes filtrados com base no núcleo selecionado
+    tbody.innerHTML = ''; // Limpa a tabela antes de adicionar novas linhas
 
+    if (feats.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="7">Nenhum dado disponível. Faça o upload das camadas primeiro ou ajuste os filtros.</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    feats.forEach((f, idx) => {
+        const p = f.properties || {};
+        const tr = document.createElement('tr');
+
+        // Usa as propriedades corretas das suas tabelas
+        const codLote = p.cod_lote || p.codigo || `Lote ${idx + 1}`; 
+        const descNucleo = p.desc_nucleo || p.nucleo || 'N/A';
+        const tipoUso = p.tipo_uso || 'N/A';
+        const areaM2 = (p.area_m2 && typeof p.area_m2 === 'number') ? p.area_m2.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : 'N/A';
+        const statusRisco = p.risco || p.status_risco || 'N/A'; 
+        const emApp = (typeof p.dentro_app === 'number' && p.dentro_app > 0) ? 'Sim' : 'Não'; 
+        
+        // Botão "Ver no Mapa" na última coluna
+        const btnHtml = `<button class="zoomLoteBtn small-btn" data-codlote="${codLote}">Ver no Mapa</button>`;
+        tr.innerHTML = `
+            <td>${codLote}</td>
+            <td>${descNucleo}</td>
+            <td>${tipoUso}</td>
+            <td>${areaM2}</td>
+            <td>${statusRisco}</td>
+            <td>${emApp}</td>
+            <td>${btnHtml}</td>
+        `;
+        fragment.appendChild(tr);
+    });
+    tbody.appendChild(fragment);
+
+    // **CORREÇÃO AQUI**: Adiciona listeners para os botões "Ver no Mapa"
+    tbody.querySelectorAll('.zoomLoteBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const codLoteToZoom = btn.getAttribute('data-codlote');
+            const loteToZoom = state.allLotes.find(l => (l.properties?.cod_lote == codLoteToZoom)); // '==' para comparar string com número se necessário
+            
+            if (loteToZoom) {
+                // Navega para o dashboard (onde está o mapa)
+                document.querySelector('nav a[data-section="dashboard"]').click();
+                
+                // Cria uma camada Leaflet temporária para obter os limites (bounds) do lote
+                const tempLayer = L.geoJSON(loteToZoom); 
+                try { 
+                    // Ajusta o zoom do mapa para o lote selecionado
+                    state.map.fitBounds(tempLayer.getBounds(), { padding: [50, 50] }); 
+                } catch (e) {
+                    console.warn("Não foi possível ajustar o mapa ao lote selecionado. Verifique as coordenadas do lote.", e);
+                }
+                // Tenta abrir o popup do lote no mapa
+                state.layers.lotes.eachLayer(layer => {
+                    if (layer.feature?.properties?.cod_lote == codLoteToZoom && layer.openPopup) { // '==' para comparar string com número
+                        layer.openPopup();
+                    }
+                });
+            } else {
+                console.warn(`Lote com código ${codLoteToZoom} não encontrado na lista para zoom.`);
+            }
+        });
+    });
+
+    // Funcionalidade de busca na tabela
+    const searchInput = document.getElementById('lotSearch');
+    searchInput.addEventListener('input', () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const textContent = tr.textContent.toLowerCase();
+            tr.style.display = textContent.includes(searchTerm) ? '' : 'none';
+        });
+    });
+
+    // Funcionalidade de exportar CSV da tabela
+    document.getElementById('exportTableBtn').onclick = () => {
+        const rows = [['Código','Núcleo','Tipo de Uso','Área (m²)','Status Risco','APP']];
+        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            if (tr.style.display === 'none') return; // Respeita o filtro de busca
+            const tds = tr.querySelectorAll('td');
+            if (tds.length >= 6) rows.push([
+                tds[0].textContent, tds[1].textContent, tds[2].textContent,
+                tds[3].textContent, tds[4].textContent, tds[5].textContent
+            ]);
+        });
+        const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
+        downloadText('lotes_tabela.csv', csv);
+    };
+}
     // Listener para o botão "Processar e Carregar Dados"
     processAndLoadBtn.addEventListener('click', async () => {
         console.log('Evento: Botão "Processar e Carregar Dados" clicado.'); 
