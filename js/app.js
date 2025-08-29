@@ -590,6 +590,7 @@ function populateNucleusFilter() {
     const filterSelect = document.getElementById('nucleusFilter');
     const reportNucleosSelect = document.getElementById('nucleosAnalise');
     
+    // Limpa os selects
     filterSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     reportNucleosSelect.innerHTML = '<option value="all">Todos os Núcleos</option>';
     
@@ -609,13 +610,14 @@ function populateNucleusFilter() {
             }
         });
     } else {
-        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>';
+        reportNucleosSelect.innerHTML = '<option value="none" disabled selected>Nenhum núcleo disponível.</option>';
     }
 }
-
 /** Filtra os lotes com base no núcleo selecionado. */
 function filteredLotes() {
-    if (state.currentNucleusFilter === 'all') return state.allLotes;
+    if (state.currentNucleusFilter === 'all') {
+        return state.allLotes;
+    }
     return state.allLotes.filter(f => {
         const nuc = (f.properties?.desc_nucleo || f.properties?.nucleo || '');
         return nuc === state.currentNucleusFilter;
@@ -626,11 +628,13 @@ function filteredLotes() {
 function zoomToFilter() {
     const feats = filteredLotes();
     if (feats.length === 0) {
-        state.map.setView([-15.7801, -47.9292], 5); 
+        state.map.setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
         return;
     }
     const layer = L.geoJSON({ type: 'FeatureCollection', features: feats });
-    try { state.map.fitBounds(layer.getBounds(), { padding: [20,20] }); } catch (e) {
+    try { 
+        state.map.fitBounds(layer.getBounds(), { padding: [20, 20] }); 
+    } catch (e) {
         console.warn("Não foi possível ajustar o mapa ao filtro. Verifique as coordenadas dos lotes filtrados.", e);
     }
 }
