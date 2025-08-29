@@ -210,7 +210,7 @@ function initNav() {
     });
 }
 
-// ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
+/// ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
 function initUpload() {
     console.log('initUpload: Configurando upload de arquivos...');
     const fileInput = document.getElementById('geojsonFileInput');
@@ -341,7 +341,6 @@ function initUpload() {
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.');
     });
 }
-
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
