@@ -568,6 +568,22 @@ async function onEachPoligonalFeature(feature, layer) {
     }
 }
 
+// ===================== Função simulada para buscar dados extras de cidade =====================
+async function buscarInfoCidade(nomeCidade) {
+    alert(`Buscando dados simulados para ${nomeCidade}...`);
+    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
+    
+    let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
+    info += `- Região: ${dadosSimulados.regiao}\n`;
+    info += `- População Estimada: ${dadosSimulados.populacao}\n`;
+    info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
+    info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
+
+    alert(info);
+    console.log("Dados do município simulados:", dadosSimulados);
+}
+
+
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
