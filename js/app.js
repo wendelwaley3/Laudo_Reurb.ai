@@ -100,8 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap(); 
     initNav(); 
     initUpload(); 
-    initLegendToggles(); 
+    initLegendToggles(); // <-- O PROBLEMA ESTÁ AQUI
     initGeneralInfoForm(); 
+
+    // Configura listeners para os botões principais...
+    // ...
+});
 
     // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
@@ -656,11 +660,52 @@ async function onEachPoligonalFeature(feature, layer) {
 // ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    
+    // 1. Inicializa os componentes principais
     initMap(); 
-    initNav(); // Garante que a navegação seja inicializada
+    initNav(); 
+    
+    // 2. Configura os formulários e interações
     initUpload(); 
-    initLegendToggles(); 
     initGeneralInfoForm(); 
+    initLegendToggles(); // <-- CORRIGIDO: Agora é chamado após a definição das funções
+
+    // 3. Configura os listeners para os botões principais
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+    });
+    
+    // 4. Configura o listener para a mudança no select de filtros
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+
+    // 5. Define o estado inicial da UI
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
+});
 
     // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
