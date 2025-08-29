@@ -97,6 +97,14 @@
                 <li><span id="areasIntervencao">0</span> áreas demandam intervenção estrutural</li>
             </ul>
 
+            <!-- NOVA SEÇÃO: Análise de Tipos de Uso -->
+            <h2>Análise de Tipos de Uso</h2>
+            <div id="useTypesAnalysis" class="use-types-grid">
+                <!-- O conteúdo será gerado dinamicamente pelo JavaScript -->
+                <p>Nenhum dado de tipo de uso disponível. Verifique se a propriedade 'tipo_uso' existe nos seus lotes.</p>
+            </div>
+
+
             <h2>Análise Comparativa por Núcleo</h2>
             <div id="nucleusComparisonChart" class="chart-container">
                 <p>Nenhum dado disponível. Faça o upload das camadas para visualizar o gráfico.</p>
@@ -125,6 +133,25 @@
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
+            <!-- CONTROLE DE REPROJEÇÃO UTM (ESSENCIAL PARA O JS FUNCIONAR) -->
+            <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
+                <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
+                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
+                    <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
+                    <div id="utmOptionsContainer" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
+                        <label>Hemisfério:
+                            <select id="utmHemisphereSelect">
+                                <option value="S">Sul</option>
+                                <option value="N">Norte</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <p style="font-size:0.85em; color:#666; margin-top:10px;">
+                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção apenas se não puder converter previamente.
+                </p>
+            </div>
         </section>
 
         <!-- SEÇÃO: Informações Gerais (Preenchimento Manual) -->
