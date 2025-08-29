@@ -980,3 +980,20 @@ function ensurePolygonClosed(coords) {
     }
     return coords;
 }
+function initUpload() {
+    // ... código para selecionar os elementos HTML ...
+
+    // --- Lógica do Botão "Selecionar Arquivos" ---
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            fileInput.click(); 
+        });
+    }
+
+    // ... código para lidar com a seleção de arquivos e drag-and-drop ...
+
+    // --- Lógica do Botão "Processar e Carregar Dados" ---
+    processAndLoadBtn.addEventListener('click', async () => {
+        // ... todo o código para ler, reprojetar, categorizar, e carregar os dados no mapa e dashboard ...
+    });
+}
