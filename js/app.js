@@ -568,22 +568,6 @@ async function onEachPoligonalFeature(feature, layer) {
     }
 }
 
-// ===================== Função simulada para buscar dados extras de cidade =====================
-async function buscarInfoCidade(nomeCidade) {
-    alert(`Buscando dados simulados para ${nomeCidade}...`);
-    const dadosSimulados = getSimulatedMunicipioData(nomeCidade); 
-    
-    let info = `**Informações para ${dadosSimulados.municipio}:**\n`;
-    info += `- Região: ${dadosSimulados.regiao}\n`;
-    info += `- População Estimada: ${dadosSimulados.populacao}\n`;
-    info += `- Área Territorial: ${dadosSimulados.area_km2} km²\n\n`;
-    info += `(Estes dados são simulados para demonstração client-side. Para dados reais, um backend seria necessário.)`;
-
-    alert(info);
-    console.log("Dados do município simulados:", dadosSimulados);
-}
-
-
 // ===================== Filtros por Núcleo =====================
 function populateNucleusFilter() {
     console.log('populateNucleusFilter: Preenchendo filtro de núcleos com:', Array.from(state.nucleusSet)); 
@@ -641,7 +625,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesRiscoAltoMuitoAlto = 0;
+    let lotesRiscoAltoMuitoAlto = 0; 
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -650,62 +634,42 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Pega o valor de risco de múltiplas colunas possíveis e converte para string e minúsculas
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
-
-        // **NOVA LÓGICA DE CONTAGEM DE RISCO**
-        // Primeiro, verifica se o risco é "geologico" ou "hidrologico" e os trata como risco ALTO por padrão
-        if (risco === 'geologico' || risco === 'hidrologico') {
-            riskCounts['Alto']++; // Classifica como Risco Alto
-        } 
-        // Se não for, verifica os outros valores
-        else if (risco === '1' || risco.includes('baixo')) {
-            riskCounts['Baixo']++;
-        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
-            riskCounts['Médio']++;
-        } else if (risco === '3' || risco.includes('alto')) {
-            riskCounts['Alto']++;
-        } else if (risco === '4' || risco.includes('muito alto')) {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            // Apenas mostra o aviso se o risco não for N/A, null ou vazio
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
-        }
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
-        // Contagem para o card "Lotes em Risco" (Médio + Alto + Muito Alto)
-        // Inclui "geologico" e "hidrologico" como risco, e também médio
-        if (risco === '2' || risco === '3' || risco === '4' || risco.includes('médio') || risco.includes('medio') || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
+        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
             lotesRiscoAltoMuitoAlto++;
         }
         
-        // Contagem de Lotes em APP
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
+        const dentroApp = Number(p.dentro_app || p.app || 0); 
+        if (dentroApp > 0) lotesAppCount++;
 
-        // Cálculo do Custo de Intervenção
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
-        if (!isNaN(valorCusto) && valorCusto > 0) {
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
+        if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto;
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
