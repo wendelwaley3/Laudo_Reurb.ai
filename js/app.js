@@ -529,7 +529,93 @@ async function onEachPoligonalFeature(feature, layer) {
         layer.bindPopup(popupContent);
     }
 }
+// ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
+// (Mantenha as funções 'styleLote', 'styleApp', 'onEachAppFeature', 'stylePoligonal' e 'onEachPoligonalFeature' como estão)
+
+// **CORREÇÃO AQUI**: Substitua a função 'onEachLoteFeature' pela função abaixo
+// Popup ao clicar no lote
+function onEachLoteFeature(feature, layer) {
+    if (feature.properties) {
+        let popupContent = "<h3>Detalhes do Lote:</h3>";
+        
+        // Mapeamento de chaves para nomes de exibição (conforme seu popup de exemplo e tabelas)
+        const keyMappings = {
+            'cod_lote': 'Código',
+            'desc_nucleo': 'Núcleo',
+            'tipo_uso': 'Tipo de Uso',
+            'area_m2': 'Área (m²)',
+            'risco': 'Status de Risco',
+            'status_risco': 'Status de Risco', // Adicionado para cobrir ambas as nomenclaturas
+            'dentro_app': 'Em APP',
+            'valor': 'Custo de Intervenção',
+            'custo_intervencao': 'Custo de Intervenção', // Adicionado para cobrir ambas as nomenclaturas
+            'id_respondente': 'ID Respondente',
+            'cod_area': 'Cód. Área',
+            'grau': 'Grau',
+            'qtde_lote': 'Qtde. Lote',
+            'intervencao': 'Intervenção',
+            'lotes_atingidos': 'Lotes Atingidos',
+        };
+
+        // Ordem de exibição das propriedades (opcional, mas recomendado)
+        const displayOrder = [
+            'cod_lote',
+            'id_respondente',
+            'cod_area',
+            'grau',
+
+            'qtde_lote',
+            'intervencao',
+            'valor', 
+            'custo_intervencao',
+            'desc_nucleo',
+            'risco',
+            'status_risco',
+            'lotes_atingidos',
+            // Adicione outras chaves na ordem que você desejar
+        ];
+
+        // Adiciona as propriedades na ordem definida
+        displayOrder.forEach(key => {
+            if (feature.properties.hasOwnProperty(key)) {
+                let value = feature.properties[key];
+                const displayKey = keyMappings[key] || key; // Usa o nome mapeado ou a chave original
+
+                if (value === null || value === undefined || value === '') value = 'N/A'; 
+
+                // Formatação especial para valores específicos
+                if ((key.toLowerCase() === 'valor' || key.toLowerCase() === 'custo_intervencao') && typeof value === 'number') { 
+                    value = formatBRL(value); // Usa nossa função de formatação de moeda
+                }
+                
+                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
+            }
+        });
+        
+        // Adiciona outras propriedades que não estão na ordem definida
+        for (let key in feature.properties) {
+            if (!displayOrder.includes(key)) {
+                let value = feature.properties[key];
+                const displayKey = keyMappings[key] || key;
+                
+                if (value === null || value === undefined || value === '') value = 'N/A'; 
+
+                // Formatação para propriedades não listadas
+                if (key.toLowerCase() === 'area_m2' && typeof value === 'number') {
+                    value = value.toLocaleString('pt-BR') + ' m²';
+                }
+                if (key.toLowerCase() === 'dentro_app' && typeof value === 'number') {
+                    value = (value > 0) ? `Sim (${value}%)` : 'Não'; 
+                }
+
+                popupContent += `<strong>${displayKey}:</strong> ${value}<br>`;
+            }
+        }
+
+        layer.bindPopup(popupContent);
+    }
+}
 // ===================== Função simulada para buscar dados extras de cidade =====================
 async function buscarInfoCidade(nomeCidade) {
     alert(`Buscando dados simulados para ${nomeCidade}...`);
