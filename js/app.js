@@ -142,7 +142,6 @@ function generateSimulatedAILaudo(promptData) {
     laudo += `2. Levantamento topográfico e cadastral detalhado para delimitação precisa dos lotes.\n`;
     laudo += `3. Análise ambiental para identificar e mitigar impactos, especialmente em áreas de preservação.\n`;
     laudo += `4. Planejamento de obras de infraestrutura quando necessário.\n\n`;
-
     laudo += `Este laudo é uma simulação e deve ser complementado por uma análise técnica e jurídica completa realizada por profissionais habilitados.\n\n`;
 
     return laudo;
