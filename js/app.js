@@ -1014,3 +1014,46 @@ document.addEventListener('DOMContentLoaded', () => {
     populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
 });
+// ===================== Utilidades Diversas =====================
+
+/** Formata um número para moeda BRL. */
+function formatBRL(n) {
+    const v = Number(n || 0);
+    return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+/** Inicia o download de um arquivo de texto. */
+function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    URL.revokeObjectURL(url); // Libera o objeto URL
+}
+
+/** Calcula a área de uma feature usando Turf.js. */
+function featureAreaM2(feature) {
+    try {
+        // Turf.area retorna em metros quadrados se a projeção for WGS84
+        return turf.area(feature);
+    } catch (e) {
+        console.warn('Erro ao calcular área com Turf.js:', e);
+        return 0;
+    }
+}
+
+/** **ADICIONE ESTA FUNÇÃO AQUI**
+ * Garante que um anel de polígono seja fechado (primeiro e último ponto iguais).
+ */
+function ensurePolygonClosed(coords) {
+    if (!coords || coords.length === 0) return coords;
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    // Se o primeiro e o último ponto não são iguais, adiciona o primeiro no final
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+        coords.push(first);
+    }
+    return coords;
+}
