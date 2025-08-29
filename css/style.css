@@ -1,3 +1,6 @@
+/* Importação da fonte Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 body {
     font-family: 'Inter', sans-serif;
     margin: 0;
@@ -231,8 +234,8 @@ h3 {
     border: 1px solid rgba(0,0,0,0.2);
 }
 .risk-low::before { background-color: #2ecc71; } /* Verde */
-.risk-medium::before { background-color: #f39c12; } /* Laranja */
-.risk-high::before { background-color: #e74c3c; } /* Vermelho */
+.risk-medium::before { background-color: #f1c40f; } /* Amarelo */
+.risk-high::before { background-color: #e67e22; } /* Laranja */
 .risk-very-high::before { background-color: #c0392b; } /* Vermelho escuro */
 
 .click-info {
@@ -451,9 +454,6 @@ h3 {
     margin-right: 8px;
     transform: scale(1.1);
 }
-
-/* ----------------- ESTILOS PARA O RELATÓRIO PROFISSIONAL (NOVO) ----------------- */
-
 .report-output {
     background-color: #ecf0f1;
     padding: 20px;
@@ -462,116 +462,20 @@ h3 {
     display: flex;
     flex-direction: column;
 }
-
-.report-content-stylized {
+.report-content {
     flex-grow: 1;
     background-color: white;
-    padding: 25px;
+    padding: 15px;
     border-radius: 6px;
     border: 1px solid #ddd;
     min-height: 250px;
     max-height: 600px; /* Limite de altura para relatório */
     overflow-y: auto; /* Scroll se o conteúdo for grande */
+    white-space: pre-wrap; /* Para preservar quebras de linha do relatório */
     font-size: 0.95em;
     color: #555;
     line-height: 1.5;
 }
-
-#reportPlaceholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #7f8c8d;
-    font-style: italic;
-}
-
-.report-header h1 {
-    font-size: 1.8em;
-    color: #2c3e50;
-    margin-bottom: 5px;
-}
-
-.report-header p {
-    font-size: 0.9em;
-    color: #7f8c8d;
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-.report-section {
-    margin-bottom: 25px;
-}
-
-.report-section h2 {
-    font-size: 1.4em;
-    color: #34495e;
-    background-color: #f8f8f8;
-    padding: 10px 15px;
-    border-radius: 6px;
-    border-bottom: 2px solid #3498db;
-    margin-top: 0;
-    margin-bottom: 15px;
-}
-
-.report-section table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9em;
-}
-
-.report-section th, .report-section td {
-    border: 1px solid #eee;
-    padding: 10px;
-    text-align: left;
-}
-
-.report-section th {
-    background-color: #f8f8f8;
-    font-weight: 600;
-    width: 40%;
-}
-
-.report-section td {
-    background-color: #ffffff;
-}
-
-.report-footer {
-    border-top: 1px solid #eee;
-    padding-top: 15px;
-    margin-top: 25px;
-    font-size: 0.8em;
-    color: #7f8c8d;
-    text-align: center;
-}
-
-/* Estilo para impressão */
-@media print {
-    body, header, nav, main > section:not(#relatorios) {
-        display: none;
-    }
-    #relatorios {
-        display: block;
-        margin: 0;
-        padding: 0;
-        box-shadow: none;
-        border-radius: 0;
-        border: none;
-    }
-    #generatedReportContainer {
-        border: none;
-        padding: 0;
-    }
-    .report-content-stylized {
-        max-height: none;
-        overflow-y: visible;
-        border: none;
-    }
-}
-
-
-/* ----------------- FIM DOS ESTILOS DE RELATÓRIO ----------------- */
-
 
 /* Data Table */
 .data-table-controls {
@@ -691,8 +595,4 @@ footer {
         margin-right: -15px;
         width: calc(100% + 30px);
     }
-    .form-grid {
-        grid-template-columns: 1fr; /* Colunas empilham em telas menores */
-    }
 }
-```
