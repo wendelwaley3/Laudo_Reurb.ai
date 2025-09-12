@@ -1067,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initLegendToggles(); 
     initGeneralInfoForm(); 
 
-    // Configura listeners para os botões principais (Aplicar Filtros, Gerar Relatório, Exportar Relatório)
+    // Configura listeners para os botões principais
     document.getElementById('applyFiltersBtn').addEventListener('click', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
         refreshDashboard();
@@ -1075,30 +1075,30 @@ document.addEventListener('DOMContentLoaded', () => {
         zoomToFilter();
     });
 
-    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorioIA);
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorio); // Renomeado para gerarRelatorio
 
     document.getElementById('exportReportBtn').addEventListener('click', () => {
         if (!state.lastReportText.trim()) {
             alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
             return;
         }
-        downloadText('relatorio_geolaudo.txt', state.lastReportText);
+        // A função de exportar agora usa a impressão para salvar como PDF
+        window.print(); 
     });
     
-    // Configura listener para a mudança no select de filtros (para aplicar o zoom também)
+    // Configura listener para a mudança no select de filtros
     document.getElementById('nucleusFilter').addEventListener('change', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
         refreshDashboard();
         fillLotesTable();
-        zoomToFilter(); // Zoom quando o filtro muda no Dashboard
+        zoomToFilter(); 
     });
 
-
-    // Estado inicial: Dashboard ativo e preenchido (vazio no início)
+    // Estado inicial
     document.getElementById('dashboard').classList.add('active');
     document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
     refreshDashboard(); 
     fillLotesTable(); 
     populateNucleusFilter(); 
     console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
-});```
+});
