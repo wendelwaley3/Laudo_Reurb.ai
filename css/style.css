@@ -650,4 +650,40 @@ footer {
         border: none;
     }
 }
+/* ----------------- ESTILOS PARA UPLOAD SEPARADO ----------------- */
+.upload-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.upload-group {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.upload-group label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.upload-group input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: white;
+}
+
+.upload-group small {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.85em;
+    color: #7f8c8d;
+}
 /* ----------------- FIM DOS ESTILOS DE RELATÓRIO ----------------- */
