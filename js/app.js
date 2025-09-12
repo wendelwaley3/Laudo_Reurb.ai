@@ -274,12 +274,27 @@ function initNav() {
 
 // ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
 function initUpload() {
-    console.log('initUpload: Configurando upload de arquivos...');
+    console.log('initUpload: Configurando upload de arquivos...'); 
     const fileInput = document.getElementById('geojsonFileInput');
     const dragDropArea = document.querySelector('.drag-drop-area');
     const fileListElement = document.getElementById('fileList');
     const processAndLoadBtn = document.getElementById('processAndLoadBtn');
     const uploadStatus = document.getElementById('uploadStatus');
+
+    // ADICIONE ESTA PARTE - Início
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
+
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            fileInput.click(); 
+        });
+    } else {
+        console.error('initUpload: Botão de upload visível ou input de arquivo não encontrados.');
+    }
+    // ADICIONE ESTA PARTE - Fim
+
+    // ... (o restante da sua função initUpload continua como está) ...
+}
 
     const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
 
@@ -666,17 +681,18 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
-        
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
+        // **LÓGICA DE RISCO CORRIGIDA**
+        const risco = String(p.risco || p.status_risco || p.grau || '').trim().toLowerCase(); 
 
-        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
-            lotesRiscoAltoMuitoAlto++;
+        if (risco && risco !== 'n/a' && risco !== '') {
+            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+            
+            if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+                lotesRiscoAltoMuitoAlto++;
+            }
         }
         
         const dentroApp = Number(p.dentro_app || p.app || 0); 
@@ -706,7 +722,6 @@ function refreshDashboard() {
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
 }
-
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
