@@ -197,7 +197,50 @@ function generateSimulatedAILaudo(promptData) {
 
     return laudo;
 }
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
 
+    // Configura listeners para os botões principais
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorio); // Renomeado para gerarRelatorio
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        // A função de exportar agora usa a impressão para salvar como PDF
+        window.print(); 
+    });
+    
+    // Configura listener para a mudança no select de filtros
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); 
+    });
+
+    // Estado inicial
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
 
 // ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
