@@ -349,45 +349,39 @@
             </div>
         </section>
 
-
-        <!-- Relatórios Section -->
+               <!-- Relatórios Section -->
         <section id="relatorios" class="container">
-            <h2>Gerador de Relatórios com IA</h2>
+            <h2>Gerador de Relatórios</h2>
             <div class="report-generator-grid">
                 <div class="report-config">
                     <h3>Configurações do Relatório</h3>
-                    <label for="reportType">Tipo de Relatório</label>
-                    <select id="reportType">
-                        <option value="completo">Relatório Completo</option>
-                        <option value="resumido">Relatório Resumido</option>
-                        <option value="risco">Análise de Risco</option>
-                    </select>
-
-                    <label for="nucleosAnalise">Núcleos para Análise</label>
+                    <label for="nucleosAnalise">Núcleo para Análise:</label>
                     <select id="nucleosAnalise">
                         <option value="none">Nenhum núcleo disponível. Faça o upload dos dados primeiro.</option>
-                        <!-- Opções de núcleo serão adicionadas via JS -->
                     </select>
 
-                    <h4>Seções a Incluir</h4>
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" id="incDadosGerais" checked> Dados Gerais dos Lotes</label>
-                        <label><input type="checkbox" id="incAnaliseRiscos" checked> Análise de Riscos</label>
-                        <label><input type="checkbox" id="incAreasPublicas"> Áreas Públicas (APP)</label>
-                        <label><input type="checkbox" id="incInformacoesGerais" checked> Informações Gerais do Projeto</label>
-                        <label><input type="checkbox" id="incInfraestrutura"> Infraestrutura (Poligonais)</label>
-                    </div>
-                    <button id="generateReportBtn">Gerar Relatório com IA</button>
+                    <label for="dataPreenchimento">Data de Preenchimento:</label>
+                    <input type="date" id="dataPreenchimento">
+
+                    <label for="dataRevisao">Data de Revisão:</label>
+                    <input type="date" id="dataRevisao">
+                    
+                    <button id="generateReportBtn">Gerar Relatório</button>
                 </div>
-                <div class="report-output">
+                <!-- NOVA ESTRUTURA PARA RELATÓRIO ESTILIZADO -->
+                <div id="generatedReportContainer" class="report-output">
                     <h3>Relatório Gerado</h3>
-                    <div id="generatedReportContent" class="report-content">
-                        Nenhum relatório gerado ainda. Configure as opções e clique em "Gerar Relatório".
+                    <div class="report-content-stylized">
+                        <div id="reportPlaceholder">
+                            Nenhum relatório gerado ainda. Configure as opções e clique em "Gerar Relatório".
+                        </div>
+                        <div id="reportData" style="display: none;">
+                            <pre id="reportTextOutput" class="report-text-output"></pre>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
-
         <!-- Instruções Section -->
         <section id="instrucoes" class="container">
             <h2>Instruções de Uso</h2>
