@@ -113,34 +113,39 @@
             </div>
         </section>
 
-        <!-- Upload Section -->
+               <!-- Upload Section -->
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
-            <div class="upload-area">
-                <!-- ESTRUTURA PARA UPLOAD -->
-                <label for="geojsonFileInput" class="drag-drop-area">
-                    <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
-                    <p>ou clique para selecionar</p>
-                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button> 
-                </label>
-                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
-            </div>
-            <div class="uploaded-files-preview">
-                <h3>Arquivos Selecionados:</h3>
-                <ul id="fileList">
-                    <li>Nenhum arquivo selecionado.</li>
-                </ul>
+            <div class="upload-grid">
+                <!-- Upload para Lotes -->
+                <div class="upload-group">
+                    <label for="lotesFileInput"><strong>1. Camada de Lotes</strong> (Obrigatório)</label>
+                    <input type="file" id="lotesFileInput" accept=".geojson,.json">
+                    <small>Arquivo GeoJSON contendo os polígonos dos lotes com suas propriedades (núcleo, risco, app, etc.).</small>
+                </div>
+                <!-- Upload para APPs -->
+                <div class="upload-group">
+                    <label for="appFileInput"><strong>2. Camada de APPs</strong> (Opcional)</label>
+                    <input type="file" id="appFileInput" accept=".geojson,.json">
+                    <small>Arquivo GeoJSON com os polígonos das Áreas de Preservação Permanente.</small>
+                </div>
+                <!-- Upload para Poligonal -->
+                <div class="upload-group">
+                    <label for="poligonalFileInput"><strong>3. Camada de Poligonal do Núcleo/Município</strong> (Opcional)</label>
+                    <input type="file" id="poligonalFileInput" accept=".geojson,.json">
+                    <small>Arquivo GeoJSON com o contorno da área do projeto ou do município.</small>
+                </div>
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
-            <!-- CONTROLE DE REPROJEÇÃO UTM (ESSENCIAL PARA O JS FUNCIONAR) -->
+            <!-- CONTROLE DE REPROJEÇÃO UTM -->
             <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
                 <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
                 <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
                     <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
+                    <div id="utmOptionsContainer" style="display:flex; gap:10px; align-items:center; display:none;">
                         <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
-                        <label>Hemisfério:
+                        <label>Hemisfério: 
                             <select id="utmHemisphereSelect">
                                 <option value="S">Sul</option>
                                 <option value="N">Norte</option>
@@ -149,7 +154,7 @@
                     </div>
                 </div>
                 <p style="font-size:0.85em; color:#666; margin-top:10px;">
-                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção apenas se não puder converter previamente.
+                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho.
                 </p>
             </div>
         </section>
