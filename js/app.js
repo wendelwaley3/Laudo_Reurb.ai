@@ -479,25 +479,62 @@ function initUpload() {
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
-// Estilo dos lotes baseado no risco
+// **CORREÇÃO AQUI**: Substitua a função 'styleLote' por esta
+// Estilo dos lotes baseado no risco. Lotes sem risco ficam em azul.
 function styleLote(feature) {
-    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
-    let color;
-    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
-    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
-    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
-    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
-    else color = '#3498db'; 
+    const p = feature.properties || {};
+    const grau = Number(p.grau);
+    let color, fillOpacity = 0.5; // Transparência padrão para todos os lotes
+
+    if (grau === 1) {
+        color = '#2ecc71'; // Verde para Grau 1
+    } else if (grau === 2) {
+        color = '#f1c40f'; // Amarelo para Grau 2
+    } else if (grau === 3) {
+        color = '#e67e22'; // Laranja para Grau 3
+    } else if (grau >= 4) {
+        color = '#e74c3c'; // Vermelho para Grau 4
+    } else {
+        color = '#3498db'; // Azul para lotes sem risco definido
+        fillOpacity = 0.3; // Um pouco mais transparente para lotes normais
+    }
 
     return {
         fillColor: color,
-        weight: 1,
-        opacity: 1,
-        color: 'white', 
-        dashArray: '3', 
-        fillOpacity: 0.7
+        weight: 1, // Espessura da borda
+        opacity: 1, // Opacidade da borda
+        color: 'white', // Cor da borda
+        fillOpacity: fillOpacity // Opacidade do preenchimento
     };
 }
+
+// **CORREÇÃO AQUI**: Substitua a função 'styleApp' por esta
+// Estilo da camada APP (Verde escuro com sombreamento)
+function styleApp(feature) {
+    return {
+        fillColor: '#16a085', // Verde escuro
+        color: '#117a65',     // Borda um pouco mais escura para dar profundidade
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.6,    // Opacidade para o "sombreamento"
+        dashArray: '4, 4'    // Linha tracejada para diferenciar
+    };
+}
+
+// **CORREÇÃO AQUI**: Substitua a função 'stylePoligonal' por esta
+// Estilo da camada Poligonal (Cinza quase transparente)
+function stylePoligonal(feature) {
+    return {
+        fillColor: '#bdc3c7', // Cinza claro
+        color: '#7f8c8d',     // Borda cinza um pouco mais escura
+        weight: 1.5,
+        opacity: 0.8,
+        fillOpacity: 0.1,    // Quase transparente
+        dashArray: '5, 5'    // Linha tracejada
+    };
+}
+
+// (O restante do seu js/app.js, incluindo as funções onEachFeature, permanece o mesmo)
 
 // Popup ao clicar no lote
 function onEachLoteFeature(feature, layer) {
