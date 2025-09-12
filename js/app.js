@@ -870,104 +870,178 @@ function initGeneralInfoForm() {
 }
 
 
-// ===================== Geração de Relatório com IA (Simulado) =====================
-async function gerarRelatorioIA() {
-    console.log('Gerando Relatório com IA (simulado)...'); 
-    const reportType = document.getElementById('reportType').value;
-    const nucleosAnalise = document.getElementById('nucleosAnalise').value;
-    const incDadosGerais = document.getElementById('incDadosGerais').checked;
-    const incAnaliseRiscos = document.getElementById('incAnaliseRiscos').checked;
-    const incAreasPublicas = document.getElementById('incAreasPublicas').checked;
-    const incInformacoesGerais = document.getElementById('incInformacoesGerais').checked; 
-    const incInfraestrutura = document.getElementById('incInfraestrutura').checked;
-    const generatedReportContent = document.getElementById('generatedReportContent');
+// ===================== Geração de Relatório =====================
+async function gerarRelatorio() {
+    console.log('Gerando Relatório...');
+    const nucleoAnalisado = document.getElementById('nucleosAnalise').value;
+    const dataPreenchimento = document.getElementById('dataPreenchimento').value;
+    const dataRevisao = document.getElementById('dataRevisao').value;
+
+    const reportPlaceholder = document.getElementById('reportPlaceholder');
+    const reportDataContainer = document.getElementById('reportData');
+    const reportTextOutput = document.getElementById('reportTextOutput');
 
     if (state.allLotes.length === 0) {
-        generatedReportContent.textContent = "Nenhum dado de lotes disponível para gerar o relatório. Faça o upload das camadas primeiro.";
+        reportPlaceholder.textContent = "Nenhum dado de lote disponível para gerar o relatório. Faça o upload das camadas primeiro.";
+        reportDataContainer.style.display = 'none';
+        reportPlaceholder.style.display = 'flex';
         return;
     }
-    if (incInformacoesGerais && Object.keys(state.generalProjectInfo).length === 0) {
-        generatedReportContent.textContent = "Seção 'Informações Gerais do Projeto' selecionada, mas nenhum dado foi salvo. Por favor, preencha e salve as informações na aba 'Informações Gerais'.";
+    if (nucleoAnalisado === 'none') {
+        reportPlaceholder.textContent = "Por favor, selecione um núcleo para análise.";
+        reportDataContainer.style.display = 'none';
+        reportPlaceholder.style.display = 'flex';
         return;
     }
 
-    let reportText = `RELATÓRIO GEOLAUDO.AI - ${reportType.toUpperCase()}\n`;
-    reportText += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}\n\n`;
+    // Filtra os lotes para o núcleo selecionado
+    const lotesDoNucleo = state.allLotes.filter(f => f.properties.desc_nucleo === nucleoAnalisado);
+    if (lotesDoNucleo.length === 0) {
+        reportPlaceholder.textContent = `Nenhum lote encontrado para o núcleo "${nucleoAnalisado}".`;
+        reportDataContainer.style.display = 'none';
+        reportPlaceholder.style.display = 'flex';
+        return;
+    }
 
-    let featuresToAnalyze = filteredLotes(); 
-    let municipioDoNucleo = "Não informado"; 
-    if (nucleosAnalise !== 'all' && nucleosAnalise !== 'none' && featuresToAnalyze.length > 0) {
-        reportText += `Análise Focada no Núcleo: ${nucleosAnalise}\n\n`;
-        municipioDoNucleo = featuresToAnalyze[0].properties?.nm_mun || featuresToAnalyze[0].properties?.municipio || "Não informado";
-    } else {
-        reportText += `Análise Abrangente (Todos os Núcleos)\n\n`;
-        if (state.allLotes.length > 0) {
-             municipioDoNucleo = state.allLotes[0].properties?.nm_mun || state.allLotes[0].properties?.municipio || "Não informado";
+    // --- Início dos Cálculos para o Relatório ---
+
+    // Informações básicas do primeiro lote (assumindo consistência)
+    const primeiroLoteProps = lotesDoNucleo[0].properties;
+    const municipio = primeiroLoteProps.municipio || primeiroLoteProps.nm_mun || 'Não informado';
+    const uf = primeiroLoteProps.uf || 'Não informado';
+
+    // Total de lotes e área
+    const totalLotes = lotesDoNucleo.length;
+    const areaPoligonal = lotesDoNucleo.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0);
+    
+    // Contagem de lotes edificados e vagos
+    const lotesEdificados = lotesDoNucleo.filter(f => f.properties.tipo_edificacao && f.properties.tipo_edificacao.toLowerCase() !== 'sem edificação').length;
+    const lotesVagos = totalLotes - lotesEdificados;
+    const percVagos = totalLotes > 0 ? (lotesVagos / totalLotes * 100).toFixed(1) : 0;
+    
+    // Contagem por tipologia construtiva
+    const tipologiasConstrutivas = lotesDoNucleo.reduce((acc, f) => {
+        const tipo = f.properties.tipo_edificacao || 'Não informado';
+        acc[tipo] = (acc[tipo] || 0) + 1;
+        return acc;
+    }, {});
+    
+    // Contagem por tipologia de uso
+    const tipologiasUso = lotesDoNucleo.reduce((acc, f) => {
+        const tipo = f.properties.tipo_uso || 'Não informado';
+        acc[tipo] = (acc[tipo] || 0) + 1;
+        return acc;
+    }, {});
+
+    // Lotes sem número postal
+    const lotesSemNumero = lotesDoNucleo.filter(f => !f.properties.numero_postal).length;
+
+    // Análise de APP
+    const lotesEmApp = lotesDoNucleo.filter(f => (f.properties.dentro_app || 0) > 0);
+    const totalLotesEmApp = lotesEmApp.length;
+    const areaTotalSobreposicaoApp = lotesEmApp.reduce((acc, f) => acc + (f.properties.area_app || 0), 0);
+    const lotesTotalmenteEmApp = lotesEmApp.filter(f => (f.properties.dentro_app || 0) >= 100).length;
+
+    // Análise de Risco
+    let riskCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    let custoTotalRisco = 0;
+    const lotesEmRisco = lotesDoNucleo.filter(f => f.properties.risco || f.properties.grau);
+    const areasDeRisco = lotesEmRisco.reduce((acc, f) => {
+        const p = f.properties;
+        const idArea = p.id_respondente || p.cod_area; // Assumindo que cada linha na tabela de risco é uma "área"
+        if (idArea && !acc[idArea]) {
+            acc[idArea] = {
+                grau: p.grau || 'N/D',
+                tipoRisco: p.risco || 'N/D',
+                qtdeLotes: (acc[idArea]?.qtdeLotes || 0) + 1, // Contagem simples por enquanto
+                intervencao: p.intervencao || 'N/D',
+                valor: (acc[idArea]?.valor || 0) + (p.valor || 0)
+            };
         }
+        return acc;
+    }, {});
+    
+    lotesEmRisco.forEach(f => {
+        const grau = Number(f.properties.grau);
+        if (grau >= 1 && grau <= 4) riskCounts[grau]++;
+        custoTotalRisco += (f.properties.valor || 0);
+    });
+
+    const totalLotesUnicosEmRisco = Object.values(riskCounts).reduce((a, b) => a + b, 0);
+    const percLotesEmRisco = totalLotes > 0 ? (totalLotesUnicosEmRisco / totalLotes * 100).toFixed(1) : 0;
+    
+    // --- Início da Montagem do Texto do Relatório ---
+
+    let reportText = `RELATÓRIO DO NÚCLEO: ${nucleoAnalisado}\n`;
+    reportText += "=".repeat(67) + "\n";
+    reportText += `  Núcleo: ${nucleoAnalisado}\n`;
+    reportText += `  Município/UF: ${municipio}/${uf}\n`;
+    // Microrregião e Mesorregião precisariam vir dos dados ou de uma API
+    reportText += `  Data de Preenchimento: ${dataPreenchimento || new Date().toLocaleDateString('pt-BR')}\n`;
+    reportText += `  Data de Revisão: ${dataRevisao || 'N/A'}\n`;
+    reportText += `  Número Total de Unidades/Lotes: ${totalLotes}\n`;
+    reportText += `  Área da Poligonal: ${areaPoligonal.toLocaleString('pt-BR', {maximumFractionDigits: 2})} m²\n`;
+    reportText += `  Lotes Edificados: ${lotesEdificados}\n`;
+    reportText += `  Lotes Não Edificados (Vagos): ${lotesVagos}\n`;
+    reportText += `  % de Lotes Vagos: ${percVagos}%\n`;
+
+    reportText += `  Tipologias Construtivas Predominantes:\n`;
+    for (const [tipo, count] of Object.entries(tipologiasConstrutivas)) {
+        const perc = ((count / totalLotes) * 100).toFixed(1);
+        reportText += `    ${tipo}: ${count} (${perc}%)\n`;
     }
 
-    // Busca dados IBGE simulados
-    const dadosIbge = getSimulatedMunicipioData(municipioDoNucleo);
-    if (dadosIbge && dadosIbge.municipio && dadosIbge.municipio !== "Não informado") {
-        reportText += `--- Informações do Município (${dadosIbge.municipio}) ---\n`;
-        reportText += `  - Região: ${dadosIbge.regiao}\n`;
-        reportText += `  - População Estimada: ${dadosIbge.populacao}\n`;
-        reportText += `  - Área Territorial: ${dadosIbge.area_km2} km²\n\n`;
-    } else {
-        reportText += `--- Informações do Município ---\n`;
-        reportText += `  - Dados do município (${municipioDoNucleo}) não encontrados ou não informados nos lotes. (Simulado)\n\n`;
+    reportText += `  Tipologias de Uso Predominantes:\n`;
+    for (const [tipo, count] of Object.entries(tipologiasUso)) {
+        const perc = ((count / totalLotes) * 100).toFixed(1);
+        reportText += `    ${tipo}: ${count} (${perc}%)\n`;
     }
 
-    if (incDadosGerais) {
-        reportText += `--- 1. Dados Gerais da Área Analisada ---\n`;
-        reportText += `Total de Lotes Analisados: ${featuresToAnalyze.length}\n`;
-        
-        const totalArea = featuresToAnalyze.reduce((acc, f) => acc + (f.properties.area_m2 || 0), 0); 
-        reportText += `Área Total dos Lotes: ${totalArea.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²\n\n`;
+    reportText += `  Lotes Sem Número Postal: ${lotesSemNumero}\n`;
+    reportText += `  Identificação de Números Postais: ${lotesSemNumero < totalLotes ? 'SIM' : 'NÃO'}\n`;
+    reportText += `  Presença de APP no Núcleo: ${totalLotesEmApp > 0 ? 'SIM' : 'NÃO'}\n`;
+    reportText += `  Total de Lotes do Núcleo em APP: ${totalLotesEmApp}\n`;
+    reportText += `  Área Total de Sobreposição com APP: ${areaTotalSobreposicaoApp.toLocaleString('pt-BR', {maximumFractionDigits: 2})} m²\n`;
+    reportText += `  Lotes do Núcleo Totalmente Dentro da APP: ${lotesTotalmenteEmApp}\n`;
+    // Outras interseções (faixa de domínio, etc.) precisariam de mais camadas
+    reportText += `  Interseção com Faixa de Domínio de Rodovia: [CAMADA NÃO ENCONTRADA]\n`;
 
-        const uniqueTiposUso = new Set(featuresToAnalyze.map(f => f.properties.tipo_uso).filter(Boolean));
-        if (uniqueTiposUso.size > 0) {
-            reportText += `Principais Tipos de Uso Identificados: ${Array.from(uniqueTiposUso).join(', ')}\n\n`;
-        }
+    reportText += `\n--- RESUMO DAS ÁREAS DE RISCO ---\n`;
+    reportText += `  ID Área    | Grau | Tipo Risco      | Lotes Qtde | Intervenção (Início)                     |      Valor (R$)\n`;
+    reportText += "  " + "-".repeat(110) + "\n";
+    for (const [id, area] of Object.entries(areasDeRisco)) {
+        const intervencaoCurta = area.intervencao.substring(0, 40);
+        const valorFormatado = area.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        reportText += `  ${String(id).padEnd(10)} | ${String(area.grau).padEnd(4)} | ${String(area.tipoRisco).padEnd(15)} | ${String(area.qtdeLotes).padEnd(10)} | ${intervencaoCurta.padEnd(40)} | ${valorFormatado.padStart(15)}\n`;
+    }
+    reportText += "  " + "-".repeat(110) + "\n";
+    reportText += `  CUSTO TOTAL DAS INTERVENÇÕES: ${formatBRL(custoTotalRisco)}\n`;
+    
+    reportText += `\n--- TOTAIS E CLASSIFICAÇÕES DE RISCO (Resumo) ---\n`;
+    reportText += `  Presença de Áreas de Risco (SIM/NÃO): ${totalLotesUnicosEmRisco > 0 ? 'SIM' : 'NÃO'}\n`;
+    reportText += `  Número de Áreas de Risco Identificadas: ${Object.keys(areasDeRisco).length}\n`;
+    reportText += `  Total de Lotes Únicos do Núcleo em Risco: ${totalLotesUnicosEmRisco}\n`;
+    reportText += `  Lotes em Risco Grau 1: ${riskCounts[1]}\n`;
+    reportText += `  Lotes em Risco Grau 2: ${riskCounts[2]}\n`;
+    reportText += `  Lotes em Risco Grau 3: ${riskCounts[3]}\n`;
+    reportText += `  Lotes em Risco Grau 4: ${riskCounts[4]}\n`;
+    reportText += `  % de Lotes do Núcleo em Risco: ${percLotesEmRisco}%\n`;
+    reportText += `  Áreas que Demandam Intervenção Estrutural: ${Object.keys(areasDeRisco).length}\n`;
+
+    reportText += `\n--- DEMAIS INFORMAÇÕES (TABELA GERAL) ---\n`;
+    // Puxa das informações manuais salvas no estado
+    for (const [key, value] of Object.entries(state.generalProjectInfo)) {
+        reportText += `  ${key.replace(/([A-Z])/g, ' $1').toLowerCase()}: ${value || 'Não informado'}\n`;
     }
 
-    if (incAnaliseRiscos) {
-        const riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
-        featuresToAnalyze.forEach(f => {
-            const risco = String(f.properties.risco || f.properties.status_risco || 'N/A').toLowerCase();
-            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        });
-        const lotesComRiscoElevado = riskCounts['Médio'] + riskCounts['Alto'] + riskCounts['Muito Alto'];
-        const percRiscoElevado = (lotesComRiscoElevado / featuresToAnalyze.length * 100 || 0).toFixed(2);
+    reportText += "=".repeat(67) + "\n";
 
-        reportText += `--- 2. Análise de Riscos Geológicos e Ambientais ---\n`;
-        reportText += `Distribuição de Risco dos Lotes:\n`;
-        reportText += `- Baixo Risco: ${riskCounts['Baixo'] || 0} lotes\n`;
-        reportText += `- Médio Risco: ${riskCounts['Médio'] || 0} lotes\n`;
-        reportText += `- Alto Risco: ${riskCounts['Alto'] || 0} lotes\n`;
-        reportText += `- Muito Alto Risco: ${riskCounts['Muito Alto'] || 0} lotes\n\n`;
-        reportText += `Total de Lotes com Risco Elevado (Médio, Alto, Muito Alto): ${lotesComRiscoElevado} (${percRiscoElevado}% do total)\n`;
-        
-        if (lotesComRiscoElevado > 0) {
-            reportText += `Recomendação: Áreas com risco médio a muito alto demandam estudos geotécnicos aprofundados e, possivelmente, intervenções estruturais para mitigação de riscos ou realocação, conforme a legislação vigente de REURB e plano de contingência municipal.\n\n`;
-        } else {
-            reportText += `Recomendação: A área analisada apresenta um perfil de baixo risco predominante, o que facilita o processo de regularização fundiária.\n\n`;
-        }
-    }
-
-    if (incAreasPublicas) {
-        const lotesEmAPP = featuresToAnalyze.filter(f => typeof f.properties.dentro_app === 'number' && f.properties.dentro_app > 0).length;
-        reportText += `--- 3. Análise de Áreas de Preservação Permanente (APP) ---\n`;
-        reportText += `Número de lotes que intersectam ou estão em APP: ${lotesEmAPP}\n`;
-        if (lotesEmAPP > 0) {
-            reportText += `Observação: A presença de lotes em Áreas de Preservação Permanente exige a aplicação de medidas específicas de regularização ambiental, como a recuperação da área degradada ou a compensação ambiental, conforme o Código Florestal e demais normativas ambientais aplicáveis à REURB.\n\n`;
-        } else {
-            reportText += `Observação: Não foram identificados lotes em Áreas de Preservação Permanente no conjunto de dados analisado, o que simplifica o licenciamento ambiental da regularização.\n\n`;
-        }
-    }
+    // Exibe o relatório
+    reportTextOutput.textContent = reportText;
+    state.lastReportText = reportText; // Salva para exportação
+    reportPlaceholder.style.display = 'none';
+    reportDataContainer.style.display = 'block';
+}
 
     if (incInformacoesGerais && Object.keys(state.generalProjectInfo).length > 0) {
         const info = state.generalProjectInfo; 
