@@ -596,3 +596,58 @@ footer {
         width: calc(100% + 30px);
     }
 }
+/* ----------------- ESTILOS PARA O RELATÓRIO PROFISSIONAL (NOVO) ----------------- */
+.report-content-stylized {
+    flex-grow: 1;
+    background-color: white;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    min-height: 250px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-size: 0.95em;
+    color: #333;
+    line-height: 1.5;
+}
+
+#reportPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+.report-text-output {
+    white-space: pre-wrap; /* Mantém a formatação do texto */
+    word-wrap: break-word; /* Quebra palavras longas */
+    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada para alinhamento */
+    font-size: 0.85em;
+}
+
+/* Estilo para impressão */
+@media print {
+    body, header, nav, main > section:not(#relatorios) {
+        display: none;
+    }
+    #relatorios {
+        display: block;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        border-radius: 0;
+        border: none;
+    }
+    #generatedReportContainer {
+        border: none;
+        padding: 0;
+    }
+    .report-content-stylized {
+        max-height: none;
+        overflow-y: visible;
+        border: none;
+    }
+}
+/* ----------------- FIM DOS ESTILOS DE RELATÓRIO ----------------- */
