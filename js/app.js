@@ -202,6 +202,11 @@ function generateSimulatedAILaudo(promptData) {
 // ===================== Inicialização do Mapa Leaflet =====================
 function initMap() {
     console.log('initMap: Iniciando mapa Leaflet...'); 
+    // Verifica se o mapa já foi inicializado para evitar erros
+    if (state.map) {
+        state.map.remove();
+    }
+
     state.map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
     console.log('initMap: Objeto mapa criado.'); 
 
@@ -213,8 +218,8 @@ function initMap() {
     osmLayer.addTo(state.map); 
 
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 18, // Max zoom para Esri é 18
-        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        maxZoom: 18, 
+        attribution: 'Tiles &copy; Esri'
     });
 
     // Controle de camadas base para o usuário escolher o basemap
@@ -230,15 +235,14 @@ function initMap() {
     state.layers.app = L.featureGroup().addTo(state.map); 
     state.layers.poligonais = L.featureGroup().addTo(state.map); 
 
-    // Remove as camadas APP e Poligonais do mapa por padrão, para que o usuário as ative pela legenda
+    // Remove as camadas APP e Poligonais do mapa por padrão
     state.map.removeLayer(state.layers.app);
     state.map.removeLayer(state.layers.poligonais);
 
-    // Garante que o mapa renderize corretamente após estar visível no DOM
+    // Garante que o mapa renderize corretamente
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
 }
-
 // ===================== Navegação entre Seções =====================
 function initNav() {
     document.querySelectorAll('nav a').forEach(link => {
