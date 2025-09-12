@@ -198,22 +198,20 @@ function generateSimulatedAILaudo(promptData) {
     return laudo;
 }
 
-// ===================== Inicialização do Mapa Leaflet =====================
-function initMap() {
     console.log('initMap: Iniciando mapa Leaflet...'); 
-    // Verifica se o mapa já foi inicializado para evitar erros
-    if (state.map) {
-        state.map.remove();
-    }
-
     state.map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
     console.log('initMap: Objeto mapa criado.'); 
 
+    // Camadas base (tiles)
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
     osmLayer.addTo(state.map); 
 
     const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 18, 
-        attribution: 'Tiles &copy; Esri'
+        maxZoom: 18, // Max zoom para Esri é 18
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
 
     // Controle de camadas base para o usuário escolher o basemap
@@ -229,11 +227,11 @@ function initMap() {
     state.layers.app = L.featureGroup().addTo(state.map); 
     state.layers.poligonais = L.featureGroup().addTo(state.map); 
 
-    // Remove as camadas APP e Poligonais do mapa por padrão
+    // Remove as camadas APP e Poligonais do mapa por padrão, para que o usuário as ative pela legenda
     state.map.removeLayer(state.layers.app);
     state.map.removeLayer(state.layers.poligonais);
 
-    // Garante que o mapa renderize corretamente
+    // Garante que o mapa renderize corretamente após estar visível no DOM
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
 }
