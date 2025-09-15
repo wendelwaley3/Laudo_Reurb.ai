@@ -273,7 +273,6 @@ function generateSimulatedAILaudo(promptData) {
     // Garante que o mapa renderize corretamente após estar visível no DOM
     state.map.invalidateSize(); 
     console.log('initMap: invalidateSize() chamado.'); 
-}
 // ===================== Navegação entre Seções =====================
 function initNav() {
     document.querySelectorAll('nav a').forEach(link => {
