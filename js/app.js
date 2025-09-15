@@ -14,7 +14,46 @@ const state = {
     generalProjectInfo: {}, // Informações gerais do projeto (preenchimento manual)
     lastReportText: '',     // Último relatório gerado (para exportação)
 };
+// ===================== Inicialização do Mapa Leaflet =====================
+function initMap() {
+    console.log('initMap: Iniciando mapa Leaflet...'); 
+    // Garante que o mapa seja destruído se já existir, para evitar erros
+    if (state.map) {
+        state.map.remove();
+        state.map = null;
+    }
 
+    state.map = L.map('mapid').setView([-15.7801, -47.9292], 5); // Centraliza no Brasil
+    console.log('initMap: Objeto mapa criado.'); 
+
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+    osmLayer.addTo(state.map); 
+
+    const esriWorldImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 18, 
+        attribution: 'Tiles &copy; Esri'
+    });
+
+    const baseMaps = {
+        "OpenStreetMap": osmLayer,
+        "Esri World Imagery (Satélite)": esriWorldImagery 
+    };
+    L.control.layers(baseMaps).addTo(state.map); 
+    console.log('initMap: Controle de camadas base adicionado.'); 
+
+    state.layers.lotes = L.featureGroup().addTo(state.map);
+    state.layers.app = L.featureGroup().addTo(state.map); 
+    state.layers.poligonais = L.featureGroup().addTo(state.map); 
+
+    state.map.removeLayer(state.layers.app);
+    state.map.removeLayer(state.layers.poligonais);
+
+    state.map.invalidateSize(); 
+    console.log('initMap: invalidateSize() chamado.'); 
+}
 // ===================== Utilidades Diversas =====================
 
 /** Formata um número para moeda BRL. */
@@ -460,9 +499,7 @@ function initNav() {
         console.log('Todos os arquivos processados e dados carregados no mapa e dashboard.'); 
     });
 }
-// ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
-// 
 
 // ===================== Estilos e Popups das Camadas Geoespaciais =====================
 
@@ -1104,6 +1141,76 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Configura listener para a mudança no select de filtros
+    document.getElementById('nucleusFilter').addEventListener('change', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter(); 
+    });
+
+    // Estado inicial
+    document.getElementById('dashboard').classList.add('active');
+    document.querySelector('nav a[data-section="dashboard"]').classList.add('active');
+    refreshDashboard(); 
+    fillLotesTable(); 
+    populateNucleusFilter(); 
+    console.log('DOMContentLoaded: Configurações iniciais do app aplicadas.'); 
+});
+// ===================== Gerenciamento de Upload e Processamento de GeoJSON =====================
+function initUpload() {
+    console.log('initUpload: Configurando upload de arquivos...'); 
+    const fileInput = document.getElementById('geojsonFileInput');
+    const dragDropArea = document.querySelector('.drag-drop-area');
+    const fileListElement = document.getElementById('fileList');
+    const processAndLoadBtn = document.getElementById('processAndLoadBtn');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const selectFilesVisibleButton = document.getElementById('selectFilesVisibleButton');
+
+    // ... (o restante da função, incluindo a lógica UTM e o processamento, permanece o mesmo) ...
+
+    // **CORREÇÃO CRÍTICA AQUI**: Garante que o botão de upload funcione
+    if (selectFilesVisibleButton && fileInput) {
+        selectFilesVisibleButton.addEventListener('click', () => {
+            fileInput.click(); 
+        });
+    }
+
+    // ... (o restante da sua função initUpload continua como está) ...
+}
+```*(Para ser mais claro: encontre a sua função `initUpload` e, logo após a declaração das variáveis, adicione o bloco `if (selectFilesVisibleButton && fileInput) { ... }`)*
+
+**Alteração C: Corrija a Seção de Inicialização no Final do Arquivo**
+
+Vá até o final do seu `js/app.js` e substitua o bloco `document.addEventListener('DOMContentLoaded', ...)` por esta versão completa e correta:
+
+```javascript
+// ===================== Funções de Inicialização Principal (Chamadas no DOMContentLoaded) =====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded: Página e DOM carregados. Iniciando componentes...'); 
+    initMap(); 
+    initNav(); 
+    initUpload(); 
+    initLegendToggles(); 
+    initGeneralInfoForm(); 
+
+    // Configura listeners para os botões principais
+    document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        state.currentNucleusFilter = document.getElementById('nucleusFilter').value; 
+        refreshDashboard();
+        fillLotesTable();
+        zoomToFilter();
+    });
+
+    document.getElementById('generateReportBtn').addEventListener('click', gerarRelatorio);
+
+    document.getElementById('exportReportBtn').addEventListener('click', () => {
+        if (!state.lastReportText.trim()) {
+            alert('Nenhum relatório para exportar. Gere um relatório primeiro.');
+            return;
+        }
+        window.print(); 
+    });
+    
     document.getElementById('nucleusFilter').addEventListener('change', () => {
         state.currentNucleusFilter = document.getElementById('nucleusFilter').value;
         refreshDashboard();
