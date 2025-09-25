@@ -659,7 +659,7 @@ function zoomToFilter() {
     }
 }
 
-// ===================== Dashboard =====================
+/ ===================== Dashboard =====================
 function refreshDashboard() {
     console.log('refreshDashboard: Atualizando cards do dashboard.');
     const feats = filteredLotes();
@@ -671,50 +671,78 @@ function refreshDashboard() {
     let custoMin = Infinity;
     let custoMax = -Infinity;
     let riskCounts = { 'Baixo': 0, 'Médio': 0, 'Alto': 0, 'Muito Alto': 0 };
+    
+    // **NOVO**: Objeto para contar os tipos de uso
+    let tiposUsoCounts = {};
 
     feats.forEach(f => {
         const p = f.properties || {};
-        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
         
-        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
-        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
-        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
-        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
-        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
-        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
-
+        // Lógica de Risco
+        const risco = String(p.risco || p.status_risco || p.grau || '').trim().toLowerCase();
+        if (risco && risco !== 'n/a' && risco !== '') {
+            if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+            else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+            else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+            else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        }
         if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
             lotesRiscoAltoMuitoAlto++;
         }
         
+        // Lógica de APP
         const dentroApp = Number(p.dentro_app || p.app || 0); 
         if (dentroApp > 0) lotesAppCount++;
 
+        // Lógica de Custo de Intervenção
         const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
         if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
+
+        // **NOVO**: Lógica para contar Tipos de Uso
+        const tipoUso = p.tipo_uso || 'Não informado';
+        tiposUsoCounts[tipoUso] = (tiposUsoCounts[tipoUso] || 0) + 1;
     });
 
+    // Atualiza os Cards do Dashboard
     document.getElementById('totalLotes').textContent = totalLotesCount;
     document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
     document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
+    // Atualiza a Análise de Riscos (Listas Detalhadas)
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
-    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
-
+    // Atualiza o Resumo de Intervenções
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
-}
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto;
 
+ 
+    // **NOVO E MELHORADO**: Preenche a lista de Análise de Tipos de Uso com contagem e porcentagem
+    const tiposUsoList = document.getElementById('tiposUsoSummary');
+    tiposUsoList.innerHTML = ''; // Limpa a lista
+    if (Object.keys(tiposUsoCounts).length > 0) {
+        // Ordena os tipos de uso pela contagem, do maior para o menor, para destacar os predominantes
+        const sortedTiposUso = Object.entries(tiposUsoCounts).sort(([,a],[,b]) => b - a);
+
+        for (const [tipo, count] of sortedTiposUso) {
+            const percentage = totalLotesCount > 0 ? ((count / totalLotesCount) * 100).toFixed(1) : 0;
+            const li = document.createElement('li');
+            li.textContent = `${tipo}: ${count} unidades (${percentage}%)`;
+            tiposUsoList.appendChild(li);
+        }
+    } else {
+        tiposUsoList.innerHTML = "<li>Nenhum dado de tipo de uso disponível. Verifique se a propriedade 'tipo_uso' existe nos seus lotes.</li>";
+    }
+}
 // ===================== Tabela de Lotes =====================
 function fillLotesTable() {
     console.log('fillLotesTable: Preenchendo tabela de lotes.');
