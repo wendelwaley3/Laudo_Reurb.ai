@@ -85,6 +85,7 @@ function reprojectGeoJSONFromUTM(geojson, zone, south) {
 }
 
 
+
 // ===================== Simulações de IBGE e IA (para ambiente client-side) =====================
 // Estas funções substituem as chamadas ao backend Flask no ambiente de produção do GitHub Pages.
 
