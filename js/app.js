@@ -457,35 +457,13 @@ function initUpload() {
 
 // Estilo dos lotes baseado no risco
 function styleLote(feature) {
-    // Busca por 'grau', 'risco' ou 'status_risco' e converte para minúsculas
-    const risco = String(feature.properties.risco || feature.properties.status_risco || feature.properties.grau || 'N/A').toLowerCase();
+    const risco = String(feature.properties.risco || feature.properties.status_risco || 'N/A').toLowerCase(); 
     let color;
-
-    // Mapeamento de risco para cores
-    switch (risco) {
-        case '1':
-        case 'baixo':
-            color = '#2ecc71'; // Verde
-            break;
-        case '2':
-        case 'médio':
-        case 'medio':
-            color = '#f1c40f'; // Amarelo
-            break;
-        case '3':
-        case 'alto':
-        case 'geologico':
-        case 'hidrologico':
-            color = '#e67e22'; // Laranja
-            break;
-        case '4':
-        case 'muito alto':
-            color = '#c0392b'; // Vermelho
-            break;
-        default:
-            color = '#3498db'; // Azul padrão (para lotes sem risco definido)
-            break;
-    }
+    if (risco.includes('baixo') || risco === '1') color = '#2ecc71';      
+    else if (risco.includes('médio') || risco.includes('medio') || risco === '2') color = '#f39c12'; 
+    else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') color = '#e74c3c'; 
+    else if (risco.includes('muito alto') || risco === '4') color = '#c0392b'; 
+    else color = '#3498db'; 
 
     return {
         fillColor: color,
@@ -496,6 +474,7 @@ function styleLote(feature) {
         fillOpacity: 0.7
     };
 }
+
 // Popup ao clicar no lote
 function onEachLoteFeature(feature, layer) {
     if (feature.properties) {
@@ -540,13 +519,12 @@ function onEachLoteFeature(feature, layer) {
 // Estilo da camada APP
 function styleApp(feature) {
     return {
-        fillColor: '#006400', // Verde escuro
-        weight: 2,           // Espessura da borda
-        opacity: 1,          // Opacidade da borda
-        color: '#006400',    // Cor da borda (verde escuro)
-        dashArray: '5, 5',   // Borda tracejada (5 pixels desenhados, 5 pixels vazios)
-        fillOpacity: 0.3     // Transparência do preenchimento (0.3 = 70% transparente)
+        color: '#e74c3c', // Vermelho para APP
+        weight: 2,
+        opacity: 0.7,
+        fillOpacity: 0.2
     };
+}
 
 // Popup da camada APP
 function onEachAppFeature(feature, layer) {
@@ -663,7 +641,7 @@ function refreshDashboard() {
     const feats = filteredLotes();
     const totalLotesCount = feats.length;
 
-    let lotesEmRiscoGeral = 0; // Contagem para o card 'Lotes em Risco' (Médio, Alto, Muito Alto)
+    let lotesRiscoAltoMuitoAlto = 0; 
     let lotesAppCount = 0;
     let custoTotal = 0;
     let custoMin = Infinity;
@@ -672,56 +650,42 @@ function refreshDashboard() {
 
     feats.forEach(f => {
         const p = f.properties || {};
-        // Pega o valor de risco de múltiplas colunas possíveis e converte para string e minúsculas
-        const risco = String(p.risco || p.status_risco || p.grau || 'N/A').toLowerCase();
+        const risco = String(p.risco || p.status_risco || '').toLowerCase(); 
+        
+        // **CORREÇÃO AQUI**: Lógica de contagem de risco mais robusta
+        if (risco.includes('baixo') || risco === '1') riskCounts['Baixo']++;
+        else if (risco.includes('médio') || risco.includes('medio') || risco === '2') riskCounts['Médio']++;
+        else if (risco.includes('alto') && !risco.includes('muito') || risco === '3') riskCounts['Alto']++;
+        else if (risco.includes('muito alto') || risco === '4') riskCounts['Muito Alto']++;
+        else console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p); 
 
-        // Contagem por nível de risco para a lista "Análise de Riscos"
-        if (risco === '1' || risco.includes('baixo')) {
-            riskCounts['Baixo']++;
-        } else if (risco === '2' || risco.includes('médio') || risco.includes('medio')) {
-            riskCounts['Médio']++;
-        } else if (risco === '3' || risco.includes('alto') || risco === 'geologico' || risco === 'hidrologico') {
-            riskCounts['Alto']++;
-        } else if (risco === '4' || risco.includes('muito alto')) {
-            riskCounts['Muito Alto']++;
-        } else if (risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            console.warn(`Risco não mapeado encontrado: "${risco}" para lote`, p);
+        if (risco.includes('alto') || risco === '3' || risco.includes('muito alto') || risco === '4') {
+            lotesRiscoAltoMuitoAlto++;
         }
         
-        // Contagem para o card "Lotes em Risco" (qualquer risco que não seja 'Baixo')
-        if (risco !== '1' && !risco.includes('baixo') && risco !== 'n/a' && risco !== 'null' && risco.trim() !== '') {
-            lotesEmRiscoGeral++;
-        }
-        
-        // Contagem de Lotes em APP
-        const dentroApp = Number(p.dentro_app || p.app || 0);
-        if (dentroApp > 0) {
-            lotesAppCount++;
-        }
+        const dentroApp = Number(p.dentro_app || p.app || 0); 
+        if (dentroApp > 0) lotesAppCount++;
 
-        // Cálculo do Custo de Intervenção
-        const valorCusto = Number(p.valor || p.custo_intervencao || 0);
-        if (!isNaN(valorCusto) && valorCusto > 0) {
+        const valorCusto = Number(p.valor || p.custo_intervencao || 0); 
+        if (!isNaN(valorCusto) && valorCusto > 0) { 
             custoTotal += valorCusto;
             if (valorCusto < custoMin) custoMin = valorCusto;
             if (valorCusto > custoMax) custoMax = valorCusto;
         }
     });
 
-    // Atualiza os elementos do HTML
     document.getElementById('totalLotes').textContent = totalLotesCount;
-    document.getElementById('lotesRisco').textContent = lotesEmRiscoGeral;
+    document.getElementById('lotesRisco').textContent = lotesRiscoAltoMuitoAlto; 
     document.getElementById('lotesApp').textContent = lotesAppCount;
-    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal).replace('R$', '').trim();
+    document.getElementById('custoEstimado').textContent = formatBRL(custoTotal);
 
     document.getElementById('riskLowCount').textContent = riskCounts['Baixo'];
     document.getElementById('riskMediumCount').textContent = riskCounts['Médio'];
     document.getElementById('riskHighCount').textContent = riskCounts['Alto'];
     document.getElementById('riskVeryHighCount').textContent = riskCounts['Muito Alto'];
 
-    // Para o resumo, usamos a mesma contagem do card
-    document.getElementById('areasIdentificadas').textContent = lotesEmRiscoGeral;
-    document.getElementById('areasIntervencao').textContent = lotesEmRiscoGeral;
+    document.getElementById('areasIdentificadas').textContent = lotesRiscoAltoMuitoAlto; 
+    document.getElementById('areasIntervencao').textContent = lotesRiscoAltoMuitoAlto; 
 
     document.getElementById('minCustoIntervencao').textContent = `Custo Mínimo de Intervenção: ${custoMin === Infinity ? 'N/D' : formatBRL(custoMin)}`;
     document.getElementById('maxCustoIntervencao').textContent = `Custo Máximo de Intervenção: ${custoMax === -Infinity ? 'N/D' : formatBRL(custoMax)}`;
