@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -92,19 +91,9 @@
             </ul>
             <h3>Resumo de Intervenções</h3>
             <ul>
-                <li id="minCustoIntervencao">Custo Mínimo de Intervenção: R$ 0,00</li>
-                <li id="maxCustoIntervencao">Custo Máximo de Intervenção: R$ 0,00</li>
                 <li><span id="areasIdentificadas">0</span> áreas de risco identificadas</li>
                 <li><span id="areasIntervencao">0</span> áreas demandam intervenção estrutural</li>
             </ul>
-
-            <!-- NOVA SEÇÃO: Análise de Tipos de Uso -->
-            <h2>Análise de Tipos de Uso</h2>
-            <div id="useTypesAnalysis" class="use-types-grid">
-                <!-- O conteúdo será gerado dinamicamente pelo JavaScript -->
-                <p>Nenhum dado de tipo de uso disponível. Verifique se a propriedade 'tipo_uso' existe nos seus lotes.</p>
-            </div>
-
 
             <h2>Análise Comparativa por Núcleo</h2>
             <div id="nucleusComparisonChart" class="chart-container">
@@ -118,13 +107,13 @@
         <section id="upload" class="container">
             <h2>Upload de Camadas GeoJSON</h2>
             <div class="upload-area">
-                <!-- ESTRUTURA PARA UPLOAD -->
                 <label for="geojsonFileInput" class="drag-drop-area">
                     <p class="drag-text">Arraste e solte seus arquivos GeoJSON aqui</p>
                     <p>ou clique para selecionar</p>
-                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button> 
+                    <!-- BOTÃO DE SELEÇÃO DE ARQUIVOS (COM ID) -->
+                    <button type="button" id="selectFilesVisibleButton">Selecionar Arquivos</button>
+                    <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
                 </label>
-                <input type="file" id="geojsonFileInput" accept=".geojson,.json" multiple style="display: none;">
             </div>
             <div class="uploaded-files-preview">
                 <h3>Arquivos Selecionados:</h3>
@@ -134,25 +123,6 @@
             </div>
             <button id="processAndLoadBtn">Processar e Carregar Dados</button>
             <p id="uploadStatus" class="status-message"></p>
-            <!-- CONTROLE DE REPROJEÇÃO UTM (ESSENCIAL PARA O JS FUNCIONAR) -->
-            <div id="utmConversionSettings" style="margin-top:20px; padding:15px; background-color:#eef4f7; border-radius:8px;">
-                <h3>Configurações de Reprojeção UTM (se seus arquivos são UTM)</h3>
-                <div style="display:flex; flex-wrap:wrap; gap:15px; align-items:center;">
-                    <label><input type="checkbox" id="useUtmCheckbox"> Meus arquivos GeoJSON estão em UTM</label>
-                    <div id="utmOptionsContainer" style="display:none; flex-wrap:wrap; gap:10px; align-items:center;">
-                        <label>Zona UTM: <input type="number" id="utmZoneInput" value="23" min="1" max="60" style="width:60px;"></label>
-                        <label>Hemisfério:
-                            <select id="utmHemisphereSelect">
-                                <option value="S">Sul</option>
-                                <option value="N">Norte</option>
-                            </select>
-                        </label>
-                    </div>
-                </div>
-                <p style="font-size:0.85em; color:#666; margin-top:10px;">
-                    <strong>Atenção:</strong> É altamente recomendado que seus arquivos GeoJSON já estejam em Latitude/Longitude (WGS84 - EPSG:4326) para melhor precisão e desempenho. Use esta opção apenas se não puder converter previamente.
-                </p>
-            </div>
         </section>
 
         <!-- SEÇÃO: Informações Gerais (Preenchimento Manual) -->
@@ -398,11 +368,7 @@
                 <li><strong>Upload de Dados:</strong> Navegue até a aba "Upload de Dados". Arraste e solte seus arquivos GeoJSON (para lotes, APPs, infraestrutura, poligonais etc.) ou clique em "Selecionar Arquivos".
                     <p class="note"><strong>IMPORTANTE SOBRE SEUS DADOS GEOSPATIAIS:</strong>
                         <ul>
-                            <li>Todos os seus arquivos GeoJSON **DEVEM estar no sistema de coordenadas Latitude/Longitude (WGS84 - EPSG:4326)** para serem exibidos corretamente no mapa.
-                                <ul>
-                                    <li>**Opção Avançada (embutida no app):** Se seus dados GeoJSON estão em **UTM**, marque a opção "Meus arquivos GeoJSON estão em UTM" na aba Upload e configure a Zona UTM e Hemisfério. **ATENÇÃO: Reprojeção no navegador pode ser lenta para arquivos grandes e a precisão pode variar. A conversão via software GIS (QGIS) ANTES do upload é sempre a mais recomendada.**</li>
-                                </ul>
-                            </li>
+                            <li>Todos os seus arquivos GeoJSON **DEVEM estar no sistema de coordenadas Latitude/Longitude (WGS84 - EPSG:4326)**. Seus dados com coordenadas N/E são provavelmente UTM e precisam ser convertidos para Lat/Lon **antes do upload**. Caso contrário, o mapa não exibirá os dados no local correto. Utilize softwares GIS (como QGIS) para fazer essa conversão.</li>
                             <li>Para o Dashboard e Relatórios funcionarem, o arquivo GeoJSON principal dos lotes (que contiver "lotes" no nome) deve ter as seguintes propriedades (entre outras, conforme as suas tabelas):
                                 <ul>
                                     <li><code>desc_nucleo</code>: Nome do núcleo (para filtros).</li>
@@ -411,11 +377,10 @@
                                     <li><code>cod_lote</code>: Código identificador do lote.</li>
                                     <li><code>area_m2</code>: Área do lote em metros quadrados.</li>
                                     <li><code>valor</code>: Custo de intervenção (se disponível por lote).</li>
-                                    <li><code>municipio</code> ou <code>nm_mun</code>: Nome do município (para a camada de poligonais e informações IBGE).</li>
                                 </ul>
                             </li>
                             <li>Arquivos com "app" no nome serão tratados como Áreas de Preservação Permanente.</li>
-                            <li>Outros arquivos GeoJSON (como "tabela_geral" no seu caso) que não contenham "lotes" nem "app" no nome serão carregados como "Poligonais" genéricas no mapa.</li>
+                            <li>Outros arquivos GeoJSON (como "tabela_geral" ou poligonais de infraestrutura) serão carregados como "Poligonais" genéricas no mapa.</li>
                         </ul>
                     </p>
                 </li>
