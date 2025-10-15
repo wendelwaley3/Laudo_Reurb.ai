@@ -13,7 +13,7 @@ let appLayer = null;
 let poligonaisLayer = null;
 
 // =========================================================================
-// ATUALIZAÇÃO PROFISSIONAL: CONFIGURAÇÃO PADRONIZADA DE RISCO (1 a 4 + Nulo)
+// CONFIGURAÇÃO PROFISSIONAL: PADRÃO DE RISCO (1 a 4 + Nulo Transparente)
 // =========================================================================
 const RISK_GRADES_CONFIG = {
     // PADRÃO SOLICITADO
@@ -93,7 +93,6 @@ function setupTabNavigation() {
         });
     });
 
-    // Garante que a primeira aba (Dashboard) esteja ativa ao carregar
     const dashboardSection = document.getElementById('dashboard');
     const dashboardLink = document.querySelector('a[data-section="dashboard"]');
     
@@ -156,7 +155,7 @@ function getStyleForRisco(feature, type = 'lotes') {
         };
         
     } else if (type === 'app') {
-        // Estilo APP (Semi-transparente para ver o lote abaixo)
+        // Estilo APP (Semi-transparente para ver o lote abaixo, se o lote tiver cor)
         return {
             fillColor: '#3498db', // Azul para APP
             color: '#2980b9',
@@ -165,7 +164,7 @@ function getStyleForRisco(feature, type = 'lotes') {
             fillOpacity: 0.4 
         };
     } else if (type === 'poligonais') {
-        // Estilo Outras Poligonais (Mais abaixo, pode ter uma cor mais sólida)
+        // Estilo Outras Poligonais (Camada de Fundo)
         return {
             fillColor: '#9b59b6', // Roxo
             color: '#8e44ad',
@@ -242,7 +241,7 @@ function transformUtm(geojsonData, sigasZone) {
 }
 
 // ----------------------------------------------------
-// 5. Lógica de Upload (OTIMIZADA)
+// 5. Lógica de Upload (OTIMIZADA: Redução de Duplicação)
 
 // Função auxiliar para processar um único arquivo GeoJSON
 function processGeoJSONFile(file, type, sigasZone, statusDiv) {
@@ -339,7 +338,6 @@ function applyFilters() {
     // 2. Filtro por Risco (Grau de Cor)
     const activeGrades = Object.keys(RISK_GRADES_CONFIG).filter(g => RISK_GRADES_CONFIG[g].toggle);
     features = features.filter(f => {
-        // Usa a mesma lógica de tratamento de nulo do estilo para o filtro
         const riskProperty = f.properties.GRAU_RISCO;
         const featureGrade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
                              ? 'NA' 
@@ -373,10 +371,6 @@ function renderLotesLayer(featuresToRender) {
         onEachFeature: onEachFeature
     });
 
-    // Se a camada já existe, apenas a adicionamos novamente com o novo estilo.
-    if (map.hasLayer(lotesLayer)) {
-        map.removeLayer(lotesLayer); // Apenas por segurança, embora o código acima já faça isso.
-    }
     map.addLayer(lotesLayer);
     lotesLayer.bringToFront(); // Garante que a camada de risco/lote está no topo
 
@@ -385,16 +379,17 @@ function renderLotesLayer(featuresToRender) {
     }
 }
 
+// CORREÇÃO CRÍTICA: GERENCIAMENTO DE EMPILHAMENTO DE CAMADAS
 function updateMapLayers(type) {
     
-    // 1. Remove todas as camadas que vamos atualizar
-    if (poligonaisLayer) map.removeLayer(poligonaisLayer);
-    if (appLayer) map.removeLayer(appLayer);
-    if (lotesLayer) map.removeLayer(lotesLayer);
+    // 1. Remove todas as camadas existentes do mapa
+    if (poligonaisLayer && map.hasLayer(poligonaisLayer)) map.removeLayer(poligonaisLayer);
+    if (appLayer && map.hasLayer(appLayer)) map.removeLayer(appLayer);
+    if (lotesLayer && map.hasLayer(lotesLayer)) map.removeLayer(lotesLayer);
     
-    // 2. Ordem de Empilhamento (Bottom to Top):
+    // 2. Re-adiciona na Ordem Solicitada (Bottom to Top):
     
-    // CAMADA 1 (Bottom): Poligonais
+    // CAMADA 1 (Fundo): Poligonais
     if (allPoligonaisGeoJSON.features.length > 0) {
         poligonaisLayer = L.geoJson(allPoligonaisGeoJSON, {
             style: (feature) => getStyleForRisco(feature, 'poligonais'),
@@ -414,7 +409,7 @@ function updateMapLayers(type) {
         appLayer = null;
     }
     
-    // CAMADA 3 (Top): Lotes/Risco (Chama o filtro para re-renderizar e adicionar ao mapa)
+    // CAMADA 3 (Topo): Lotes/Risco (Chama o filtro para re-renderizar e adicionar ao mapa)
     if (type === 'lotes') {
         applyFilters(); 
     } else if (lotesLayer) {
@@ -447,7 +442,6 @@ function updateLayerControl() {
     const isLotesLoaded = allLotesGeoJSON.features.length > 0;
     
     if (isLotesLoaded) {
-        // Lotes: a cor é a média de risco, mas aqui usamos uma cor neutra para o controle
         mainList.innerHTML += `
             <li class="layer-item">
                 <span class="layer-name">
@@ -504,6 +498,7 @@ function toggleLayer(type, listItem) {
             map.addLayer(poligonaisLayer);
             checkbox.checked = true;
             if (appLayer) appLayer.bringToBack(); 
+            if (poligonaisLayer) poligonaisLayer.bringToBack();
         }
     }
 }
@@ -517,7 +512,6 @@ function updateRiskControl(features) {
 
     // Contagem baseada em TODOS os lotes carregados
     allLotesGeoJSON.features.forEach(f => {
-        // Tratamento de nulos/ausentes para contagem
         const riskProperty = f.properties.GRAU_RISCO;
         const grade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
                       ? 'NA' 
@@ -533,7 +527,7 @@ function updateRiskControl(features) {
         const listItem = document.createElement('li');
         listItem.className = `risk-legend-item ${data.toggle ? 'active' : ''}`;
         
-        // Se for o NULO, usa uma borda para indicar o filtro, mas não a cor
+        // Usa a cor da legenda ou cinza escuro para 'NA'
         listItem.style.borderLeftColor = grade === 'NA' ? '#7f8c8d' : data.color;
         
         listItem.setAttribute('data-grade', grade);
@@ -588,7 +582,6 @@ function updateSummaryCards(features) {
         }
     });
     
-    // Atualiza os cards
     document.getElementById('totalLotesCarregados').textContent = totalLotesFiltrados; 
     document.getElementById('totalLotesComRisco').textContent = totalLotesComRisco;
     document.getElementById('totalLotesEmAPP').textContent = totalLotesEmAPP;
@@ -684,7 +677,6 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     Object.keys(RISK_GRADES_CONFIG).forEach(grade => {
         labels.push(RISK_GRADES_CONFIG[grade].name);
         dataValues.push(riskCounts[grade]);
-        // Garante que o 'NA' não tem cor no gráfico, se for o caso
         backgroundColors.push(grade === 'NA' ? '#cccccc' : RISK_GRADES_CONFIG[grade].color);
     });
 
