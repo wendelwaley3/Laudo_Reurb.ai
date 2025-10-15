@@ -4,14 +4,14 @@
 body {
     font-family: 'Inter', sans-serif;
     margin: 0;
-    background-color: #f0f2f5; 
+    background-color: #f0f2f5; /* Fundo cinza claro */
     color: #333;
     line-height: 1.6;
 }
 
 /* Header */
 header {
-    background-color: #2c3e50; 
+    background-color: #2c3e50; /* Azul escuro */
     color: white;
     padding: 15px 30px;
     display: flex;
@@ -35,7 +35,7 @@ nav {
     flex-wrap: wrap; 
 }
 
-nav a, #exportReportBtn {
+nav a {
     color: white;
     text-decoration: none;
     margin-left: 25px;
@@ -43,125 +43,90 @@ nav a, #exportReportBtn {
     border-radius: 4px;
     transition: background-color 0.3s;
     font-weight: 500;
-    cursor: pointer;
-    background-color: transparent; 
-    border: none;
-    font-size: 16px;
 }
 
-nav a:hover {
+nav a:hover, nav a.active {
     background-color: #34495e; 
 }
 
-nav a.active {
-    background-color: #1abc9c; 
+/* Botão de exportação no header */
+header button {
+    background-color: #1abc9c; /* Turquesa */
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
     font-weight: 600;
+    transition: background-color 0.3s;
+    margin-left: 25px;
 }
 
-#exportReportBtn {
-    margin-left: auto; 
-    background-color: #f39c12; 
-    font-weight: 600;
+header button:hover {
+    background-color: #16a085;
 }
-#exportReportBtn:hover {
-    background-color: #e67e22; 
-}
-
 
 /* Main Content */
 main {
-    padding: 20px 30px;
+    padding: 20px;
 }
 
 .content-section {
     background-color: white;
     padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    margin-bottom: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+    /* CORREÇÃO CHAVE: Esconde se não estiver ativo */
+    display: none; 
 }
 
-/* CORREÇÃO ESSENCIAL: Esconder/Mostrar Seções */
-.content-section:not(.active) {
-    display: none;
+.content-section.active {
+    display: block;
 }
 
-/* CORREÇÃO ESSENCIAL: Dashboard GRID (Mapa e Controles) */
+h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+
+/* ----------------- ESTILOS DO DASHBOARD ----------------- */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 350px 1fr; 
-    gap: 25px;
-    min-height: 70vh; 
+    grid-template-columns: 300px 1fr; /* 300px para a barra lateral, o resto para o mapa */
+    gap: 20px;
+    min-height: 600px; /* Garante que o grid tenha altura */
 }
 
+/* 1. Mapa */
+#mapid {
+    height: 100%; /* Ocupa a altura total do grid */
+    min-height: 600px; /* Mínimo para garantir a visualização */
+    background-color: #ccc;
+    border-radius: 8px;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+}
+
+/* 2. Sidebar e Controles */
 .sidebar-controls {
     display: flex;
     flex-direction: column;
     gap: 20px;
 }
 
-/* CORREÇÃO ESSENCIAL: Mapa deve ter altura definida */
-.map-container {
-    height: 100%;
-    min-height: 600px; 
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-#mapid {
-    width: 100%;
-    height: 100%; 
-}
-
-/* --- Summary Cards (Cartões de Resumo) --- */
-.summary-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 15px;
-}
-
-.card {
-    background-color: #ecf0f1; 
-    padding: 15px;
-    border-radius: 6px;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.card-value {
-    font-size: 2.2em;
-    font-weight: 700;
-    color: #2c3e50;
-    line-height: 1.1;
-}
-
-.card-title {
-    font-size: 0.85em;
-    color: #7f8c8d;
-    margin-top: 5px;
-}
-
-/* --- Controles Sidebar (Filtros e Camadas) --- */
 .controls-panel {
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.controls-panel h3 {
-    color: #34495e;
-    margin-top: 0;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
-    margin-bottom: 15px;
-    font-size: 1.1em;
+    background-color: #f8f8f8;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
 }
 
 .form-group {
     margin-bottom: 15px;
 }
+
 .form-group label {
     display: block;
     font-weight: 600;
@@ -171,62 +136,94 @@ main {
 
 .form-group select {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
+    padding: 8px;
     border-radius: 4px;
+    border: 1px solid #ccc;
     box-sizing: border-box;
 }
 
-/* --- Estilos para Camadas e Risco --- */
+/* Cards de Resumo */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.card {
+    background-color: #ecf0f1;
+    padding: 15px;
+    border-radius: 6px;
+    text-align: center;
+    border-left: 5px solid #3498db;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card-value {
+    display: block;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.card-title {
+    font-size: 0.8em;
+    color: #7f8c8d;
+}
+
+/* Controles de Camada/Risco */
 .layer-list, .risk-legend {
     list-style: none;
     padding: 0;
-    margin: 0;
+    margin: 10px 0;
 }
 
 .layer-item, .risk-legend-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px dotted #e0e0e0;
+    padding: 8px 10px;
+    margin-bottom: 5px;
+    background-color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    border-left: 5px solid transparent; 
+    transition: background-color 0.2s;
+    font-size: 0.9em;
+}
+
+.risk-legend-item {
+    border-left-width: 8px;
+    font-weight: 500;
+}
+
+.risk-legend-item.active {
+    background-color: #f5f5f5;
+}
+
+.color-box {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 8px;
+    border: 1px solid #ccc; 
 }
 
 .layer-name {
     display: flex;
     align-items: center;
-    font-size: 0.9em;
-    font-weight: 500;
+    flex-grow: 1;
 }
 
-.color-box {
-    width: 12px;
-    height: 12px;
-    border-radius: 2px;
-    margin-right: 8px;
-    border: 1px solid #7f8c8d;
-}
-
-.risk-legend-item {
-    cursor: pointer;
-    border-left: 5px solid transparent;
-    transition: all 0.2s ease;
-    padding-left: 10px;
-}
-
-.risk-legend-item.active {
-    background-color: #f0f7ff;
-    border-left-color: #2c3e50;
-}
-
-.risk-legend-item:hover {
-    background-color: #f0f0f0;
-}
-
-/* --- Estilos para UPLOAD DE DADOS --- */
+/* ----------------- ESTILOS PARA UPLOAD SEPARADO ----------------- */
 .upload-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsivo */
     gap: 25px;
     margin-bottom: 30px;
 }
@@ -250,55 +247,60 @@ main {
     border: 1px solid #ccc;
     border-radius: 4px;
     box-sizing: border-box;
+    margin-top: 5px;
 }
 
 .upload-status {
     margin-top: 15px;
     padding: 10px;
     border-radius: 4px;
-    font-size: 0.85em;
+    font-weight: 600;
+    text-align: center;
+    background-color: #f0f0f0;
+    color: #333;
 }
 
 .status-success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background-color: #e8f9f5;
+    color: #1abc9c;
+    border: 1px solid #1abc9c;
 }
 
 .status-error {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background-color: #fbecec;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
 }
 
-/* --- Estilos para DADOS TABULARES --- */
+/* ----------------- ESTILOS DE DADOS TABULAR ----------------- */
 .table-container {
     max-height: 500px;
     overflow-y: auto;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 8px;
 }
 
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    font-size: 0.9em;
 }
 
 .data-table th, .data-table td {
     padding: 12px 15px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
-    font-size: 0.85em;
+    border-bottom: 1px solid #eee;
 }
 
 .data-table th {
     background-color: #2c3e50;
     color: white;
-    position: sticky; 
+    position: sticky; /* Fixa o cabeçalho ao rolar */
     top: 0;
+    z-index: 10;
 }
 
-.data-table tr:nth-child(even) {
+.data-table tbody tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
@@ -306,80 +308,124 @@ main {
     display: flex;
     justify-content: space-between;
     margin-bottom: 15px;
-    gap: 15px;
+    gap: 10px;
 }
-.filter-and-export input {
+
+#dataTableFilter {
     flex-grow: 1;
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 4px;
 }
 
-/* --- Estilos para RELATÓRIOS --- */
+.filter-and-export button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* ----------------- ESTILOS DE RELATÓRIO ----------------- */
 .report-controls {
     margin-bottom: 20px;
 }
+
 .primary-btn {
-    background-color: #1abc9c;
+    background-color: #2ecc71; /* Verde */
     color: white;
-    padding: 10px 20px;
     border: none;
-    border-radius: 4px;
+    padding: 12px 20px;
+    border-radius: 5px;
     cursor: pointer;
     font-weight: 600;
     transition: background-color 0.3s;
 }
+
 .primary-btn:hover {
-    background-color: #16a085;
+    background-color: #27ae60;
 }
 
 .report-status-msg {
     margin-top: 10px;
     font-size: 0.9em;
-    color: #e74c3c;
+    color: #7f8c8d;
 }
 
 .report-content-stylized {
-    border: 1px solid #ddd;
+    border: 1px solid #eee;
     padding: 20px;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: #fafafa;
-    max-height: 800px;
+    max-height: 800px; 
     overflow-y: auto;
 }
 
-.report-text-container {
-    margin-top: 20px;
-    padding: 15px;
-    background-color: #fff;
-    border: 1px solid #eee;
-    border-radius: 4px;
+.report-content-stylized h3, .report-content-stylized h4 {
+    color: #34495e;
+    border-bottom: 1px dashed #ddd;
+    padding-bottom: 5px;
+    margin-top: 25px;
 }
 
 .report-text-output {
-    white-space: pre-wrap; 
-    word-wrap: break-word; 
-    font-family: 'Courier New', Courier, monospace; 
+    white-space: pre-wrap; /* Mantém a formatação do texto */
+    word-wrap: break-word; /* Quebra palavras longas */
+    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada para alinhamento */
     font-size: 0.85em;
 }
 
-/* Cartões de Custo no Relatório */
-.max-cost-card .card-value { color: #e74c3c; } 
-.min-cost-card .card-value { color: #1abc9c; } 
-.card-subtitle { font-size: 0.8em; margin-top: 5px; color: #7f8c8d; }
+/* Estilo para impressão */
+@media print {
+    body, header, nav, main > section:not(#relatorios) {
+        display: none;
+    }
+    #relatorios {
+        display: block;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        border-radius: 0;
+        border: none;
+    }
+    #generatedReportContainer {
+        border: none;
+        padding: 0;
+    }
+    .report-content-stylized {
+        max-height: none;
+        overflow-y: visible;
+        border: none;
+    }
+}
 
 /* Responsividade Básica */
 @media (max-width: 900px) {
     .dashboard-grid {
-        grid-template-columns: 1fr; 
+        grid-template-columns: 1fr; /* Coluna única em telas menores */
     }
     .sidebar-controls {
-        order: 2; 
+        order: 2; /* Move controles para baixo */
     }
-    .map-container {
-        order: 1; 
+    #mapid {
+        order: 1; /* Move mapa para cima */
     }
-    .upload-grid {
-        grid-template-columns: 1fr;
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    nav {
+        margin-top: 10px;
+    }
+    nav a {
+        margin-left: 0;
+        margin-right: 15px;
+        margin-bottom: 5px;
+    }
+    header button {
+        margin-left: 0;
+        margin-top: 10px;
     }
 }
