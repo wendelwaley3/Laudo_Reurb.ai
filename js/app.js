@@ -1,19 +1,18 @@
 // Variáveis Globais para armazenar os dados e camadas
-let map; 
-let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; 
-let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   
-let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; 
-let filteredLotesFeatures = []; 
+let map; // Apenas declaração, a inicialização ocorre em initMap()
+let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena todos os lotes carregados
+let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   // Armazena todas as APPs carregadas
+let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena outras poligonais (infraestrutura, etc.)
+let filteredLotesFeatures = []; // Armazena os lotes após aplicação de filtros
+
+const DEFAULT_CENTER = [-15.7801, -47.9297]; 
 
 // Camadas Leaflet no mapa
 let lotesLayer = null;
 let appLayer = null;
 let poligonaisLayer = null;
 
-const DEFAULT_CENTER = [-15.7801, -47.9297]; // Centro de Brasília
-
-// ----------------------------------------------------
-// Definições de Cores e Níveis de Risco (Grau 1 a 4) - Padrão final
+// Mapa de estilos para riscos (Estrutura NOVA para suportar filtros e relatórios)
 const RISK_GRADES_CONFIG = {
     '1': { color: '#2ecc71', name: 'Grau 1 (Risco Baixo)', toggle: true, count: 0 },  // Verde
     '2': { color: '#f1c40f', name: 'Grau 2 (Risco Moderado)', toggle: true, count: 0 }, // Amarelo
@@ -22,32 +21,30 @@ const RISK_GRADES_CONFIG = {
     'NA': { color: '#7f8c8d', name: 'Sem Risco Atribuído', toggle: true, count: 0 } // Cinza
 };
 
-
 // ----------------------------------------------------
-// 1. Inicializa o Mapa (Com ESRI World Street Map)
+// 1. Inicializa o Mapa (Com ESRI World Street Map Original)
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     
     if (map) map.remove(); 
 
-    // O mapa DEVE ser inicializado APENAS no contêiner com id="mapid"
     map = L.map('mapid').setView(DEFAULT_CENTER, 4);
 
-    // ESRI World Street Map (Solicitado pelo usuário)
+    // MAPA BASE ESRI (Seu código original)
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NGA, and the GIS User Community',
         maxZoom: 19
     }).addTo(map);
 
-    // CORREÇÃO CRUCIAL: Chama invalidateSize na inicialização para garantir que o mapa preencha o container
+    // CORREÇÃO ESSENCIAL 1: Garante que o mapa calcule seu tamanho inicial
     map.invalidateSize(); 
 
     updateLayerControl();
 }
 
-// ----------------------------------------------------
-// 2. Lógica de Navegação/Abas
 
+// ----------------------------------------------------
+// 2. Lógica de Navegação/Abas (Correção de Layout)
 function setupTabNavigation() {
     console.log('setupTabNavigation: Configurando navegação por abas.');
     const navLinks = document.querySelectorAll('header nav a');
@@ -58,7 +55,7 @@ function setupTabNavigation() {
             e.preventDefault();
             const targetSectionId = this.getAttribute('data-section');
 
-            // 1. Gerencia as classes ativas (esconde todas e mostra a selecionada)
+            // 1. Gerencia as classes ativas
             navLinks.forEach(l => l.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
             this.classList.add('active');
@@ -68,11 +65,11 @@ function setupTabNavigation() {
                 targetSection.classList.add('active');
             }
 
-            // 2. CORREÇÃO ESSENCIAL PARA MAPA CINZA AO TROCAR DE ABA
+            // 2. CORREÇÃO ESSENCIAL 2: Corrige o mapa cinza ao trocar de aba
             if (targetSectionId === 'dashboard' && map) {
-                // Necessário um pequeno atraso para o CSS da aba "active" ser aplicado
                 setTimeout(() => {
                     map.invalidateSize(); // Força o mapa a recalcular seu tamanho
+                    // Tenta centralizar nos lotes carregados
                     if (lotesLayer && lotesLayer.getBounds().isValid()) {
                          map.fitBounds(lotesLayer.getBounds());
                     } else {
@@ -93,15 +90,17 @@ function setupTabNavigation() {
     }
 }
 
+
 // ----------------------------------------------------
-// INICIALIZAÇÃO PRINCIPAL (usando window.onload para garantir que os scripts Leaflet e DOM estejam prontos)
+// INICIALIZAÇÃO PRINCIPAL (garante que o DOM e as bibliotecas estejam prontos)
 window.addEventListener('load', () => {
     console.log('Window Load: Inicializando GeoLaudo.AI');
-    setupTabNavigation();
+    setupTabNavigation(); // Adicionada a função de gerenciamento de abas
     initMap(); 
     
     document.getElementById('exportReportBtn').style.display = 'none';
 
+    // Se houver dados (na primeira execução, não há), chama a atualização
     if (allLotesGeoJSON.features.length > 0) {
         updateSummaryCards(allLotesGeoJSON.features);
         updateNucleoFilter(allLotesGeoJSON.features);
@@ -117,6 +116,7 @@ window.addEventListener('load', () => {
 
 function getStyleForRisco(feature, type = 'lotes') {
     if (type === 'lotes') {
+        // Usa GRAU_RISCO como chave (padrão 1 a 4)
         const riskGrade = String(feature.properties.GRAU_RISCO) || 'NA'; 
         const colorData = RISK_GRADES_CONFIG[riskGrade] || RISK_GRADES_CONFIG['NA'];
 
@@ -163,7 +163,7 @@ function onEachFeature(feature, layer) {
 }
 
 // ----------------------------------------------------
-// 4. Lógica de Reprojeção (UTM)
+// 4. Lógica de Reprojeção (UTM) - Mantida para manter a compatibilidade com reprojeção
 function convertUtmToWgs84(easting, northing, utmZone) {
     const zoneNum = utmZone.slice(0, -1);
     const projDef = `+proj=utm +zone=${zoneNum} +${utmZone.endsWith('s') ? 'south' : 'north'} +ellps=GRS80 +units=m +no_defs`;
@@ -247,7 +247,7 @@ function handleFileUpload(type) {
                 updateNucleoFilter(allLotesGeoJSON.features);
                 updateRiskControl(allLotesGeoJSON.features);
                 populateDataTable(allLotesGeoJSON.features);
-                applyFilters(); // Aplica filtro para renderizar no mapa
+                applyFilters(); 
             }
             
 
@@ -329,7 +329,6 @@ function updateMapLayers(type) {
             style: (feature) => getStyleForRisco(feature, 'app'),
             onEachFeature: onEachFeature
         }).addTo(map);
-        // Garante que o Lotes fique por cima, se existir
         if (lotesLayer) lotesLayer.bringToFront();
     } else {
         appLayer = null;
@@ -342,7 +341,6 @@ function updateMapLayers(type) {
             style: (feature) => getStyleForRisco(feature, 'poligonais'),
             onEachFeature: onEachFeature
         }).addTo(map);
-        // Garante que o Lotes fique por cima, se existir
         if (lotesLayer) lotesLayer.bringToFront();
     } else {
         poligonaisLayer = null;
@@ -358,7 +356,6 @@ function updateNucleoFilter(features) {
     const nucleoSelect = document.getElementById('nucleo-filter');
     const nucleos = new Set(features.map(f => f.properties.NUCLEO || 'N/A').filter(n => n !== 'N/A'));
     
-    // Mantém apenas a primeira opção ("Todos")
     const currentOptions = nucleoSelect.options[0].outerHTML;
     nucleoSelect.innerHTML = currentOptions; 
     
@@ -437,7 +434,7 @@ function updateRiskControl(features) {
     
     Object.keys(RISK_GRADES_CONFIG).forEach(key => RISK_GRADES_CONFIG[key].count = 0);
 
-    // Contagem baseada em TODOS os lotes carregados
+    // Contagem baseada em TODOS os lotes carregados (para o total no controle)
     allLotesGeoJSON.features.forEach(f => {
         const grade = String(f.properties.GRAU_RISCO) || 'NA';
         if (RISK_GRADES_CONFIG[grade]) {
