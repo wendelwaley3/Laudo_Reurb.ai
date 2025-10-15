@@ -5,7 +5,7 @@ let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };
 let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; 
 let filteredLotesFeatures = []; 
 
-const DEFAULT_CENTER = [-15.7801, -47.9297]; // Centro de Brasília
+const DEFAULT_CENTER = [-15.7801, -47.9297]; // Centro padrão (Brasília)
 
 // Camadas Leaflet no mapa
 let lotesLayer = null;
@@ -47,12 +47,11 @@ function initMap() {
         "Satélite (ESRI)": esriSatellite
     };
 
-    // Adiciona o controle de camadas (opção de Satélite/Ruas)
+    // Adiciona o controle de camadas para trocar entre mapa base e satélite
     L.control.layers(baseLayers, null, { collapsed: false }).addTo(map);
 
 
     // CORREÇÃO ESSENCIAL 1: Garante que o mapa calcule seu tamanho inicial
-    // ESSENCIAL para corrigir o cinza quando o container está inicialmente "escondido" pelo CSS de abas
     map.invalidateSize(); 
 
     updateLayerControl();
@@ -164,10 +163,11 @@ function getStyleForRisco(feature, type = 'lotes') {
 function onEachFeature(feature, layer) {
     let popupContent = "<strong>Dados do Lote/Feição:</strong><br>";
     if (feature.properties) {
+        // Itera sobre as propriedades e formata o CUSTO
         for (const key in feature.properties) {
             if (feature.properties.hasOwnProperty(key) && key.length < 30 && key.toUpperCase() !== 'ID') {
                 let value = feature.properties[key];
-                if (key.toUpperCase().includes('CUSTO')) {
+                if (key.toUpperCase().includes('CUSTO') && typeof value === 'number') {
                      value = `R$ ${parseFloat(value).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
                 }
                 popupContent += `<b>${key}:</b> ${value}<br>`;
@@ -220,7 +220,7 @@ function transformUtm(geojsonData, sigasZone) {
 }
 
 // ----------------------------------------------------
-// 5. Lógica de Upload
+// 5. Lógica de Upload (Verificada: Permite selecionar e processar 3 camadas)
 
 function handleFileUpload(type) {
     const fileInput = document.getElementById(`geojson-${type}-file`);
@@ -261,7 +261,7 @@ function handleFileUpload(type) {
                 updateSummaryCards(allLotesGeoJSON.features);
                 updateNucleoFilter(allLotesGeoJSON.features);
                 updateRiskControl(allLotesGeoJSON.features);
-                populateDataTable(allLotesGeoJSON.features);
+                // A tabela será atualizada dentro do applyFilters
                 applyFilters(); 
             }
             
@@ -283,6 +283,7 @@ function applyFilters() {
     if (!allLotesGeoJSON || allLotesGeoJSON.features.length === 0) {
         renderLotesLayer([]);
         updateSummaryCards([]);
+        populateDataTable([]);
         return;
     }
 
@@ -308,11 +309,13 @@ function applyFilters() {
     
     // 4. Atualiza os cards com as novas estatísticas filtradas
     updateSummaryCards(filteredLotesFeatures);
-    // Atualiza a tabela de dados com os lotes filtrados
+    
+    // 5. Atualiza a tabela com os lotes filtrados
     populateDataTable(filteredLotesFeatures);
 }
 
 function renderLotesLayer(featuresToRender) {
+    // Remove a camada existente, se houver
     if (lotesLayer) {
         map.removeLayer(lotesLayer);
     }
@@ -329,6 +332,7 @@ function renderLotesLayer(featuresToRender) {
         onEachFeature: onEachFeature
     }).addTo(map);
 
+    // Centraliza o mapa se for a primeira renderização ou após um filtro significativo
     if(lotesLayer.getBounds().isValid()) {
          map.fitBounds(lotesLayer.getBounds());
     }
@@ -371,10 +375,8 @@ function updateMapLayers(type) {
 
 function updateNucleoFilter(features) {
     const nucleoSelect = document.getElementById('nucleo-filter');
-    // Mapeia para NUCLEO ou 'N/A' e filtra 'N/A' se não tiver valor
     const nucleos = new Set(features.map(f => f.properties.NUCLEO || 'N/A').filter(n => n !== 'N/A'));
     
-    // Mantém apenas a primeira opção ("Todos")
     const currentOptions = nucleoSelect.options[0].outerHTML;
     nucleoSelect.innerHTML = currentOptions; 
     
@@ -387,10 +389,10 @@ function updateLayerControl() {
     const mainList = document.getElementById('main-layer-list');
     mainList.innerHTML = ''; 
     
-    // Se o lotesLayer for nulo, significa que não há dados carregados ou renderizados
     const isLotesLoaded = allLotesGeoJSON.features.length > 0;
     
     if (isLotesLoaded) {
+        // Lotes não pode ser desativado pois é a camada principal de análise
         mainList.innerHTML += `
             <li class="layer-item">
                 <span class="layer-name">
@@ -456,7 +458,6 @@ function updateRiskControl(features) {
     const list = document.getElementById('risk-layer-filter');
     list.innerHTML = '';
     
-    // Reset da contagem
     Object.keys(RISK_GRADES_CONFIG).forEach(key => RISK_GRADES_CONFIG[key].count = 0);
 
     // Contagem baseada em TODOS os lotes carregados
@@ -518,7 +519,7 @@ function updateSummaryCards(features) {
                 totalLotesEmAPP++;
             }
 
-            // Soma o custo
+            // Soma o custo (com validação)
             if (props.CUSTO && typeof props.CUSTO === 'number') {
                 custoTotal += props.CUSTO;
             }
@@ -720,6 +721,7 @@ function populateDataTable(features) {
         return;
     }
 
+    // Pega as chaves da primeira feição para o cabeçalho
     const properties = features[0].properties;
     let headerRow = '<tr>';
     const keys = [];
@@ -732,6 +734,7 @@ function populateDataTable(features) {
     headerRow += '</tr>';
     thead.innerHTML = headerRow;
 
+    // Preenche as linhas da tabela
     features.forEach(feature => {
         let bodyRow = '<tr>';
         keys.forEach(key => {
@@ -752,6 +755,7 @@ function filterDataTable() {
     const table = document.getElementById('lotesDataTable');
     const tr = table.getElementsByTagName('tr');
 
+    // Começa do índice 1 para pular o cabeçalho (thead)
     for (let i = 1; i < tr.length; i++) {
         let display = false;
         const td = tr[i].getElementsByTagName('td');
@@ -781,13 +785,14 @@ function exportDataTableToCSV() {
 
     const bodyRows = table.querySelectorAll('tbody tr');
     bodyRows.forEach(row => {
-        if (row.style.display !== 'none') {
+        if (row.style.display !== 'none') { // Exporta apenas linhas visíveis (filtradas)
             csv.push(Array.from(row.cells).map(cell => {
                 let text = cell.textContent.replace(/\s\s+/g, ' ').trim();
                 if (text.startsWith('R$')) {
+                    // Remove formatação de moeda para facilitar uso em planilhas
                     text = text.replace('R$ ', '').replace('.', '').replace(',', '.');
                 }
-                return `"${text}"`; 
+                return `"${text}"`; // Usa aspas para envolver o conteúdo e evitar problemas com vírgulas
             }).join(';'));
         }
     });
