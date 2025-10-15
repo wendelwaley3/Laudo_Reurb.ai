@@ -1,288 +1,414 @@
-/* style.css */
+/* Importação da fonte Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* --- Reset e Estrutura Básica --- */
-body { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    margin: 0; 
-    padding: 0; 
-    background-color: #eef1f5; 
-    display: flex; 
-    flex-direction: column; 
-    height: 100vh; 
-    color: #333;
-}
-.dashboard-container { 
-    display: flex; 
-    flex-direction: row; 
-    flex-grow: 1; 
-    overflow: hidden; 
-}
-
-/* --- Header --- */
-.header { 
-    background-color: #004d99; /* Azul escuro profissional */
-    color: white; 
-    padding: 15px 20px; 
-    text-align: center; 
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-}
-.header h1 {
+body {
+    font-family: 'Inter', sans-serif;
     margin: 0;
-    font-size: 1.5em;
-    font-weight: 500;
+    background-color: #f0f2f5; /* Fundo cinza claro */
+    color: #333;
+    line-height: 1.6;
 }
 
-/* --- Sidebar (Painel de Controle) --- */
-.sidebar { 
-    width: 350px; /* Maior para melhor visualização dos controles */
-    background-color: #fff; 
-    padding: 20px; 
-    box-shadow: 2px 0 10px rgba(0,0,0,0.05); 
-    display: flex; 
-    flex-direction: column; 
-    overflow-y: auto;
-}
-
-/* --- Menu de Abas (Tabs) --- */
-.tab-menu { 
-    display: flex; 
-    margin-bottom: 20px; 
-    border-bottom: 2px solid #eee;
-}
-.tab-button { 
-    background-color: #f7f7f7; 
-    border: none; 
-    padding: 12px 10px; 
-    cursor: pointer; 
-    flex-grow: 1; 
-    text-align: center; 
-    transition: all 0.3s ease; 
-    font-weight: 600;
-    border-radius: 4px 4px 0 0;
-    margin-right: 2px;
-}
-.tab-button:last-child {
-    margin-right: 0;
-}
-.tab-button.active { 
-    background-color: #004d99; 
-    color: white; 
-    box-shadow: 0 -2px 0 #004d99 inset;
-}
-.tab-content { 
-    /* Estilo do conteúdo das abas */
-    padding: 10px 0;
-}
-.hidden { 
-    display: none !important; 
-}
-
-/* --- Formulários e Controles --- */
-.form-group { 
-    margin-bottom: 15px; 
-}
-.form-group label { 
-    display: block; 
-    margin-bottom: 5px; 
-    font-weight: bold; 
-    font-size: 0.9em;
-}
-.form-group input[type="file"], 
-.form-group select { 
-    width: 100%; 
-    padding: 10px; 
-    border: 1px solid #ccc; 
-    border-radius: 4px; 
-    box-sizing: border-box; 
-    transition: border-color 0.3s;
-}
-.form-group input:focus, .form-group select:focus {
-    border-color: #004d99;
-    outline: none;
-}
-hr {
-    border: 0;
-    border-top: 1px solid #eee;
-    margin: 20px 0;
-}
-
-/* --- Mensagens de Status --- */
-.status-message { 
-    margin-top: 10px; 
-    padding: 10px; 
-    border: 1px solid; 
-    border-radius: 4px; 
-    font-size: 0.9em;
-}
-.status-message.success { 
-    background-color: #d4edda; 
-    color: #155724; 
-    border-color: #c3e6cb;
-}
-.status-message.error { 
-    background-color: #f8d7da; 
-    color: #721c24; 
-    border-color: #f5c6cb;
-}
-
-/* --- Lista de Camadas (Layers) --- */
-#main-layer-list, .risk-legend { 
-    list-style: none; 
-    padding: 0; 
-}
-#main-layer-list li, .risk-item { 
-    padding: 10px; 
-    border-bottom: 1px dotted #ccc; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    cursor: pointer;
-    transition: background-color 0.1s;
-}
-#main-layer-list li:hover, .risk-item:hover {
-    background-color: #f9f9f9;
-}
-.layer-name { 
-    font-weight: bold; 
+/* Header */
+header {
+    background-color: #2c3e50; /* Azul escuro */
+    color: white;
+    padding: 15px 30px;
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    flex-wrap: wrap; /* Para responsividade */
 }
-.layer-color-box {
-    width: 15px;
-    height: 15px;
-    margin-right: 10px;
-    border-radius: 3px;
-    border: 1px solid #777;
+
+.logo {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-right: 20px;
 }
-.layer-toggle { 
-    font-size: 0.8em;
-    padding: 5px 10px;
-    border-radius: 3px;
+
+nav {
+    flex-grow: 1; /* Permite que a navegação ocupe espaço */
+    display: flex;
+    justify-content: flex-start;
+    flex-wrap: wrap; /* Para responsividade */
+}
+
+nav a, #exportReportBtn {
     color: white;
-    background-color: #007bff;
-}
-.layer-toggle.active { 
-    background-color: #28a745; 
-}
-.layer-toggle.inactive { 
-    background-color: #dc3545; 
-}
-
-/* --- Filtro de Risco (Cores) --- */
-.risk-item {
-    border-left: 5px solid;
-    padding-left: 10px;
-    border-bottom: none;
-    margin-bottom: 5px;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.risk-item.active {
-    background-color: #f0f8ff;
-}
-
-/* --- Botões de Ação --- */
-.action-button {
-    width: 100%;
-    padding: 12px;
-    border: none;
+    text-decoration: none;
+    margin-left: 25px;
+    padding: 8px 15px;
     border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
     transition: background-color 0.3s;
-}
-.action-button.primary {
-    background-color: #007bff;
-    color: white;
-}
-.action-button.primary:hover {
-    background-color: #0056b3;
+    font-weight: 500;
+    cursor: pointer;
+    background-color: transparent; /* Certifica que é transparente por padrão */
+    border: none;
+    font-size: 16px;
 }
 
-/* --- Conteúdo Principal (Mapa e Resumo) --- */
-.content { 
-    flex-grow: 1; 
-    display: flex; 
-    flex-direction: column; 
-    position: relative;
-}
-#map { 
-    flex-grow: 1; 
-    min-height: 400px; 
+nav a:hover {
+    background-color: #34495e; /* Azul um pouco mais claro no hover */
 }
 
-/* --- Summary Cards (Resumo) --- */
-.summary-cards { 
-    display: flex; 
-    justify-content: space-between; 
-    padding: 15px; 
-    background-color: #f8f9fa; 
-    border-bottom: 1px solid #ddd;
+nav a.active {
+    background-color: #1abc9c; /* Verde água vibrante para o ativo */
+    font-weight: 600;
 }
-.card { 
-    background-color: #fff; 
-    border-radius: 8px; 
-    padding: 15px; 
-    text-align: center; 
-    flex: 1; 
-    margin: 0 8px; 
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-    min-width: 150px;
+
+#exportReportBtn {
+    margin-left: auto; /* Alinha à direita */
+    background-color: #f39c12; /* Laranja para destaque */
+    font-weight: 600;
 }
-.card-value { 
-    font-size: 1.8em; 
-    font-weight: bold; 
-    color: #004d99; 
+#exportReportBtn:hover {
+    background-color: #e67e22; 
 }
-.card-title { 
-    font-size: 0.85em; 
-    color: #6c757d; 
+
+
+/* Main Content */
+main {
+    padding: 20px 30px;
+}
+
+.content-section {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-bottom: 25px;
+}
+
+.content-section h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+/* Esconder/Mostrar Seções */
+.content-section:not(.active) {
+    display: none;
+}
+
+/* --- Dashboard GRID (Mapa e Controles) --- */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 350px 1fr; /* Sidebar de 350px e o Mapa preenchendo o restante */
+    gap: 25px;
+    min-height: 70vh; /* Altura mínima para o mapa */
+}
+
+.sidebar-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Mapa */
+.map-container {
+    height: 100%;
+    min-height: 600px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+#mapid {
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Summary Cards (Cartões de Resumo) --- */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+
+.card {
+    background-color: #ecf0f1; /* Cinza claro */
+    padding: 15px;
+    border-radius: 6px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.card-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #2c3e50;
+    line-height: 1.1;
+}
+
+.card-title {
+    font-size: 0.85em;
+    color: #7f8c8d;
     margin-top: 5px;
 }
 
-/* --- Destaques de Relatório --- */
-#highlight-cards {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 15px;
+/* --- Controles Sidebar (Filtros e Camadas) --- */
+.controls-panel {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
-.highlight-card {
-    flex: 1;
-    padding: 15px;
-    border-radius: 8px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.highlight-card.max-cost {
-    background-color: #ffe5e5; /* Vermelho claro */
-    border: 1px solid #ff9999;
-}
-.highlight-card.min-cost {
-    background-color: #e5ffe5; /* Verde claro */
-    border: 1px solid #99ff99;
-}
-.highlight-card h5 {
+.controls-panel h3 {
+    color: #34495e;
     margin-top: 0;
-    font-size: 0.9em;
-    color: #333;
-}
-.highlight-card p {
-    margin: 5px 0;
-    font-weight: bold;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
     font-size: 1.1em;
 }
 
-/* --- Relatório (Simulação) --- */
-.report-output {
-    padding: 20px;
-    background-color: white;
-    border: 1px solid #ddd;
-    margin-top: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+.form-group {
+    margin-bottom: 15px;
 }
-.chart-container {
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.form-group select {
     width: 100%;
-    margin: 20px 0;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* --- NOVO: Estilos para Camadas e Risco --- */
+.layer-list, .risk-legend {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.layer-item, .risk-legend-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dotted #e0e0e0;
+}
+
+.layer-name {
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.color-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 8px;
+    border: 1px solid #7f8c8d;
+}
+
+.risk-legend-item {
+    cursor: pointer;
+    border-left: 5px solid transparent;
+    transition: all 0.2s ease;
+    padding-left: 10px;
+}
+
+.risk-legend-item.active {
+    background-color: #f0f7ff;
+    border-left-color: #2c3e50;
+}
+
+.risk-legend-item:hover {
+    background-color: #f0f0f0;
+}
+
+/* --- Estilos para UPLOAD DE DADOS --- */
+.upload-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+    margin-bottom: 30px;
+}
+
+.upload-group {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.upload-group label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.upload-group input[type="file"], .siga-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.upload-status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.status-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* --- Estilos para DADOS TABULARES --- */
+.table-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.85em;
+}
+
+.data-table th {
+    background-color: #2c3e50;
+    color: white;
+    position: sticky; /* Fixa o cabeçalho ao rolar */
+    top: 0;
+}
+
+.data-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.filter-and-export {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    gap: 15px;
+}
+.filter-and-export input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* --- Estilos para RELATÓRIOS --- */
+.report-controls {
+    margin-bottom: 20px;
+}
+.primary-btn {
+    background-color: #1abc9c;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s;
+}
+.primary-btn:hover {
+    background-color: #16a085;
+}
+
+.report-status-msg {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #e74c3c;
+}
+
+.report-content-stylized {
+    border: 1px solid #ddd;
+    padding: 20px;
+    border-radius: 6px;
+    background-color: #fafafa;
+    max-height: 800px;
+    overflow-y: auto;
+}
+
+.report-text-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+.report-text-output {
+    white-space: pre-wrap; /* Mantém a formatação do texto */
+    word-wrap: break-word; /* Quebra palavras longas */
+    font-family: 'Courier New', Courier, monospace; /* Fonte monoespaçada para alinhamento */
+    font-size: 0.85em;
+}
+
+/* Cartões de Custo no Relatório */
+.max-cost-card .card-value { color: #e74c3c; } /* Vermelho */
+.min-cost-card .card-value { color: #1abc9c; } /* Verde */
+.card-subtitle { font-size: 0.8em; margin-top: 5px; color: #7f8c8d; }
+
+/* Estilo para impressão */
+@media print {
+    body, header, nav, main > section:not(#relatorios) {
+        display: none;
+    }
+    #relatorios {
+        display: block;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+        border-radius: 0;
+        border: none;
+    }
+    #generatedReportContainer {
+        border: none;
+        padding: 0;
+    }
+    .report-content-stylized {
+        max-height: none;
+        overflow-y: visible;
+        border: none;
+    }
+}
+
+/* Responsividade Básica */
+@media (max-width: 900px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr; /* Coluna única em telas menores */
+    }
+    .sidebar-controls {
+        order: 2; /* Move os controles para baixo do mapa */
+    }
+    .map-container {
+        order: 1; /* Move o mapa para cima */
+    }
 }
