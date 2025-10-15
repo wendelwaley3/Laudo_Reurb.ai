@@ -12,30 +12,33 @@ let lotesLayer = null;
 let appLayer = null;
 let poligonaisLayer = null;
 
-// Mapa de estilos para riscos (Grau 1 a 4)
+// =========================================================================
+// ATUALIZAÇÃO PROFISSIONAL: CONFIGURAÇÃO PADRONIZADA DE RISCO (1 a 4 + Nulo)
+// =========================================================================
 const RISK_GRADES_CONFIG = {
-    '1': { color: '#2ecc71', name: 'Grau 1 (Risco Baixo)', toggle: true, count: 0 },  // Verde
-    '2': { color: '#f1c40f', name: 'Grau 2 (Risco Moderado)', toggle: true, count: 0 }, // Amarelo
-    '3': { color: '#e67e22', name: 'Grau 3 (Risco Elevado)', toggle: true, count: 0 }, // Laranja
-    '4': { color: '#e74c3c', name: 'Grau 4 (Risco Crítico)', toggle: true, count: 0 },  // Vermelho
-    'NA': { color: '#7f8c8d', name: 'Sem Risco Atribuído', toggle: true, count: 0 } // Cinza
+    // PADRÃO SOLICITADO
+    '1': { color: '#2ecc71', name: 'Grau 1 (Risco Baixo - Verde)', toggle: true, count: 0 },  // Verde
+    '2': { color: '#f1c40f', name: 'Grau 2 (Risco Médio - Amarelo)', toggle: true, count: 0 }, // Amarelo
+    '3': { color: '#e67e22', name: 'Grau 3 (Risco Elevado - Laranja)', toggle: true, count: 0 }, // Laranja (Alto)
+    '4': { color: '#e74c3c', name: 'Grau 4 (Risco Muito Alto - Vermelho)', toggle: true, count: 0 },  // Vermelho
+    
+    // TRATAMENTO DE NULOS/AUSENTES
+    'NA': { color: 'transparent', name: 'Sem Risco Atribuído (NULO)', toggle: true, count: 0 } // Estilo transparente
 };
 
 // ----------------------------------------------------
-// 1. Inicializa o Mapa (Com ESRI e Satélite + Controle de Camadas)
+// 1. Inicializa o Mapa
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     
-    // Remove o mapa anterior se existir
     if (map) map.remove(); 
 
     map = L.map('mapid').setView(DEFAULT_CENTER, 4);
 
-    // Definição das Camadas Base (Street Map e Satélite)
     const esriStreet = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NGA, and the GIS User Community',
         maxZoom: 19
-    }).addTo(map); // Adiciona o Street Map como padrão
+    }).addTo(map);
 
     const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
@@ -47,11 +50,8 @@ function initMap() {
         "Satélite (ESRI)": esriSatellite
     };
 
-    // Adiciona o controle de camadas para trocar entre mapa base e satélite
     L.control.layers(baseLayers, null, { collapsed: false }).addTo(map);
 
-
-    // CORREÇÃO ESSENCIAL 1: Garante que o mapa calcule seu tamanho inicial
     map.invalidateSize(); 
 
     updateLayerControl();
@@ -59,7 +59,7 @@ function initMap() {
 
 
 // ----------------------------------------------------
-// 2. Lógica de Navegação/Abas (Correção de Layout)
+// 2. Lógica de Navegação/Abas 
 function setupTabNavigation() {
     console.log('setupTabNavigation: Configurando navegação por abas.');
     const navLinks = document.querySelectorAll('header nav a');
@@ -70,7 +70,6 @@ function setupTabNavigation() {
             e.preventDefault();
             const targetSectionId = this.getAttribute('data-section');
 
-            // 1. Gerencia as classes ativas
             navLinks.forEach(l => l.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
             this.classList.add('active');
@@ -80,12 +79,10 @@ function setupTabNavigation() {
                 targetSection.classList.add('active');
             }
 
-            // 2. CORREÇÃO ESSENCIAL 2: Corrige o mapa cinza ao trocar de aba
+            // CORREÇÃO ESSENCIAL: Corrige o mapa cinza ao trocar de aba
             if (targetSectionId === 'dashboard' && map) {
-                // Pequeno atraso é NECESSÁRIO para o navegador aplicar o display: block; do CSS
                 setTimeout(() => {
-                    map.invalidateSize(); // Força o mapa a recalcular seu tamanho
-                    // Tenta centralizar nos lotes carregados
+                    map.invalidateSize();
                     if (lotesLayer && lotesLayer.getBounds().isValid()) {
                          map.fitBounds(lotesLayer.getBounds());
                     } else {
@@ -96,7 +93,7 @@ function setupTabNavigation() {
         });
     });
 
-    // 3. Garante que a primeira aba (Dashboard) esteja ativa ao carregar
+    // Garante que a primeira aba (Dashboard) esteja ativa ao carregar
     const dashboardSection = document.getElementById('dashboard');
     const dashboardLink = document.querySelector('a[data-section="dashboard"]');
     
@@ -112,7 +109,7 @@ function setupTabNavigation() {
 window.addEventListener('load', () => {
     console.log('Window Load: Inicializando GeoLaudo.AI');
     setupTabNavigation(); 
-    initMap(); // Inicializa o mapa com as correções
+    initMap(); 
     
     document.getElementById('exportReportBtn').style.display = 'none';
 
@@ -120,7 +117,6 @@ window.addEventListener('load', () => {
         updateSummaryCards(allLotesGeoJSON.features);
         updateNucleoFilter(allLotesGeoJSON.features);
         updateRiskControl(allLotesGeoJSON.features);
-        populateDataTable(allLotesGeoJSON.features);
         applyFilters();
     }
 });
@@ -131,9 +127,26 @@ window.addEventListener('load', () => {
 
 function getStyleForRisco(feature, type = 'lotes') {
     if (type === 'lotes') {
-        const riskGrade = String(feature.properties.GRAU_RISCO) || 'NA'; 
+        // TRATAMENTO DE NULOS: Garante que GRAU_RISCO seja tratado como 'NA' se for null/undefined/0
+        const riskProperty = feature.properties.GRAU_RISCO;
+        const riskGrade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
+                          ? 'NA' 
+                          : String(riskProperty);
+                          
         const colorData = RISK_GRADES_CONFIG[riskGrade] || RISK_GRADES_CONFIG['NA'];
 
+        // CORREÇÃO ESSENCIAL: Estilo Transparente para Lotes 'NA' (Sem Risco)
+        if (riskGrade === 'NA') {
+            return {
+                fillColor: 'transparent', 
+                color: 'transparent',     
+                weight: 0,
+                opacity: 0,
+                fillOpacity: 0
+            };
+        }
+
+        // Estilos para Risco 1 a 4
         return {
             fillColor: colorData.color,
             color: colorData.color,
@@ -141,15 +154,18 @@ function getStyleForRisco(feature, type = 'lotes') {
             opacity: 0.8,
             fillOpacity: 0.7
         };
+        
     } else if (type === 'app') {
+        // Estilo APP (Semi-transparente para ver o lote abaixo)
         return {
             fillColor: '#3498db', // Azul para APP
             color: '#2980b9',
             weight: 2,
             opacity: 1,
-            fillOpacity: 0.4
+            fillOpacity: 0.4 
         };
     } else if (type === 'poligonais') {
+        // Estilo Outras Poligonais (Mais abaixo, pode ter uma cor mais sólida)
         return {
             fillColor: '#9b59b6', // Roxo
             color: '#8e44ad',
@@ -160,17 +176,23 @@ function getStyleForRisco(feature, type = 'lotes') {
     }
 }
 
+// Utilitário para formatar valores (reduz duplicidade)
+function formatValue(key, value) {
+    if (value === null || value === undefined) return 'N/A';
+
+    if (key.toUpperCase().includes('CUSTO') && typeof value === 'number') {
+        return `R$ ${parseFloat(value).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+    }
+    return value;
+}
+
+
 function onEachFeature(feature, layer) {
     let popupContent = "<strong>Dados do Lote/Feição:</strong><br>";
     if (feature.properties) {
-        // Itera sobre as propriedades e formata o CUSTO
         for (const key in feature.properties) {
             if (feature.properties.hasOwnProperty(key) && key.length < 30 && key.toUpperCase() !== 'ID') {
-                let value = feature.properties[key];
-                if (key.toUpperCase().includes('CUSTO') && typeof value === 'number') {
-                     value = `R$ ${parseFloat(value).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
-                }
-                popupContent += `<b>${key}:</b> ${value}<br>`;
+                popupContent += `<b>${key}:</b> ${formatValue(key, feature.properties[key])}<br>`;
             }
         }
     }
@@ -178,7 +200,7 @@ function onEachFeature(feature, layer) {
 }
 
 // ----------------------------------------------------
-// 4. Lógica de Reprojeção (UTM) - MANTIDA
+// 4. Lógica de Reprojeção (UTM)
 function convertUtmToWgs84(easting, northing, utmZone) {
     const zoneNum = utmZone.slice(0, -1);
     const projDef = `+proj=utm +zone=${zoneNum} +${utmZone.endsWith('s') ? 'south' : 'north'} +ellps=GRS80 +units=m +no_defs`;
@@ -190,7 +212,7 @@ function convertUtmToWgs84(easting, northing, utmZone) {
     const utm = proj4.defs(utmZone);
     const wgs84 = proj4.defs('WGS84');
     
-    return proj4(utm, wgs84, [easting, northing]); // Retorna [longitude, latitude]
+    return proj4(utm, wgs84, [easting, northing]);
 }
 
 function transformUtm(geojsonData, sigasZone) {
@@ -220,9 +242,44 @@ function transformUtm(geojsonData, sigasZone) {
 }
 
 // ----------------------------------------------------
-// 5. Lógica de Upload (Verificada: Permite selecionar e processar 3 camadas)
+// 5. Lógica de Upload (OTIMIZADA)
 
-function handleFileUpload(type) {
+// Função auxiliar para processar um único arquivo GeoJSON
+function processGeoJSONFile(file, type, sigasZone, statusDiv) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                let geojsonData = JSON.parse(e.target.result);
+
+                if (sigasZone !== 'wgs84') {
+                    statusDiv.textContent = `Convertendo de ${sigasZone}...`;
+                    geojsonData = transformUtm(geojsonData, sigasZone);
+                }
+                
+                statusDiv.textContent = `Sucesso! ${geojsonData.features.length} feições carregadas.`;
+                statusDiv.className = 'upload-status status-success';
+                resolve(geojsonData);
+
+            } catch (error) {
+                statusDiv.textContent = `Erro ao processar o arquivo: ${error.message}`;
+                statusDiv.className = 'upload-status status-error';
+                reject(error);
+            }
+        };
+
+        reader.onerror = () => {
+            statusDiv.textContent = `Erro de leitura do arquivo.`;
+            statusDiv.className = 'upload-status status-error';
+            reject(new Error("Erro de leitura do arquivo."));
+        };
+
+        reader.readAsText(file);
+    });
+}
+
+async function handleFileUpload(type) {
     const fileInput = document.getElementById(`geojson-${type}-file`);
     const statusDiv = document.getElementById(`status-${type}`);
     const sigasZone = document.getElementById(`siga-${type}-select`).value;
@@ -230,51 +287,35 @@ function handleFileUpload(type) {
     if (fileInput.files.length === 0) return;
 
     const file = fileInput.files[0];
-    const reader = new FileReader();
-
     statusDiv.textContent = `Lendo arquivo...`;
     statusDiv.className = 'upload-status';
 
-    reader.onload = function(e) {
-        try {
-            let geojsonData = JSON.parse(e.target.result);
-
-            if (sigasZone !== 'wgs84') {
-                statusDiv.textContent = `Convertendo de ${sigasZone}...`;
-                geojsonData = transformUtm(geojsonData, sigasZone);
-            }
-            
-            if (type === 'lotes') {
-                allLotesGeoJSON = geojsonData;
-            } else if (type === 'app') {
-                allAPPGeoJSON = geojsonData;
-            } else if (type === 'poligonais') {
-                allPoligonaisGeoJSON = geojsonData;
-            }
-
-            statusDiv.textContent = `Sucesso! ${geojsonData.features.length} feições carregadas.`;
-            statusDiv.className = 'upload-status status-success';
-            
-            updateMapLayers(type);
-            
-            if (type === 'lotes') {
-                updateSummaryCards(allLotesGeoJSON.features);
-                updateNucleoFilter(allLotesGeoJSON.features);
-                updateRiskControl(allLotesGeoJSON.features);
-                // A tabela será atualizada dentro do applyFilters
-                applyFilters(); 
-            }
-            
-
-        } catch (error) {
-            statusDiv.textContent = `Erro ao processar o arquivo: ${error.message}`;
-            statusDiv.className = 'upload-status status-error';
-            console.error("Erro no processamento do GeoJSON:", error);
+    try {
+        const geojsonData = await processGeoJSONFile(file, type, sigasZone, statusDiv);
+        
+        // Atribuição da variável global 
+        if (type === 'lotes') {
+            allLotesGeoJSON = geojsonData;
+        } else if (type === 'app') {
+            allAPPGeoJSON = geojsonData;
+        } else if (type === 'poligonais') {
+            allPoligonaisGeoJSON = geojsonData;
         }
-    };
 
-    reader.readAsText(file);
+        updateMapLayers(type);
+        
+        if (type === 'lotes') {
+            updateSummaryCards(allLotesGeoJSON.features);
+            updateNucleoFilter(allLotesGeoJSON.features);
+            updateRiskControl(allLotesGeoJSON.features);
+            applyFilters(); 
+        }
+
+    } catch (error) {
+        console.error(`Falha no upload de ${type}:`, error);
+    }
 }
+
 
 // ----------------------------------------------------
 // 6. Lógica de Renderização e Filtro
@@ -298,24 +339,24 @@ function applyFilters() {
     // 2. Filtro por Risco (Grau de Cor)
     const activeGrades = Object.keys(RISK_GRADES_CONFIG).filter(g => RISK_GRADES_CONFIG[g].toggle);
     features = features.filter(f => {
-        const featureGrade = String(f.properties.GRAU_RISCO) || 'NA';
+        // Usa a mesma lógica de tratamento de nulo do estilo para o filtro
+        const riskProperty = f.properties.GRAU_RISCO;
+        const featureGrade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
+                             ? 'NA' 
+                             : String(riskProperty);
+        
         return activeGrades.includes(featureGrade); 
     });
 
     filteredLotesFeatures = features;
     
-    // 3. Redesenha a camada
+    // 3. Redesenha e atualiza UI
     renderLotesLayer(filteredLotesFeatures);
-    
-    // 4. Atualiza os cards com as novas estatísticas filtradas
     updateSummaryCards(filteredLotesFeatures);
-    
-    // 5. Atualiza a tabela com os lotes filtrados
     populateDataTable(filteredLotesFeatures);
 }
 
 function renderLotesLayer(featuresToRender) {
-    // Remove a camada existente, se houver
     if (lotesLayer) {
         map.removeLayer(lotesLayer);
     }
@@ -330,41 +371,55 @@ function renderLotesLayer(featuresToRender) {
     lotesLayer = L.geoJson(featureCollection, {
         style: (feature) => getStyleForRisco(feature, 'lotes'),
         onEachFeature: onEachFeature
-    }).addTo(map);
+    });
 
-    // Centraliza o mapa se for a primeira renderização ou após um filtro significativo
+    // Se a camada já existe, apenas a adicionamos novamente com o novo estilo.
+    if (map.hasLayer(lotesLayer)) {
+        map.removeLayer(lotesLayer); // Apenas por segurança, embora o código acima já faça isso.
+    }
+    map.addLayer(lotesLayer);
+    lotesLayer.bringToFront(); // Garante que a camada de risco/lote está no topo
+
     if(lotesLayer.getBounds().isValid()) {
          map.fitBounds(lotesLayer.getBounds());
     }
 }
 
 function updateMapLayers(type) {
-    if (type === 'lotes') {
-        applyFilters(); 
-    }
     
-    // 2. APP
-    if (appLayer) map.removeLayer(appLayer);
-    if (allAPPGeoJSON.features.length > 0) {
-        appLayer = L.geoJson(allAPPGeoJSON, {
-            style: (feature) => getStyleForRisco(feature, 'app'),
-            onEachFeature: onEachFeature
-        }).addTo(map);
-        if (lotesLayer) lotesLayer.bringToFront();
-    } else {
-        appLayer = null;
-    }
-
-    // 3. Poligonais
+    // 1. Remove todas as camadas que vamos atualizar
     if (poligonaisLayer) map.removeLayer(poligonaisLayer);
+    if (appLayer) map.removeLayer(appLayer);
+    if (lotesLayer) map.removeLayer(lotesLayer);
+    
+    // 2. Ordem de Empilhamento (Bottom to Top):
+    
+    // CAMADA 1 (Bottom): Poligonais
     if (allPoligonaisGeoJSON.features.length > 0) {
         poligonaisLayer = L.geoJson(allPoligonaisGeoJSON, {
             style: (feature) => getStyleForRisco(feature, 'poligonais'),
             onEachFeature: onEachFeature
         }).addTo(map);
-        if (lotesLayer) lotesLayer.bringToFront();
     } else {
         poligonaisLayer = null;
+    }
+    
+    // CAMADA 2: APP
+    if (allAPPGeoJSON.features.length > 0) {
+        appLayer = L.geoJson(allAPPGeoJSON, {
+            style: (feature) => getStyleForRisco(feature, 'app'),
+            onEachFeature: onEachFeature
+        }).addTo(map);
+    } else {
+        appLayer = null;
+    }
+    
+    // CAMADA 3 (Top): Lotes/Risco (Chama o filtro para re-renderizar e adicionar ao mapa)
+    if (type === 'lotes') {
+        applyFilters(); 
+    } else if (lotesLayer) {
+         map.addLayer(lotesLayer);
+         lotesLayer.bringToFront();
     }
 
     updateLayerControl();
@@ -392,7 +447,7 @@ function updateLayerControl() {
     const isLotesLoaded = allLotesGeoJSON.features.length > 0;
     
     if (isLotesLoaded) {
-        // Lotes não pode ser desativado pois é a camada principal de análise
+        // Lotes: a cor é a média de risco, mas aqui usamos uma cor neutra para o controle
         mainList.innerHTML += `
             <li class="layer-item">
                 <span class="layer-name">
@@ -411,7 +466,7 @@ function updateLayerControl() {
                     <span class="color-box" style="background-color: #3498db;"></span>
                     APP (${allAPPGeoJSON.features.length})
                 </span>
-                <input type="checkbox" ${appLayer ? 'checked' : ''}>
+                <input type="checkbox" ${appLayer && map.hasLayer(appLayer) ? 'checked' : ''}>
             </li>
         `;
     }
@@ -423,7 +478,7 @@ function updateLayerControl() {
                     <span class="color-box" style="background-color: #9b59b6;"></span>
                     Outras Poligonais (${allPoligonaisGeoJSON.features.length})
                 </span>
-                <input type="checkbox" ${poligonaisLayer ? 'checked' : ''}>
+                <input type="checkbox" ${poligonaisLayer && map.hasLayer(poligonaisLayer) ? 'checked' : ''}>
             </li>
         `;
     }
@@ -448,7 +503,7 @@ function toggleLayer(type, listItem) {
         } else {
             map.addLayer(poligonaisLayer);
             checkbox.checked = true;
-            if (lotesLayer) lotesLayer.bringToFront();
+            if (appLayer) appLayer.bringToBack(); 
         }
     }
 }
@@ -462,7 +517,12 @@ function updateRiskControl(features) {
 
     // Contagem baseada em TODOS os lotes carregados
     allLotesGeoJSON.features.forEach(f => {
-        const grade = String(f.properties.GRAU_RISCO) || 'NA';
+        // Tratamento de nulos/ausentes para contagem
+        const riskProperty = f.properties.GRAU_RISCO;
+        const grade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
+                      ? 'NA' 
+                      : String(riskProperty);
+
         if (RISK_GRADES_CONFIG[grade]) {
             RISK_GRADES_CONFIG[grade].count++;
         }
@@ -472,7 +532,10 @@ function updateRiskControl(features) {
         const data = RISK_GRADES_CONFIG[grade];
         const listItem = document.createElement('li');
         listItem.className = `risk-legend-item ${data.toggle ? 'active' : ''}`;
-        listItem.style.borderLeftColor = data.color;
+        
+        // Se for o NULO, usa uma borda para indicar o filtro, mas não a cor
+        listItem.style.borderLeftColor = grade === 'NA' ? '#7f8c8d' : data.color;
+        
         listItem.setAttribute('data-grade', grade);
         listItem.innerHTML = `
             <span class="layer-name">${data.name}</span>
@@ -499,7 +562,6 @@ function toggleRiskGrade(grade, checkbox) {
 
 // ----------------------------------------------------
 // 8. Atualização dos Cards de Resumo
-
 function updateSummaryCards(features) {
     let totalLotesFiltrados = features.length;
     let totalLotesComRisco = 0;
@@ -509,8 +571,8 @@ function updateSummaryCards(features) {
     features.forEach(feature => {
         const props = feature.properties;
         if (props) {
-            // Lotes em Risco (Grau > 1 ou LOTE_APP = 'SIM')
-            if ((props.GRAU_RISCO && props.GRAU_RISCO > 1) || (props.LOTE_APP && props.LOTE_APP.toUpperCase() === 'SIM')) {
+            // Lotes em Risco (Grau > 1)
+            if (props.GRAU_RISCO && props.GRAU_RISCO > 1) {
                 totalLotesComRisco++;
             }
             
@@ -537,14 +599,12 @@ function updateSummaryCards(features) {
 
 // ----------------------------------------------------
 // 9. Destaques de Relatório
-
 function updateReportHighlights(features) {
     const reportMaxCostEl = document.getElementById('report-max-cost');
     const reportMaxCostInfoEl = document.getElementById('report-max-cost-info');
     const reportMinCostEl = document.getElementById('report-min-cost');
     const reportMinCostInfoEl = document.getElementById('report-min-cost-info');
 
-    // Reset
     reportMaxCostEl.textContent = 'R$ 0,00';
     reportMaxCostInfoEl.textContent = 'Lote/ID: N/A';
     reportMinCostEl.textContent = 'R$ 0,00';
@@ -591,7 +651,6 @@ function updateReportHighlights(features) {
 
 // ----------------------------------------------------
 // 10. Geração de Relatório e Gráfico
-
 let riskChartInstance = null; 
 
 document.getElementById('generateReportBtn').addEventListener('click', () => {
@@ -606,7 +665,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     
     reportMsg.textContent = 'Gerando relatório...';
 
-    // 1. Geração do Gráfico (Simulação)
+    // 1. Geração do Gráfico 
     const labels = [];
     const dataValues = [];
     const backgroundColors = [];
@@ -615,14 +674,18 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     Object.keys(RISK_GRADES_CONFIG).forEach(key => riskCounts[key] = 0);
 
     featuresToReport.forEach(f => {
-        const grade = String(f.properties.GRAU_RISCO) || 'NA';
+        const riskProperty = f.properties.GRAU_RISCO;
+        const grade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
+                      ? 'NA' 
+                      : String(riskProperty);
         riskCounts[grade] = (riskCounts[grade] || 0) + 1;
     });
 
     Object.keys(RISK_GRADES_CONFIG).forEach(grade => {
         labels.push(RISK_GRADES_CONFIG[grade].name);
         dataValues.push(riskCounts[grade]);
-        backgroundColors.push(RISK_GRADES_CONFIG[grade].color);
+        // Garante que o 'NA' não tem cor no gráfico, se for o caso
+        backgroundColors.push(grade === 'NA' ? '#cccccc' : RISK_GRADES_CONFIG[grade].color);
     });
 
     if (riskChartInstance) {
@@ -707,8 +770,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
 
 
 // ----------------------------------------------------
-// 11. Funções de Tabela 
-
+// 11. Funções de Tabela
 function populateDataTable(features) {
     const table = document.getElementById('lotesDataTable');
     const thead = table.querySelector('thead');
@@ -721,7 +783,6 @@ function populateDataTable(features) {
         return;
     }
 
-    // Pega as chaves da primeira feição para o cabeçalho
     const properties = features[0].properties;
     let headerRow = '<tr>';
     const keys = [];
@@ -734,15 +795,10 @@ function populateDataTable(features) {
     headerRow += '</tr>';
     thead.innerHTML = headerRow;
 
-    // Preenche as linhas da tabela
     features.forEach(feature => {
         let bodyRow = '<tr>';
         keys.forEach(key => {
-            let value = feature.properties[key];
-            if (key.toUpperCase().includes('CUSTO') && typeof value === 'number') {
-                 value = `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            }
-            bodyRow += `<td>${value}</td>`;
+            bodyRow += `<td>${formatValue(key, feature.properties[key])}</td>`;
         });
         bodyRow += '</tr>';
         tbody.innerHTML += bodyRow;
@@ -755,7 +811,6 @@ function filterDataTable() {
     const table = document.getElementById('lotesDataTable');
     const tr = table.getElementsByTagName('tr');
 
-    // Começa do índice 1 para pular o cabeçalho (thead)
     for (let i = 1; i < tr.length; i++) {
         let display = false;
         const td = tr[i].getElementsByTagName('td');
@@ -785,14 +840,13 @@ function exportDataTableToCSV() {
 
     const bodyRows = table.querySelectorAll('tbody tr');
     bodyRows.forEach(row => {
-        if (row.style.display !== 'none') { // Exporta apenas linhas visíveis (filtradas)
+        if (row.style.display !== 'none') { 
             csv.push(Array.from(row.cells).map(cell => {
                 let text = cell.textContent.replace(/\s\s+/g, ' ').trim();
                 if (text.startsWith('R$')) {
-                    // Remove formatação de moeda para facilitar uso em planilhas
                     text = text.replace('R$ ', '').replace('.', '').replace(',', '.');
                 }
-                return `"${text}"`; // Usa aspas para envolver o conteúdo e evitar problemas com vírgulas
+                return `"${text}"`; 
             }).join(';'));
         }
     });
