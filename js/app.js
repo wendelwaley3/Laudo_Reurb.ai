@@ -31,6 +31,7 @@ const RISK_GRADES_CONFIG = {
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     
+    // Remove o mapa se ele já existir (para evitar duplicidade)
     if (map) map.remove(); 
 
     map = L.map('mapid').setView(DEFAULT_CENTER, 4);
@@ -52,6 +53,7 @@ function initMap() {
 
     L.control.layers(baseLayers, null, { collapsed: false }).addTo(map);
 
+    // Garante que o mapa seja exibido corretamente após o carregamento inicial
     map.invalidateSize(); 
 
     updateLayerControl();
@@ -61,7 +63,6 @@ function initMap() {
 // ----------------------------------------------------
 // 2. Lógica de Navegação/Abas 
 function setupTabNavigation() {
-    console.log('setupTabNavigation: Configurando navegação por abas.');
     const navLinks = document.querySelectorAll('header nav a');
     const sections = document.querySelectorAll('.content-section');
 
@@ -104,22 +105,25 @@ function setupTabNavigation() {
 
 
 // ----------------------------------------------------
-// INICIALIZAÇÃO PRINCIPAL 
-window.addEventListener('load', () => {
-    console.log('Window Load: Inicializando GeoLaudo.AI');
+// INICIALIZAÇÃO PRINCIPAL (Refatorada para maior robustez)
+function initializeApp() {
+    console.log('GeoLaudo.AI: Inicializando aplicação.');
     setupTabNavigation(); 
     initMap(); 
     
     document.getElementById('exportReportBtn').style.display = 'none';
 
+    // Ações que dependem de todos os recursos externos terem carregado (como o Leaflet)
     if (allLotesGeoJSON.features.length > 0) {
         updateSummaryCards(allLotesGeoJSON.features);
         updateNucleoFilter(allLotesGeoJSON.features);
         updateRiskControl(allLotesGeoJSON.features);
         applyFilters();
     }
-});
+}
 
+// Garante que o mapa é iniciado imediatamente após a DOM estar pronta.
+document.addEventListener('DOMContentLoaded', initializeApp);
 
 // ----------------------------------------------------
 // 3. Lógica de Estilo e Camadas
@@ -190,6 +194,7 @@ function onEachFeature(feature, layer) {
     let popupContent = "<strong>Dados do Lote/Feição:</strong><br>";
     if (feature.properties) {
         for (const key in feature.properties) {
+            // Filtra chaves longas ou específicas para não poluir o popup
             if (feature.properties.hasOwnProperty(key) && key.length < 30 && key.toUpperCase() !== 'ID') {
                 popupContent += `<b>${key}:</b> ${formatValue(key, feature.properties[key])}<br>`;
             }
@@ -220,6 +225,7 @@ function transformUtm(geojsonData, sigasZone) {
     }
     
     function transformCoordinates(coords) {
+        // Lógica recursiva para tratar MultiPolygon, Polygon, LineString
         if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
             return coords.map(transformCoordinates);
         } else if (coords.length >= 2 && typeof coords[0] === 'number') {
@@ -241,7 +247,7 @@ function transformUtm(geojsonData, sigasZone) {
 }
 
 // ----------------------------------------------------
-// 5. Lógica de Upload (OTIMIZADA: Redução de Duplicação)
+// 5. Lógica de Upload (OTIMIZADA)
 
 // Função auxiliar para processar um único arquivo GeoJSON
 function processGeoJSONFile(file, type, sigasZone, statusDiv) {
@@ -374,6 +380,7 @@ function renderLotesLayer(featuresToRender) {
     map.addLayer(lotesLayer);
     lotesLayer.bringToFront(); // Garante que a camada de risco/lote está no topo
 
+    // Tenta ajustar o zoom para o novo lote carregado
     if(lotesLayer.getBounds().isValid()) {
          map.fitBounds(lotesLayer.getBounds());
     }
@@ -565,8 +572,8 @@ function updateSummaryCards(features) {
     features.forEach(feature => {
         const props = feature.properties;
         if (props) {
-            // Lotes em Risco (Grau > 1)
-            if (props.GRAU_RISCO && props.GRAU_RISCO > 1) {
+            // Lotes em Risco (Grau > 1 ou explicitamente 2, 3, 4)
+            if (props.GRAU_RISCO && props.GRAU_RISCO >= 2) {
                 totalLotesComRisco++;
             }
             
@@ -671,7 +678,11 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
         const grade = (riskProperty === null || riskProperty === undefined || riskProperty === 0) 
                       ? 'NA' 
                       : String(riskProperty);
-        riskCounts[grade] = (riskCounts[grade] || 0) + 1;
+
+        // Apenas conta se estiver visível
+        if (RISK_GRADES_CONFIG[grade]) {
+            riskCounts[grade] = (riskCounts[grade] || 0) + 1;
+        }
     });
 
     Object.keys(RISK_GRADES_CONFIG).forEach(grade => {
@@ -870,5 +881,3 @@ document.getElementById('exportReportBtn').addEventListener('click', () => {
     link.click();
     document.body.removeChild(link);
 });
-
-// FIM
