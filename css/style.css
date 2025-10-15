@@ -81,12 +81,12 @@ main {
     margin-bottom: 25px;
 }
 
-/* CORREÇÃO CHAVE: Esconder/Mostrar Seções */
+/* 1. CORREÇÃO ESSENCIAL: Esconder/Mostrar Seções */
 .content-section:not(.active) {
     display: none;
 }
 
-/* --- Dashboard GRID (Mapa e Controles) --- */
+/* 2. CORREÇÃO ESSENCIAL: Dashboard GRID (Mapa e Controles) */
 .dashboard-grid {
     display: grid;
     grid-template-columns: 350px 1fr; /* Sidebar de 350px e o Mapa preenchendo o restante */
@@ -100,7 +100,7 @@ main {
     gap: 20px;
 }
 
-/* CORREÇÃO CHAVE: Mapa deve ter altura definida */
+/* 3. CORREÇÃO ESSENCIAL: Mapa deve ter altura definida */
 .map-container {
     height: 100%;
     min-height: 600px; /* GARANTE ALTURA MÍNIMA */
