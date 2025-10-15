@@ -1,18 +1,18 @@
 // Variáveis Globais para armazenar os dados e camadas
-let map; // Apenas declaração, a inicialização ocorre em initMap()
-let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena todos os lotes carregados
-let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   // Armazena todas as APPs carregadas
-let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; // Armazena outras poligonais (infraestrutura, etc.)
-let filteredLotesFeatures = []; // Armazena os lotes após aplicação de filtros
+let map; 
+let allLotesGeoJSON = { type: 'FeatureCollection', features: [] }; 
+let allAPPGeoJSON = { type: 'FeatureCollection', features: [] };   
+let allPoligonaisGeoJSON = { type: 'FeatureCollection', features: [] }; 
+let filteredLotesFeatures = []; 
 
-const DEFAULT_CENTER = [-15.7801, -47.9297]; 
+const DEFAULT_CENTER = [-15.7801, -47.9297]; // Centro de Brasília
 
 // Camadas Leaflet no mapa
 let lotesLayer = null;
 let appLayer = null;
 let poligonaisLayer = null;
 
-// Mapa de estilos para riscos (Estrutura NOVA para suportar filtros e relatórios)
+// Mapa de estilos para riscos (Grau 1 a 4)
 const RISK_GRADES_CONFIG = {
     '1': { color: '#2ecc71', name: 'Grau 1 (Risco Baixo)', toggle: true, count: 0 },  // Verde
     '2': { color: '#f1c40f', name: 'Grau 2 (Risco Moderado)', toggle: true, count: 0 }, // Amarelo
@@ -22,21 +22,37 @@ const RISK_GRADES_CONFIG = {
 };
 
 // ----------------------------------------------------
-// 1. Inicializa o Mapa (Com ESRI World Street Map Original)
+// 1. Inicializa o Mapa (Com ESRI e Satélite + Controle de Camadas)
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     
+    // Remove o mapa anterior se existir
     if (map) map.remove(); 
 
     map = L.map('mapid').setView(DEFAULT_CENTER, 4);
 
-    // MAPA BASE ESRI (Seu código original)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    // Definição das Camadas Base (Street Map e Satélite)
+    const esriStreet = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NGA, and the GIS User Community',
         maxZoom: 19
-    }).addTo(map);
+    }).addTo(map); // Adiciona o Street Map como padrão
+
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, swisstopo, and the GIS User Community',
+        maxZoom: 19
+    });
+
+    const baseLayers = {
+        "Mapa Base (Ruas - ESRI)": esriStreet,
+        "Satélite (ESRI)": esriSatellite
+    };
+
+    // Adiciona o controle de camadas (opção de Satélite/Ruas)
+    L.control.layers(baseLayers, null, { collapsed: false }).addTo(map);
+
 
     // CORREÇÃO ESSENCIAL 1: Garante que o mapa calcule seu tamanho inicial
+    // ESSENCIAL para corrigir o cinza quando o container está inicialmente "escondido" pelo CSS de abas
     map.invalidateSize(); 
 
     updateLayerControl();
@@ -67,6 +83,7 @@ function setupTabNavigation() {
 
             // 2. CORREÇÃO ESSENCIAL 2: Corrige o mapa cinza ao trocar de aba
             if (targetSectionId === 'dashboard' && map) {
+                // Pequeno atraso é NECESSÁRIO para o navegador aplicar o display: block; do CSS
                 setTimeout(() => {
                     map.invalidateSize(); // Força o mapa a recalcular seu tamanho
                     // Tenta centralizar nos lotes carregados
@@ -92,15 +109,14 @@ function setupTabNavigation() {
 
 
 // ----------------------------------------------------
-// INICIALIZAÇÃO PRINCIPAL (garante que o DOM e as bibliotecas estejam prontos)
+// INICIALIZAÇÃO PRINCIPAL 
 window.addEventListener('load', () => {
     console.log('Window Load: Inicializando GeoLaudo.AI');
-    setupTabNavigation(); // Adicionada a função de gerenciamento de abas
-    initMap(); 
+    setupTabNavigation(); 
+    initMap(); // Inicializa o mapa com as correções
     
     document.getElementById('exportReportBtn').style.display = 'none';
 
-    // Se houver dados (na primeira execução, não há), chama a atualização
     if (allLotesGeoJSON.features.length > 0) {
         updateSummaryCards(allLotesGeoJSON.features);
         updateNucleoFilter(allLotesGeoJSON.features);
@@ -116,7 +132,6 @@ window.addEventListener('load', () => {
 
 function getStyleForRisco(feature, type = 'lotes') {
     if (type === 'lotes') {
-        // Usa GRAU_RISCO como chave (padrão 1 a 4)
         const riskGrade = String(feature.properties.GRAU_RISCO) || 'NA'; 
         const colorData = RISK_GRADES_CONFIG[riskGrade] || RISK_GRADES_CONFIG['NA'];
 
@@ -163,7 +178,7 @@ function onEachFeature(feature, layer) {
 }
 
 // ----------------------------------------------------
-// 4. Lógica de Reprojeção (UTM) - Mantida para manter a compatibilidade com reprojeção
+// 4. Lógica de Reprojeção (UTM) - MANTIDA
 function convertUtmToWgs84(easting, northing, utmZone) {
     const zoneNum = utmZone.slice(0, -1);
     const projDef = `+proj=utm +zone=${zoneNum} +${utmZone.endsWith('s') ? 'south' : 'north'} +ellps=GRS80 +units=m +no_defs`;
@@ -293,6 +308,8 @@ function applyFilters() {
     
     // 4. Atualiza os cards com as novas estatísticas filtradas
     updateSummaryCards(filteredLotesFeatures);
+    // Atualiza a tabela de dados com os lotes filtrados
+    populateDataTable(filteredLotesFeatures);
 }
 
 function renderLotesLayer(featuresToRender) {
@@ -354,8 +371,10 @@ function updateMapLayers(type) {
 
 function updateNucleoFilter(features) {
     const nucleoSelect = document.getElementById('nucleo-filter');
+    // Mapeia para NUCLEO ou 'N/A' e filtra 'N/A' se não tiver valor
     const nucleos = new Set(features.map(f => f.properties.NUCLEO || 'N/A').filter(n => n !== 'N/A'));
     
+    // Mantém apenas a primeira opção ("Todos")
     const currentOptions = nucleoSelect.options[0].outerHTML;
     nucleoSelect.innerHTML = currentOptions; 
     
@@ -368,14 +387,17 @@ function updateLayerControl() {
     const mainList = document.getElementById('main-layer-list');
     mainList.innerHTML = ''; 
     
-    if (allLotesGeoJSON.features.length > 0) {
+    // Se o lotesLayer for nulo, significa que não há dados carregados ou renderizados
+    const isLotesLoaded = allLotesGeoJSON.features.length > 0;
+    
+    if (isLotesLoaded) {
         mainList.innerHTML += `
-            <li class="layer-item" onclick="toggleLayer('lotes', this)">
+            <li class="layer-item">
                 <span class="layer-name">
                     <span class="color-box" style="background-color: #2c3e50;"></span>
                     Lotes (${allLotesGeoJSON.features.length})
                 </span>
-                <input type="checkbox" ${lotesLayer ? 'checked' : ''} disabled>
+                <input type="checkbox" checked disabled>
             </li>
         `;
     }
@@ -415,6 +437,7 @@ function toggleLayer(type, listItem) {
         } else {
             map.addLayer(appLayer);
             checkbox.checked = true;
+            if (lotesLayer) lotesLayer.bringToFront();
         }
     } else if (type === 'poligonais' && poligonaisLayer) {
         if (map.hasLayer(poligonaisLayer)) {
@@ -423,6 +446,7 @@ function toggleLayer(type, listItem) {
         } else {
             map.addLayer(poligonaisLayer);
             checkbox.checked = true;
+            if (lotesLayer) lotesLayer.bringToFront();
         }
     }
 }
@@ -432,9 +456,10 @@ function updateRiskControl(features) {
     const list = document.getElementById('risk-layer-filter');
     list.innerHTML = '';
     
+    // Reset da contagem
     Object.keys(RISK_GRADES_CONFIG).forEach(key => RISK_GRADES_CONFIG[key].count = 0);
 
-    // Contagem baseada em TODOS os lotes carregados (para o total no controle)
+    // Contagem baseada em TODOS os lotes carregados
     allLotesGeoJSON.features.forEach(f => {
         const grade = String(f.properties.GRAU_RISCO) || 'NA';
         if (RISK_GRADES_CONFIG[grade]) {
@@ -475,8 +500,6 @@ function toggleRiskGrade(grade, checkbox) {
 // 8. Atualização dos Cards de Resumo
 
 function updateSummaryCards(features) {
-    document.getElementById('totalLotesCarregados').textContent = allLotesGeoJSON.features.length;
-
     let totalLotesFiltrados = features.length;
     let totalLotesComRisco = 0;
     let totalLotesEmAPP = 0;
@@ -502,8 +525,8 @@ function updateSummaryCards(features) {
         }
     });
     
-    // Atualiza os cards com base nos lotes *filtrados*
-    document.getElementById('totalLotesCarregados').textContent = totalLotesFiltrados; // Mostra os filtrados aqui
+    // Atualiza os cards
+    document.getElementById('totalLotesCarregados').textContent = totalLotesFiltrados; 
     document.getElementById('totalLotesComRisco').textContent = totalLotesComRisco;
     document.getElementById('totalLotesEmAPP').textContent = totalLotesEmAPP;
     document.getElementById('custoEstimadoTotal').textContent = `R$ ${custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -692,7 +715,10 @@ function populateDataTable(features) {
     thead.innerHTML = '';
     tbody.innerHTML = '';
 
-    if (features.length === 0) return;
+    if (features.length === 0) {
+        thead.innerHTML = '<tr><th>Nenhum dado filtrado ou carregado.</th></tr>';
+        return;
+    }
 
     const properties = features[0].properties;
     let headerRow = '<tr>';
