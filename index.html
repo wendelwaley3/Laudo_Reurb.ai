@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-    <link rel="stylesheet" href="css/style.css"> 
+    <link rel="stylesheet" href="style.css"> 
 </head>
 <body>
     <header>
@@ -94,3 +94,125 @@
                     </div>
                     <div id="status-lotes" class="upload-status"></div>
                 </div>
+
+                <div class="upload-group">
+                    <h3>2. Camada APP (Opcional)</h3>
+                    <div class="form-group">
+                        <label for="geojson-app-file">GeoJSON Área de Preservação Permanente (APP):</label>
+                        <input type="file" id="geojson-app-file" accept=".geojson" onchange="handleFileUpload('app')">
+                    </div>
+                     <div class="form-group">
+                        <label for="siga-app-select">Sistema de Referência (Opcional):</label>
+                        <select id="siga-app-select" class="siga-select">
+                            <option value="wgs84">WGS84 (Padrão)</option>
+                            <option value="23s">UTM Zona 23S</option>
+                            <option value="24s">UTM Zona 24S</option>
+                        </select>
+                    </div>
+                    <div id="status-app" class="upload-status"></div>
+                </div>
+
+                <div class="upload-group">
+                    <h3>3. Outras Poligonais (Opcional)</h3>
+                    <div class="form-group">
+                        <label for="geojson-poligonais-file">GeoJSON Outras Poligonais (Infraestrutura, Limites):</label>
+                        <input type="file" id="geojson-poligonais-file" accept=".geojson" onchange="handleFileUpload('poligonais')">
+                    </div>
+                     <div class="form-group">
+                        <label for="siga-poligonais-select">Sistema de Referência (Opcional):</label>
+                        <select id="siga-poligonais-select" class="siga-select">
+                            <option value="wgs84">WGS84 (Padrão)</option>
+                            <option value="23s">UTM Zona 23S</option>
+                            <option value="24s">UTM Zona 24S</option>
+                        </select>
+                    </div>
+                    <div id="status-poligonais" class="upload-status"></div>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="informacoes-gerais" class="content-section">
+            <h2>Informações Gerais do Projeto (Metadados)</h2>
+            <div id="general-info-container">
+                 <p>Nenhum metadado definido. Por favor, carregue os dados de lotes na seção **Upload de Dados**.</p>
+            </div>
+        </section>
+
+        <section id="dados-lotes" class="content-section">
+            <h2>Dados Tabulares dos Lotes</h2>
+            <div class="filter-and-export">
+                <input type="text" id="dataTableFilter" placeholder="Filtrar tabela..." onkeyup="filterDataTable()">
+                <button onclick="exportDataTableToCSV()">Exportar para CSV</button>
+            </div>
+            <div class="table-container">
+                <table id="lotesDataTable" class="data-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="relatorios" class="content-section">
+            <h2>Geração de Relatórios</h2>
+            <div class="report-controls">
+                <button id="generateReportBtn" class="primary-btn">Gerar Relatório de Análise</button>
+                <div id="report-message" class="report-status-msg"></div>
+            </div>
+            
+            <div id="generatedReportContainer" class="report-content-stylized">
+                <h3>Relatório GeoLaudo.AI</h3>
+                <p>Nenhum relatório gerado ainda. Carregue os dados e clique em "Gerar Relatório de Análise".</p>
+
+                <div id="highlight-cards-report" class="summary-cards" style="margin-top: 20px;">
+                    <div class="card max-cost-card">
+                        <span class="card-title">Maior Custo de Intervenção:</span>
+                        <span class="card-value" id="report-max-cost">R$ 0,00</span>
+                        <p class="card-subtitle" id="report-max-cost-info">Lote/ID: N/A</p>
+                    </div>
+                     <div class="card min-cost-card">
+                        <span class="card-title">Menor Custo de Intervenção:</span>
+                        <span class="card-value" id="report-min-cost">R$ 0,00</span>
+                        <p class="card-subtitle" id="report-min-cost-info">Lote/ID: N/A</p>
+                    </div>
+                </div>
+
+                <div class="chart-container" style="max-width: 600px; margin: 30px auto;">
+                    <h4>Distribuição de Lotes por Grau de Risco</h4>
+                    <canvas id="riskChartReport"></canvas>
+                </div>
+                
+                <div class="report-text-container">
+                    <h4>Análise Detalhada (Texto)</h4>
+                    <pre id="generatedReportContent" class="report-text-output">Nenhum relatório gerado ainda.</pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="instrucoes" class="content-section">
+            <h2>Instruções de Uso</h2>
+            <p>O GeoLaudo.AI é uma ferramenta de apoio à análise geoespacial de dados de REURB.</p>
+            <h3>Passos Essenciais:</h3>
+            <ol>
+                <li><strong>Upload de Dados:</strong> Na aba "Upload de Dados", carregue seus arquivos GeoJSON. O arquivo principal deve conter as propriedades **GRAU_RISCO** (1 a 4), **NUCLEO**, **CUSTO** e **LOTE_APP** (SIM/NÃO) para que a análise completa funcione.</li>
+                <li><strong>Dashboard:</strong> Na aba "Dashboard", utilize o filtro de **Núcleo** e o filtro de **Grau de Risco** para visualizar apenas as feições desejadas no mapa.</li>
+                <li><strong>Relatórios:</strong> Acesse a aba "Relatórios" e clique em **Gerar Relatório de Análise** para obter um resumo estatístico e os destaques de custo.</li>
+                <li><strong>Exportar Relatório:</strong> Use o botão "Exportar Relatório" no cabeçalho para baixar o relatório gerado em formato de texto.</li>
+            </ol>
+            <p><strong>Desempenho:</strong> Como este aplicativo funciona totalmente no navegador, o desempenho pode variar dependendo do tamanho e complexidade dos arquivos GeoJSON carregados.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 GeoLaudo.AI. Todos os direitos reservados.</p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.min.js"></script>
+    <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+
+    <script src="app.js"></script>
+</body>
+</html>
