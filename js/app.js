@@ -13,7 +13,7 @@ let poligonaisLayer = null;
 const DEFAULT_CENTER = [-15.7801, -47.9297]; // Centro de Brasília
 
 // ----------------------------------------------------
-// Definições de Cores e Níveis de Risco (Grau 1 a 4)
+// Definições de Cores e Níveis de Risco (Grau 1 a 4) - Padrão final
 const RISK_GRADES_CONFIG = {
     '1': { color: '#2ecc71', name: 'Grau 1 (Risco Baixo)', toggle: true, count: 0 },  // Verde
     '2': { color: '#f1c40f', name: 'Grau 2 (Risco Moderado)', toggle: true, count: 0 }, // Amarelo
@@ -22,22 +22,24 @@ const RISK_GRADES_CONFIG = {
     'NA': { color: '#7f8c8d', name: 'Sem Risco Atribuído', toggle: true, count: 0 } // Cinza
 };
 
+
 // ----------------------------------------------------
-// 1. Inicializa o Mapa
+// 1. Inicializa o Mapa (Com ESRI World Street Map)
 function initMap() {
     console.log('initMap: Iniciando mapa...'); 
     
     if (map) map.remove(); 
 
+    // O mapa DEVE ser inicializado APENAS no contêiner com id="mapid"
     map = L.map('mapid').setView(DEFAULT_CENTER, 4);
 
-    // OpenStreetMap - Camada base padrão
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    // ESRI World Street Map (Solicitado pelo usuário)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NGA, and the GIS User Community',
         maxZoom: 19
     }).addTo(map);
 
-    // CHAMADA ESSENCIAL: Garante que o mapa calcule seu tamanho inicial
+    // CORREÇÃO CRUCIAL: Chama invalidateSize na inicialização para garantir que o mapa preencha o container
     map.invalidateSize(); 
 
     updateLayerControl();
@@ -45,6 +47,7 @@ function initMap() {
 
 // ----------------------------------------------------
 // 2. Lógica de Navegação/Abas
+
 function setupTabNavigation() {
     console.log('setupTabNavigation: Configurando navegação por abas.');
     const navLinks = document.querySelectorAll('header nav a');
@@ -55,7 +58,7 @@ function setupTabNavigation() {
             e.preventDefault();
             const targetSectionId = this.getAttribute('data-section');
 
-            // 1. Gerencia as classes ativas
+            // 1. Gerencia as classes ativas (esconde todas e mostra a selecionada)
             navLinks.forEach(l => l.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
             this.classList.add('active');
@@ -67,7 +70,7 @@ function setupTabNavigation() {
 
             // 2. CORREÇÃO ESSENCIAL PARA MAPA CINZA AO TROCAR DE ABA
             if (targetSectionId === 'dashboard' && map) {
-                // Pequeno atraso para garantir que o CSS da aba "active" seja aplicado e a div esteja visível
+                // Necessário um pequeno atraso para o CSS da aba "active" ser aplicado
                 setTimeout(() => {
                     map.invalidateSize(); // Força o mapa a recalcular seu tamanho
                     if (lotesLayer && lotesLayer.getBounds().isValid()) {
@@ -91,7 +94,7 @@ function setupTabNavigation() {
 }
 
 // ----------------------------------------------------
-// INICIALIZAÇÃO PRINCIPAL (garante que o DOM e as bibliotecas estejam prontos)
+// INICIALIZAÇÃO PRINCIPAL (usando window.onload para garantir que os scripts Leaflet e DOM estejam prontos)
 window.addEventListener('load', () => {
     console.log('Window Load: Inicializando GeoLaudo.AI');
     setupTabNavigation();
@@ -99,7 +102,6 @@ window.addEventListener('load', () => {
     
     document.getElementById('exportReportBtn').style.display = 'none';
 
-    // Se houver dados (na primeira execução, não há), chama a atualização
     if (allLotesGeoJSON.features.length > 0) {
         updateSummaryCards(allLotesGeoJSON.features);
         updateNucleoFilter(allLotesGeoJSON.features);
@@ -245,6 +247,7 @@ function handleFileUpload(type) {
                 updateNucleoFilter(allLotesGeoJSON.features);
                 updateRiskControl(allLotesGeoJSON.features);
                 populateDataTable(allLotesGeoJSON.features);
+                applyFilters(); // Aplica filtro para renderizar no mapa
             }
             
 
@@ -326,6 +329,7 @@ function updateMapLayers(type) {
             style: (feature) => getStyleForRisco(feature, 'app'),
             onEachFeature: onEachFeature
         }).addTo(map);
+        // Garante que o Lotes fique por cima, se existir
         if (lotesLayer) lotesLayer.bringToFront();
     } else {
         appLayer = null;
@@ -338,6 +342,7 @@ function updateMapLayers(type) {
             style: (feature) => getStyleForRisco(feature, 'poligonais'),
             onEachFeature: onEachFeature
         }).addTo(map);
+        // Garante que o Lotes fique por cima, se existir
         if (lotesLayer) lotesLayer.bringToFront();
     } else {
         poligonaisLayer = null;
@@ -353,8 +358,9 @@ function updateNucleoFilter(features) {
     const nucleoSelect = document.getElementById('nucleo-filter');
     const nucleos = new Set(features.map(f => f.properties.NUCLEO || 'N/A').filter(n => n !== 'N/A'));
     
-    const currentOptions = nucleoSelect.innerHTML;
-    nucleoSelect.innerHTML = currentOptions.split('</option>')[0] + '</option>'; 
+    // Mantém apenas a primeira opção ("Todos")
+    const currentOptions = nucleoSelect.options[0].outerHTML;
+    nucleoSelect.innerHTML = currentOptions; 
     
     nucleos.forEach(nucleo => {
         nucleoSelect.innerHTML += `<option value="${nucleo}">${nucleo}</option>`;
@@ -431,7 +437,8 @@ function updateRiskControl(features) {
     
     Object.keys(RISK_GRADES_CONFIG).forEach(key => RISK_GRADES_CONFIG[key].count = 0);
 
-    features.forEach(f => {
+    // Contagem baseada em TODOS os lotes carregados
+    allLotesGeoJSON.features.forEach(f => {
         const grade = String(f.properties.GRAU_RISCO) || 'NA';
         if (RISK_GRADES_CONFIG[grade]) {
             RISK_GRADES_CONFIG[grade].count++;
@@ -675,7 +682,7 @@ document.getElementById('generateReportBtn').addEventListener('click', () => {
     
     reportMsg.textContent = 'Relatório gerado com sucesso!';
     document.getElementById('exportReportBtn').style.display = 'inline-block'; 
-}
+});
 
 
 // ----------------------------------------------------
